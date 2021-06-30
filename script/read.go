@@ -2,7 +2,7 @@ package script
 
 import (
 	"encoding/binary"
-	"fmt"
+	"lucascript/utils"
 	"os"
 
 	"github.com/go-restruct/restruct"
@@ -16,41 +16,52 @@ type ScriptFile struct {
 }
 
 type CodeLine struct {
-	Pos       int `struct:"-"`
-	Len       uint16
-	Opcode    uint8
-	InfoFlag  uint8
-	Info      []uint16 `struct:"-"`
-	CodeBytes []byte   `struct:"size=((Len+ 1)& ^1)- 4"`
+	CodeInfo   `struct:"-"`
+	Len        uint16
+	Opcode     uint8
+	FixedFlag  uint8
+	FixedParam []uint16 `struct:"-"`
+	CodeBytes  []byte   `struct:"size=Len - 4"` //`struct:"size=((Len+ 1)& ^1)- 4"`
+	Align      []byte   `struct:"size=Len & 1"`
+}
+
+type CodeInfo struct {
+	Index      int // 序号
+	Pos        int // 文件偏移
+	LabelIndex int // 跳转标记，和Pos关联
 }
 
 func (s *ScriptFile) Read() error {
 
 	data, err := os.ReadFile(s.FileName)
 	if err != nil {
-		fmt.Println("os.ReadFile", err.Error())
+		utils.Log("os.ReadFile", err.Error())
 		return err
 	}
 	err = restruct.Unpack(data, binary.LittleEndian, s)
 	if err != nil {
-		fmt.Println("restruct.Unpack", err.Error())
+		utils.Log("restruct.Unpack", err.Error())
 		// return err
 	}
-	pos := 0
 	s.CodeNum = len(s.Code)
-	for _, code := range s.Code {
+
+	pos := 0
+	// 预处理 FixedParam
+	for i, code := range s.Code {
+		code.Index = i
 		code.Pos = pos
-		pos += (4 + len(code.CodeBytes))
-		if code.InfoFlag > 0 {
-			if code.InfoFlag >= 2 {
-				code.Info = make([]uint16, 2)
-				code.Info[0] = binary.LittleEndian.Uint16(code.CodeBytes[0:2])
-				code.Info[1] = binary.LittleEndian.Uint16(code.CodeBytes[2:4])
+		pos += ((int(code.Len) + 1) & ^1) // 向上对齐2
+		//(4 + len(code.CodeBytes))
+		if code.FixedFlag > 0 {
+			if code.FixedFlag >= 2 {
+				code.FixedParam = make([]uint16, 2)
+				code.FixedParam[0] = binary.LittleEndian.Uint16(code.CodeBytes[0:2])
+				code.FixedParam[1] = binary.LittleEndian.Uint16(code.CodeBytes[2:4])
 				code.CodeBytes = code.CodeBytes[4:]
 
 			} else {
-				code.Info = make([]uint16, 1)
-				code.Info[0] = binary.LittleEndian.Uint16(code.CodeBytes[0:2])
+				code.FixedParam = make([]uint16, 1)
+				code.FixedParam[0] = binary.LittleEndian.Uint16(code.CodeBytes[0:2])
 				code.CodeBytes = code.CodeBytes[2:]
 			}
 		}

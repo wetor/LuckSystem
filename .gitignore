@@ -14,6 +14,6 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 .DS_Store
-data/LB_EN/SCRIPT/SEEN0513.lua
+data/*/SCRIPT/
 lucascript
 main

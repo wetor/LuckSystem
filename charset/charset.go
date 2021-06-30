@@ -25,7 +25,7 @@ const (
 const (
 	EUCJP     Charset = "EUCJP"
 	ISO2022JP Charset = "ISO2022JP"
-	ShiftJIS  Charset = "ShiftJIS"
+	ShiftJIS  Charset = "Shift_JIS"
 )
 
 //韩文
@@ -68,6 +68,7 @@ func Convert(dstCharset Charset, srcCharset Charset, src []byte) (dst string, er
 			tmp, err := ioutil.ReadAll(
 				transform.NewReader(bytes.NewReader(src), e.NewDecoder()),
 			)
+
 			if err != nil {
 				return "", fmt.Errorf("%s to utf8 failed. %v", srcCharset, err)
 			}
