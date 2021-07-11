@@ -2,7 +2,9 @@ package operater
 
 import (
 	"lucascript/charset"
-	"lucascript/script"
+	"lucascript/function"
+	"lucascript/game/context"
+	"lucascript/paramter"
 )
 
 type LB_EN struct {
@@ -18,10 +20,21 @@ func GetLB_EN() Operater {
 	}
 }
 
-func (g *LB_EN) MESSAGE(code *script.CodeLine) string {
-	opcode := "message"
-	voiceId := ToUint16(code.CodeBytes[0:2])
-	jpStr, next := DecodeString(code.CodeBytes, 2, 0, g.TextCharset)
-	enStr, _ := DecodeString(code.CodeBytes, next, 0, g.TextCharset)
-	return ToString(`%d:%s (%d, "%s", "%s")`, code.Pos, opcode, voiceId, jpStr, enStr)
+func (g *LB_EN) MESSAGE(ctx *context.Context) function.HandlerFunc {
+	code := ctx.Code()
+	var voiceId paramter.LUint16
+	var msgStr_jp paramter.LString
+	var msgStr_en paramter.LString
+
+	next := GetParam(code.CodeBytes, &voiceId)
+	next = GetParam(code.CodeBytes, &msgStr_jp, next, 0, g.TextCharset)
+	GetParam(code.CodeBytes, &msgStr_en, next, 0, g.TextCharset)
+
+	fun := function.MESSAGE{}
+	return func() {
+		// 这里是执行内容
+		fun.Call([]paramter.Paramter{&voiceId, &msgStr_jp})
+		fun.Call([]paramter.Paramter{&voiceId, &msgStr_en})
+		ctx.ChanEIP <- 0
+	}
 }

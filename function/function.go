@@ -1,3 +1,5 @@
+// function 模拟器相关
+// 此包内的方法与模拟器相关，负责画面的输出、按键的输入等操作
 package function
 
 import (
@@ -6,7 +8,7 @@ import (
 	"reflect"
 )
 
-type HandlerFunc func() int
+type HandlerFunc func()
 
 type Function interface {
 	Call([]paramter.Paramter) int
@@ -31,6 +33,21 @@ type IFN struct {
 }
 
 func (f *IFN) Call(params []paramter.Paramter) int {
+	if len(params) != 2 {
+		return 0
+	}
+	name := reflect.TypeOf(f).String()[10:] // remove "*function."
+
+	ifExprStr := params[0].Value().(string)
+	jumpPos := params[1].Value().(uint32)
+	utils.Logf("%s %s{goto %d}", name, ifExprStr, jumpPos)
+	return 0 // 向下执行
+}
+
+type IFY struct {
+}
+
+func (f *IFY) Call(params []paramter.Paramter) int {
 	if len(params) != 2 {
 		return 0
 	}
@@ -89,8 +106,5 @@ func (f *JUMP) Call(params []paramter.Paramter) int {
 	fileStr := params[0].Value().(string)
 	jumpPos := params[1].Value().(uint32)
 	utils.Logf("%s {goto \"%s\", %d}", name, fileStr, jumpPos)
-	if false {
-		return int(jumpPos)
-	}
 	return 0 // 向下执行
 }

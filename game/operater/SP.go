@@ -2,7 +2,9 @@ package operater
 
 import (
 	"lucascript/charset"
-	"lucascript/script"
+	"lucascript/function"
+	"lucascript/game/context"
+	"lucascript/paramter"
 )
 
 type SP struct {
@@ -18,11 +20,21 @@ func GetSP() Operater {
 	}
 }
 
-func (g *SP) MESSAGE(code *script.CodeLine) string {
-	opcode := "message"
-	voiceId := ToUint16(code.CodeBytes[0:2])
-	jpStrLen := ToUint16(code.CodeBytes[2:4]) * 2
-	jpStr, next := DecodeString(code.CodeBytes, 4, int(jpStrLen), g.TextCharset)
-	end := ToUint16(code.CodeBytes[next : next+2])
-	return ToString(`%d:%s (%d, "%s", %d)`, code.Pos, opcode, voiceId, jpStr, end)
+func (g *SP) MESSAGE(ctx *context.Context) function.HandlerFunc {
+	code := ctx.Code()
+	var voiceId paramter.LUint16
+	var msgStr paramter.LString
+	var end paramter.LUint16
+
+	next := GetParam(code.CodeBytes, &voiceId)
+	next = GetParam(code.CodeBytes, &msgStr, next, 0, g.TextCharset)
+	GetParam(code.CodeBytes, &end, next)
+
+	fun := function.MESSAGE{}
+	return func() {
+		// 这里是执行内容
+		fun.Call([]paramter.Paramter{&voiceId, &msgStr})
+		ctx.ChanEIP <- 0
+	}
+
 }

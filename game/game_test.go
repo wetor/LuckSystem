@@ -3,7 +3,7 @@ package game
 import (
 	"fmt"
 	"lucascript/charset"
-	"lucascript/operater"
+	"lucascript/game/operater"
 	"testing"
 )
 

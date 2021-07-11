@@ -100,33 +100,26 @@ func (vm *VM) Run() {
 			//continue
 		}
 		operat := reflect.ValueOf(vm.Operate).MethodByName(opname)
-		if !operat.IsValid() {
+		if operat.IsValid() {
+			// 方法已定义，反射调用
+			in = make([]reflect.Value, 1)
+			in[0] = reflect.ValueOf(vm.Context)
+		} else {
 			utils.LogA(vm.CIndex, "Operation不存在", opname)
 			// 方法未定义，调用UNDEFINE
 			operat = reflect.ValueOf(vm.Operate).MethodByName("UNDEFINE")
 			in = make([]reflect.Value, 2)
 			in[0] = reflect.ValueOf(code)
 			in[1] = reflect.ValueOf(opname)
-		} else {
-			// 方法已定义，反射调用
-			in = make([]reflect.Value, 1)
-			in[0] = reflect.ValueOf(code)
-			if opname == "EQU" || opname == "IFN" {
-				in[0] = reflect.ValueOf(vm.Context)
-			}
 		}
-		fun := operat.Call(in) // 反射调用 operater，将CodeBytes解析为参数列表、并返回一个function.HandlerFunc
+		fun := operat.Call(in) // 反射调用 operater，并返回一个function.HandlerFunc
 
 		next := vm.getNextPos() // 取得下一句位置
 		utils.LogTf("Index:%d Position:%d", vm.CIndex, code.Pos)
 		if fun[0].Kind() == reflect.Func {
-			eip := 0
-			if opname == "EQU" || opname == "IFN" {
-				go fun[0].Interface().(function.HandlerFunc)()
-				eip = <-vm.Context.ChanEIP
-			} else {
-				eip = fun[0].Interface().(function.HandlerFunc)() // 调用，默认传递参数列表，取得跳转的位置
-			}
+			go fun[0].Interface().(function.HandlerFunc)() // 调用，默认传递参数列表
+			eip := <-vm.Context.ChanEIP                    // 取得跳转的位置
+
 			if eip > 0 { // 为0则默认下一句
 				next = eip
 			}
