@@ -8,13 +8,6 @@ import (
 	"github.com/go-restruct/restruct"
 )
 
-type ScriptFile struct {
-	FileName string      `struct:"-"`
-	Version  uint8       `struct:"-"`
-	CodeNum  int         `struct:"-"`
-	Code     []*CodeLine `struct:"while=true"`
-}
-
 type CodeLine struct {
 	CodeInfo   `struct:"-"`
 	Len        uint16
@@ -43,11 +36,11 @@ func (s *ScriptFile) Read() error {
 		utils.Log("restruct.Unpack", err.Error())
 		// return err
 	}
-	s.CodeNum = len(s.Code)
+	s.CodeNum = len(s.Codes)
 
 	pos := 0
 	// 预处理 FixedParam
-	for i, code := range s.Code {
+	for i, code := range s.Codes {
 		code.Index = i
 		code.Pos = pos
 		pos += ((int(code.Len) + 1) & ^1) // 向上对齐2

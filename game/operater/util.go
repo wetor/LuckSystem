@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"lucascript/charset"
+	"lucascript/paramter"
 )
 
 // DecodeString 从指定位置读取一个指定编码字符串
@@ -88,4 +89,61 @@ func AllToUint16(data []byte) (list []uint16, end int) {
 		list = append(list, binary.LittleEndian.Uint16(data[i:i+2]))
 	}
 	return list, end
+}
+
+// GetParam 解析一个参数
+//   1.codeBytes 完整的参数字节数据
+//   2.data[0] Paramter类型指针
+//   3.data[1] 可空，默认0。当前参数开始位置
+//   4.data[2] 可空，默认对于Paramter类型长度。当前参数字节长度
+//   5.data[3] 可空，默认Unicode。LString类型编码
+//   return start+size，即下个参数的start
+func GetParam(codeBytes []byte, data ...interface{}) int {
+	var start, size int
+	var coding charset.Charset
+	if len(data) >= 2 {
+		start = data[1].(int)
+	} else {
+		start = 0
+	}
+
+	if len(data) >= 3 {
+		size = data[2].(int)
+	} else {
+		size = 0
+	}
+
+	if len(data) >= 4 {
+		coding = data[3].(charset.Charset)
+	} else {
+		coding = charset.Unicode
+	}
+
+	switch value := data[0].(type) {
+	case *paramter.LUint16:
+		if size == 0 {
+			size = 2
+		}
+		value.Data = ToUint16(codeBytes[start : start+size])
+		return start + size
+	case *paramter.LUint32:
+		if size == 0 {
+			size = 4
+		}
+		value.Data = ToUint32(codeBytes[start : start+size])
+		return start + size
+	case *paramter.LString:
+		tmp, next := DecodeString(codeBytes, start, size, coding)
+		value.Data = tmp
+		value.Charset = coding
+		return next
+	default:
+		if size == 0 {
+			size = 1
+		}
+		data[0] = &paramter.LBytes{
+			Data: codeBytes[start : start+size],
+		}
+		return start + size
+	}
 }
