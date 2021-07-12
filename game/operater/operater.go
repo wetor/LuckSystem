@@ -5,19 +5,22 @@ import (
 	"lucascript/charset"
 	"lucascript/function"
 	"lucascript/game/context"
-	"lucascript/paramter"
+	"lucascript/game/expr"
 	"lucascript/script"
+	"lucascript/utils"
 )
 
 // Operater 需定制指令
 type Operater interface {
 	MESSAGE(ctx *context.Context) function.HandlerFunc
+	SELECT(ctx *context.Context) function.HandlerFunc
 }
 
 // LucaOperater 通用指令
 type LucaOperater interface {
 	UNDEFINE(code *script.CodeLine, opname string) string
 	EQU(ctx *context.Context) function.HandlerFunc
+	EQUN(ctx *context.Context) function.HandlerFunc
 	// ADD(code *script.CodeLine) string
 	IFN(ctx *context.Context) function.HandlerFunc
 	IFY(ctx *context.Context) function.HandlerFunc
@@ -52,8 +55,8 @@ func (g *LucaOperate) UNDEFINE(code *script.CodeLine, opcode string) string {
 }
 func (g *LucaOperate) EQU(ctx *context.Context) function.HandlerFunc {
 	code := ctx.Code()
-	var key paramter.LUint16
-	var value paramter.LUint16
+	var key uint16
+	var value uint16
 
 	next := GetParam(code.CodeBytes, &key)
 	GetParam(code.CodeBytes, &value, next)
@@ -61,9 +64,41 @@ func (g *LucaOperate) EQU(ctx *context.Context) function.HandlerFunc {
 	fun := function.EQU{}
 	return func() {
 		// 这里是执行 与虚拟机逻辑有关的代码
-		ctx.Variable.Set(ToString("#%d", key.Data), int(value.Data))
+		var keyStr string
+		if key <= 1 {
+			keyStr = ToString("%d", key)
+		} else {
+			keyStr = ToString("#%d", key)
+		}
+		ctx.Variable.Set(keyStr, int(value))
 		// 这里执行与游戏相关代码，内部与虚拟机无关联
-		fun.Call([]paramter.Paramter{&key, &value})
+		fun.Call(key, value)
+		// 下一步执行地址，为0则表示紧接着向下
+		ctx.ChanEIP <- 0
+	}
+}
+
+// EQUN 等价于EQU
+func (g *LucaOperate) EQUN(ctx *context.Context) function.HandlerFunc {
+	code := ctx.Code()
+	var key uint16
+	var value uint16
+
+	next := GetParam(code.CodeBytes, &key)
+	GetParam(code.CodeBytes, &value, next)
+
+	fun := function.EQUN{}
+	return func() {
+		// 这里是执行 与虚拟机逻辑有关的代码
+		var keyStr string
+		if key <= 1 {
+			keyStr = ToString("%d", key)
+		} else {
+			keyStr = ToString("#%d", key)
+		}
+		ctx.Variable.Set(keyStr, int(value))
+		// 这里执行与游戏相关代码，内部与虚拟机无关联
+		fun.Call(key, value)
 		// 下一步执行地址，为0则表示紧接着向下
 		ctx.ChanEIP <- 0
 	}
@@ -78,8 +113,8 @@ func (g *LucaOperate) EQU(ctx *context.Context) function.HandlerFunc {
 
 func (g *LucaOperate) IFN(ctx *context.Context) function.HandlerFunc {
 	code := ctx.Code()
-	var jumpPos paramter.LUint32
-	var exprStr paramter.LString
+	var jumpPos uint32
+	var exprStr string
 	next := GetParam(code.CodeBytes, &exprStr, 0, 0, g.ExprCharset)
 	GetParam(code.CodeBytes, &jumpPos, next, 4)
 
@@ -87,19 +122,24 @@ func (g *LucaOperate) IFN(ctx *context.Context) function.HandlerFunc {
 	return func() {
 		// 这里是执行 与虚拟机逻辑有关的代码
 		eip := 0
-		res := true // res:=expr(ifExprStr)
+
+		res, err := expr.RunExpr(exprStr, ctx.Variable.ValueMap)
+		if err != nil {
+			panic(err)
+		}
 		if !res {
-			eip = 0
+			utils.Logf("IFN %s => %d", exprStr, !res)
+			eip = int(jumpPos)
 		}
 		// 这里执行与游戏相关代码，内部与虚拟机无关联
-		fun.Call([]paramter.Paramter{&exprStr, &jumpPos})
+		fun.Call(exprStr, jumpPos)
 		ctx.ChanEIP <- eip
 	}
 }
 func (g *LucaOperate) IFY(ctx *context.Context) function.HandlerFunc {
 	code := ctx.Code()
-	var jumpPos paramter.LUint32
-	var exprStr paramter.LString
+	var jumpPos uint32
+	var exprStr string
 	next := GetParam(code.CodeBytes, &exprStr, 0, 0, g.ExprCharset)
 	GetParam(code.CodeBytes, &jumpPos, next, 4)
 
@@ -112,15 +152,15 @@ func (g *LucaOperate) IFY(ctx *context.Context) function.HandlerFunc {
 			eip = 0
 		}
 		// 这里执行与游戏相关代码，内部与虚拟机无关联
-		fun.Call([]paramter.Paramter{&exprStr, &jumpPos})
+		fun.Call(exprStr, jumpPos)
 		ctx.ChanEIP <- eip
 	}
 }
 func (g *LucaOperate) FARCALL(ctx *context.Context) function.HandlerFunc {
 	code := ctx.Code()
-	var index paramter.LUint16
-	var fileStr paramter.LString
-	var jumpPos paramter.LUint32
+	var index uint16
+	var fileStr string
+	var jumpPos uint32
 
 	next := GetParam(code.CodeBytes, &index)
 	next = GetParam(code.CodeBytes, &fileStr, next, 0, g.ExprCharset)
@@ -129,7 +169,7 @@ func (g *LucaOperate) FARCALL(ctx *context.Context) function.HandlerFunc {
 	fun := function.FARCALL{}
 	return func() {
 		// 这里是执行内容
-		fun.Call([]paramter.Paramter{&index, &fileStr, &jumpPos})
+		fun.Call(index, fileStr, jumpPos)
 		ctx.ChanEIP <- 0
 	}
 }
@@ -137,28 +177,28 @@ func (g *LucaOperate) FARCALL(ctx *context.Context) function.HandlerFunc {
 func (g *LucaOperate) GOTO(ctx *context.Context) function.HandlerFunc {
 	code := ctx.Code()
 
-	var jumpPos paramter.LUint32
+	var jumpPos uint32
 	GetParam(code.CodeBytes, &jumpPos)
 
 	fun := function.GOTO{}
 	return func() {
 		// 这里是执行内容
-		fun.Call([]paramter.Paramter{&jumpPos})
+		fun.Call(jumpPos)
 		ctx.ChanEIP <- 0
 	}
 }
 
 func (g *LucaOperate) JUMP(ctx *context.Context) function.HandlerFunc {
 	code := ctx.Code()
-	var jumpPos paramter.LUint32
-	var fileStr paramter.LString
+	var jumpPos uint32
+	var fileStr string
 	next := GetParam(code.CodeBytes, &fileStr, 0, 0, g.ExprCharset)
 	GetParam(code.CodeBytes, &jumpPos, next, 4)
 
 	fun := function.JUMP{}
 	return func() {
 		// 这里是执行内容
-		fun.Call([]paramter.Paramter{&fileStr, &jumpPos})
+		fun.Call(fileStr, jumpPos)
 		ctx.ChanEIP <- 0
 	}
 

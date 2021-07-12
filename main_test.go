@@ -27,7 +27,6 @@ func TestLB_EN(t *testing.T) {
 		fmt.Println(err.Error())
 		panic(err)
 	}
-	fmt.Println(vm.Script.CodeNum)
 	vm.Run()
 	fmt.Println(vm.Context.Variable.ValueMap)
 }
@@ -44,10 +43,11 @@ func TestSP(t *testing.T) {
 	err := vm.LoadOpcode("data/SP/OPCODE.txt")
 	// game := game.NewGame("SP")
 	// err := game.LoadOpcode("data/SP/OPCODE.txt")
-	//game.Debug = true
+	// utils.Debug = utils.DebugNone
 	if err != nil {
 		fmt.Println(err.Error())
 		panic(err)
 	}
 	vm.Run()
+	fmt.Println(vm.Context.Variable.ValueMap)
 }

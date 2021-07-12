@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"lucascript/charset"
-	"lucascript/paramter"
 )
 
 // DecodeString 从指定位置读取一个指定编码字符串
@@ -120,30 +119,28 @@ func GetParam(codeBytes []byte, data ...interface{}) int {
 	}
 
 	switch value := data[0].(type) {
-	case *paramter.LUint16:
+	case *uint16:
 		if size == 0 {
 			size = 2
 		}
-		value.Data = ToUint16(codeBytes[start : start+size])
+		*value = ToUint16(codeBytes[start : start+size])
 		return start + size
-	case *paramter.LUint32:
+	case *uint32:
 		if size == 0 {
 			size = 4
 		}
-		value.Data = ToUint32(codeBytes[start : start+size])
+		*value = ToUint32(codeBytes[start : start+size])
 		return start + size
-	case *paramter.LString:
+	case *string:
 		tmp, next := DecodeString(codeBytes, start, size, coding)
-		value.Data = tmp
-		value.Charset = coding
+		*value = tmp
 		return next
 	default:
 		if size == 0 {
 			size = 1
 		}
-		data[0] = &paramter.LBytes{
-			Data: codeBytes[start : start+size],
-		}
+		tmp := codeBytes[start : start+size]
+		value = &tmp
 		return start + size
 	}
 }

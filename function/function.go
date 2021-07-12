@@ -3,7 +3,6 @@
 package function
 
 import (
-	"lucascript/paramter"
 	"lucascript/utils"
 	"reflect"
 )
@@ -11,20 +10,35 @@ import (
 type HandlerFunc func()
 
 type Function interface {
-	Call([]paramter.Paramter) int
+	Call(...interface{}) int
 }
 
 type EQU struct {
 }
 
-func (f *EQU) Call(params []paramter.Paramter) int {
+func (f *EQU) Call(params ...interface{}) int {
 	if len(params) != 2 {
 		return 0
 	}
 	name := reflect.TypeOf(f).String()[10:] // remove "*function."
 
-	key := params[0].Value().(uint16)
-	value := params[1].Value().(uint16)
+	key := params[0].(uint16)
+	value := params[1].(uint16)
+	utils.Logf("%s #%d = %d", name, key, value)
+	return 0 // 向下执行
+}
+
+type EQUN struct {
+}
+
+func (f *EQUN) Call(params ...interface{}) int {
+	if len(params) != 2 {
+		return 0
+	}
+	name := reflect.TypeOf(f).String()[10:] // remove "*function."
+
+	key := params[0].(uint16)
+	value := params[1].(uint16)
 	utils.Logf("%s #%d = %d", name, key, value)
 	return 0 // 向下执行
 }
@@ -32,14 +46,14 @@ func (f *EQU) Call(params []paramter.Paramter) int {
 type IFN struct {
 }
 
-func (f *IFN) Call(params []paramter.Paramter) int {
+func (f *IFN) Call(params ...interface{}) int {
 	if len(params) != 2 {
 		return 0
 	}
 	name := reflect.TypeOf(f).String()[10:] // remove "*function."
 
-	ifExprStr := params[0].Value().(string)
-	jumpPos := params[1].Value().(uint32)
+	ifExprStr := params[0].(string)
+	jumpPos := params[1].(uint32)
 	utils.Logf("%s %s{goto %d}", name, ifExprStr, jumpPos)
 	return 0 // 向下执行
 }
@@ -47,14 +61,14 @@ func (f *IFN) Call(params []paramter.Paramter) int {
 type IFY struct {
 }
 
-func (f *IFY) Call(params []paramter.Paramter) int {
+func (f *IFY) Call(params ...interface{}) int {
 	if len(params) != 2 {
 		return 0
 	}
 	name := reflect.TypeOf(f).String()[10:] // remove "*function."
 
-	ifExprStr := params[0].Value().(string)
-	jumpPos := params[1].Value().(uint32)
+	ifExprStr := params[0].(string)
+	jumpPos := params[1].(uint32)
 	utils.Logf("%s %s{goto %d}", name, ifExprStr, jumpPos)
 	return 0 // 向下执行
 }
@@ -62,49 +76,44 @@ func (f *IFY) Call(params []paramter.Paramter) int {
 type FARCALL struct {
 }
 
-func (f *FARCALL) Call(params []paramter.Paramter) int {
+func (f *FARCALL) Call(params ...interface{}) int {
 	if len(params) != 3 {
 		return 0
 	}
 	name := reflect.TypeOf(f).String()[10:] // remove "*function."
-	index := params[0].Value().(uint16)
-	fileStr := params[1].Value().(string)
-	jumpPos := params[2].Value().(uint32)
+	index := params[0].(uint16)
+	fileStr := params[1].(string)
+	jumpPos := params[2].(uint32)
 	utils.Logf("%s (%d) {goto \"%s\", %d}", name, index, fileStr, jumpPos)
-	if false {
-		return int(jumpPos)
-	}
 	return 0 // 向下执行
 }
 
 type GOTO struct {
 }
 
-func (f *GOTO) Call(params []paramter.Paramter) int {
+func (f *GOTO) Call(params ...interface{}) int {
 	if len(params) != 1 {
 		return 0
 	}
 	name := reflect.TypeOf(f).String()[10:] // remove "*function."
 
-	jumpPos := params[0].Value().(uint32)
+	jumpPos := params[0].(uint32)
 	utils.Logf("%s %d", name, jumpPos)
-	if false {
-		return int(jumpPos)
-	}
+
 	return 0 // 向下执行
 }
 
 type JUMP struct {
 }
 
-func (f *JUMP) Call(params []paramter.Paramter) int {
+func (f *JUMP) Call(params ...interface{}) int {
 	if len(params) != 2 {
 		return 0
 	}
 	name := reflect.TypeOf(f).String()[10:] // remove "*function."
 
-	fileStr := params[0].Value().(string)
-	jumpPos := params[1].Value().(uint32)
+	fileStr := params[0].(string)
+	jumpPos := params[1].(uint32)
 	utils.Logf("%s {goto \"%s\", %d}", name, fileStr, jumpPos)
 	return 0 // 向下执行
 }

@@ -4,7 +4,6 @@ import (
 	"lucascript/charset"
 	"lucascript/function"
 	"lucascript/game/context"
-	"lucascript/paramter"
 )
 
 type SP struct {
@@ -22,9 +21,9 @@ func GetSP() Operater {
 
 func (g *SP) MESSAGE(ctx *context.Context) function.HandlerFunc {
 	code := ctx.Code()
-	var voiceId paramter.LUint16
-	var msgStr paramter.LString
-	var end paramter.LUint16
+	var voiceId uint16
+	var msgStr string
+	var end uint16
 
 	next := GetParam(code.CodeBytes, &voiceId)
 	next = GetParam(code.CodeBytes, &msgStr, next, 0, g.TextCharset)
@@ -33,8 +32,12 @@ func (g *SP) MESSAGE(ctx *context.Context) function.HandlerFunc {
 	fun := function.MESSAGE{}
 	return func() {
 		// 这里是执行内容
-		fun.Call([]paramter.Paramter{&voiceId, &msgStr})
+		fun.Call(voiceId, msgStr)
 		ctx.ChanEIP <- 0
 	}
 
+}
+func (g *SP) SELECT(ctx *context.Context) function.HandlerFunc {
+
+	return func() {}
 }

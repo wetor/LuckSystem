@@ -19,7 +19,7 @@ func (v *VariableStore) Set(key string, value int) (create bool) {
 	return !has
 }
 
-func (v *VariableStore) Get(key string) (value int, has bool) {
-	value, has = v.ValueMap[key]
+func (v *VariableStore) Get(key string) (int, bool) {
+	value, has := v.ValueMap[key]
 	return value, has
 }
