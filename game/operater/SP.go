@@ -2,8 +2,8 @@ package operater
 
 import (
 	"lucascript/charset"
-	"lucascript/function"
 	"lucascript/game/context"
+	"lucascript/game/engine"
 )
 
 type SP struct {
@@ -19,7 +19,7 @@ func GetSP() Operater {
 	}
 }
 
-func (g *SP) MESSAGE(ctx *context.Context) function.HandlerFunc {
+func (g *SP) MESSAGE(ctx *context.Context) engine.HandlerFunc {
 	code := ctx.Code()
 	var voiceId uint16
 	var msgStr string
@@ -29,15 +29,14 @@ func (g *SP) MESSAGE(ctx *context.Context) function.HandlerFunc {
 	next = GetParam(code.CodeBytes, &msgStr, next, 0, g.TextCharset)
 	GetParam(code.CodeBytes, &end, next)
 
-	fun := function.MESSAGE{}
 	return func() {
 		// 这里是执行内容
-		fun.Call(voiceId, msgStr)
+		ctx.Engine.MESSAGE(voiceId, msgStr)
 		ctx.ChanEIP <- 0
 	}
 
 }
-func (g *SP) SELECT(ctx *context.Context) function.HandlerFunc {
+func (g *SP) SELECT(ctx *context.Context) engine.HandlerFunc {
 
 	return func() {}
 }

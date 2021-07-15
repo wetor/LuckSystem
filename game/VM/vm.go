@@ -2,8 +2,8 @@ package vm
 
 import (
 	"fmt"
-	"lucascript/function"
 	"lucascript/game/context"
+	"lucascript/game/engine"
 	"lucascript/game/operater"
 	"lucascript/game/variable"
 	"lucascript/script"
@@ -36,6 +36,7 @@ func NewVM(script *script.ScriptFile) *VM {
 		vm.Operate = operater.GetSP()
 	}
 	vm.Context = &context.Context{
+		Engine:   &engine.Engine{},
 		KeyPress: make(chan int),
 		ChanEIP:  make(chan int),
 	}
@@ -117,8 +118,8 @@ func (vm *VM) Run() {
 		next := vm.getNextPos() // 取得下一句位置
 		utils.LogTf("Index:%d Position:%d", vm.CIndex, code.Pos)
 		if fun[0].Kind() == reflect.Func {
-			go fun[0].Interface().(function.HandlerFunc)() // 调用，默认传递参数列表
-			eip := <-vm.Context.ChanEIP                    // 取得跳转的位置
+			go fun[0].Interface().(engine.HandlerFunc)() // 调用，默认传递参数列表
+			eip := <-vm.Context.ChanEIP                  // 取得跳转的位置
 
 			if eip > 0 { // 为0则默认下一句
 				next = eip

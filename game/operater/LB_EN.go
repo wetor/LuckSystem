@@ -2,8 +2,8 @@ package operater
 
 import (
 	"lucascript/charset"
-	"lucascript/function"
 	"lucascript/game/context"
+	"lucascript/game/engine"
 	"lucascript/utils"
 )
 
@@ -20,7 +20,7 @@ func GetLB_EN() Operater {
 	}
 }
 
-func (g *LB_EN) MESSAGE(ctx *context.Context) function.HandlerFunc {
+func (g *LB_EN) MESSAGE(ctx *context.Context) engine.HandlerFunc {
 	code := ctx.Code()
 	var voiceId uint16
 	var msgStr_jp string
@@ -30,15 +30,13 @@ func (g *LB_EN) MESSAGE(ctx *context.Context) function.HandlerFunc {
 	next = GetParam(code.CodeBytes, &msgStr_jp, next, 0, g.TextCharset)
 	GetParam(code.CodeBytes, &msgStr_en, next, 0, g.TextCharset)
 
-	fun := function.MESSAGE{}
 	return func() {
 		// 这里是执行内容
-		fun.Call(voiceId, msgStr_jp)
-		fun.Call(voiceId, msgStr_en)
+		ctx.Engine.MESSAGE(voiceId, msgStr_jp)
 		ctx.ChanEIP <- 0
 	}
 }
-func (g *LB_EN) SELECT(ctx *context.Context) function.HandlerFunc {
+func (g *LB_EN) SELECT(ctx *context.Context) engine.HandlerFunc {
 	code := ctx.Code()
 	var varID uint16
 	var var0 uint16
@@ -54,9 +52,9 @@ func (g *LB_EN) SELECT(ctx *context.Context) function.HandlerFunc {
 	next = GetParam(code.CodeBytes, &msgStr_jp, next, 0, g.TextCharset)
 	GetParam(code.CodeBytes, &msgStr_en, next, 0, g.TextCharset)
 
-	fun := function.SELECT{}
 	return func() {
-		selectID := fun.Call(msgStr_jp)
+
+		selectID := ctx.Engine.SELECT(msgStr_jp)
 
 		//fun.Call(&varID, msgStr_en)
 		utils.Logf("SELECT #%d = %d", varID, selectID)

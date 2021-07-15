@@ -3,8 +3,8 @@ package operater
 import (
 	"fmt"
 	"lucascript/charset"
-	"lucascript/function"
 	"lucascript/game/context"
+	"lucascript/game/engine"
 	"lucascript/game/expr"
 	"lucascript/script"
 	"lucascript/utils"
@@ -12,21 +12,21 @@ import (
 
 // Operater 需定制指令
 type Operater interface {
-	MESSAGE(ctx *context.Context) function.HandlerFunc
-	SELECT(ctx *context.Context) function.HandlerFunc
+	MESSAGE(ctx *context.Context) engine.HandlerFunc
+	SELECT(ctx *context.Context) engine.HandlerFunc
 }
 
 // LucaOperater 通用指令
 type LucaOperater interface {
 	UNDEFINE(code *script.CodeLine, opname string) string
-	EQU(ctx *context.Context) function.HandlerFunc
-	EQUN(ctx *context.Context) function.HandlerFunc
+	EQU(ctx *context.Context) engine.HandlerFunc
+	EQUN(ctx *context.Context) engine.HandlerFunc
 	// ADD(code *script.CodeLine) string
-	IFN(ctx *context.Context) function.HandlerFunc
-	IFY(ctx *context.Context) function.HandlerFunc
-	GOTO(ctx *context.Context) function.HandlerFunc
-	JUMP(ctx *context.Context) function.HandlerFunc
-	FARCALL(ctx *context.Context) function.HandlerFunc
+	IFN(ctx *context.Context) engine.HandlerFunc
+	IFY(ctx *context.Context) engine.HandlerFunc
+	GOTO(ctx *context.Context) engine.HandlerFunc
+	JUMP(ctx *context.Context) engine.HandlerFunc
+	FARCALL(ctx *context.Context) engine.HandlerFunc
 }
 
 // LucaOperate 通用指令
@@ -53,7 +53,7 @@ func (g *LucaOperate) UNDEFINE(code *script.CodeLine, opcode string) string {
 	}
 	return ToString(`%s (%s)`, opcode, str)
 }
-func (g *LucaOperate) EQU(ctx *context.Context) function.HandlerFunc {
+func (g *LucaOperate) EQU(ctx *context.Context) engine.HandlerFunc {
 	code := ctx.Code()
 	var key uint16
 	var value uint16
@@ -61,7 +61,6 @@ func (g *LucaOperate) EQU(ctx *context.Context) function.HandlerFunc {
 	next := GetParam(code.CodeBytes, &key)
 	GetParam(code.CodeBytes, &value, next)
 
-	fun := function.EQU{}
 	return func() {
 		// 这里是执行 与虚拟机逻辑有关的代码
 		var keyStr string
@@ -72,14 +71,14 @@ func (g *LucaOperate) EQU(ctx *context.Context) function.HandlerFunc {
 		}
 		ctx.Variable.Set(keyStr, int(value))
 		// 这里执行与游戏相关代码，内部与虚拟机无关联
-		fun.Call(key, value)
+		utils.Logf("EQU #%d = %d", key, value)
 		// 下一步执行地址，为0则表示紧接着向下
 		ctx.ChanEIP <- 0
 	}
 }
 
 // EQUN 等价于EQU
-func (g *LucaOperate) EQUN(ctx *context.Context) function.HandlerFunc {
+func (g *LucaOperate) EQUN(ctx *context.Context) engine.HandlerFunc {
 	code := ctx.Code()
 	var key uint16
 	var value uint16
@@ -87,7 +86,6 @@ func (g *LucaOperate) EQUN(ctx *context.Context) function.HandlerFunc {
 	next := GetParam(code.CodeBytes, &key)
 	GetParam(code.CodeBytes, &value, next)
 
-	fun := function.EQUN{}
 	return func() {
 		// 这里是执行 与虚拟机逻辑有关的代码
 		var keyStr string
@@ -98,7 +96,7 @@ func (g *LucaOperate) EQUN(ctx *context.Context) function.HandlerFunc {
 		}
 		ctx.Variable.Set(keyStr, int(value))
 		// 这里执行与游戏相关代码，内部与虚拟机无关联
-		fun.Call(key, value)
+		utils.Logf("EQUN #%d = %d", key, value)
 		// 下一步执行地址，为0则表示紧接着向下
 		ctx.ChanEIP <- 0
 	}
@@ -111,14 +109,13 @@ func (g *LucaOperate) EQUN(ctx *context.Context) function.HandlerFunc {
 // 	return ToString(`%d:%s (#%d, %s)`, code.Pos, opcode, key, exprStr)
 // }
 
-func (g *LucaOperate) IFN(ctx *context.Context) function.HandlerFunc {
+func (g *LucaOperate) IFN(ctx *context.Context) engine.HandlerFunc {
 	code := ctx.Code()
 	var jumpPos uint32
 	var exprStr string
 	next := GetParam(code.CodeBytes, &exprStr, 0, 0, g.ExprCharset)
 	GetParam(code.CodeBytes, &jumpPos, next, 4)
 
-	fun := function.IFN{}
 	return func() {
 		// 这里是执行 与虚拟机逻辑有关的代码
 		eip := 0
@@ -132,18 +129,17 @@ func (g *LucaOperate) IFN(ctx *context.Context) function.HandlerFunc {
 			eip = int(jumpPos)
 		}
 		// 这里执行与游戏相关代码，内部与虚拟机无关联
-		fun.Call(exprStr, jumpPos)
+		utils.Logf("IFN %s{goto %d}", exprStr, jumpPos)
 		ctx.ChanEIP <- eip
 	}
 }
-func (g *LucaOperate) IFY(ctx *context.Context) function.HandlerFunc {
+func (g *LucaOperate) IFY(ctx *context.Context) engine.HandlerFunc {
 	code := ctx.Code()
 	var jumpPos uint32
 	var exprStr string
 	next := GetParam(code.CodeBytes, &exprStr, 0, 0, g.ExprCharset)
 	GetParam(code.CodeBytes, &jumpPos, next, 4)
 
-	fun := function.IFY{}
 	return func() {
 		// 这里是执行 与虚拟机逻辑有关的代码
 		eip := 0
@@ -152,11 +148,11 @@ func (g *LucaOperate) IFY(ctx *context.Context) function.HandlerFunc {
 			eip = 0
 		}
 		// 这里执行与游戏相关代码，内部与虚拟机无关联
-		fun.Call(exprStr, jumpPos)
+		utils.Logf("IFN %s{goto %d}", exprStr, jumpPos)
 		ctx.ChanEIP <- eip
 	}
 }
-func (g *LucaOperate) FARCALL(ctx *context.Context) function.HandlerFunc {
+func (g *LucaOperate) FARCALL(ctx *context.Context) engine.HandlerFunc {
 	code := ctx.Code()
 	var index uint16
 	var fileStr string
@@ -166,39 +162,37 @@ func (g *LucaOperate) FARCALL(ctx *context.Context) function.HandlerFunc {
 	next = GetParam(code.CodeBytes, &fileStr, next, 0, g.ExprCharset)
 	GetParam(code.CodeBytes, &jumpPos, next)
 
-	fun := function.FARCALL{}
 	return func() {
 		// 这里是执行内容
-		fun.Call(index, fileStr, jumpPos)
+		utils.Logf("FARCALL (%d) {goto \"%s\", %d}", index, fileStr, jumpPos)
+		ctx.Engine.FARCALL(index, fileStr, jumpPos)
 		ctx.ChanEIP <- 0
 	}
 }
 
-func (g *LucaOperate) GOTO(ctx *context.Context) function.HandlerFunc {
+func (g *LucaOperate) GOTO(ctx *context.Context) engine.HandlerFunc {
 	code := ctx.Code()
 
 	var jumpPos uint32
 	GetParam(code.CodeBytes, &jumpPos)
 
-	fun := function.GOTO{}
 	return func() {
 		// 这里是执行内容
-		fun.Call(jumpPos)
 		ctx.ChanEIP <- 0
 	}
 }
 
-func (g *LucaOperate) JUMP(ctx *context.Context) function.HandlerFunc {
+func (g *LucaOperate) JUMP(ctx *context.Context) engine.HandlerFunc {
 	code := ctx.Code()
 	var jumpPos uint32
 	var fileStr string
 	next := GetParam(code.CodeBytes, &fileStr, 0, 0, g.ExprCharset)
 	GetParam(code.CodeBytes, &jumpPos, next, 4)
 
-	fun := function.JUMP{}
 	return func() {
 		// 这里是执行内容
-		fun.Call(fileStr, jumpPos)
+		utils.Logf("JUMP {goto \"%s\", %d}", fileStr, jumpPos)
+		ctx.Engine.JUMP(fileStr, jumpPos)
 		ctx.ChanEIP <- 0
 	}
 

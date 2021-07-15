@@ -1,6 +1,7 @@
 package context
 
 import (
+	"lucascript/game/engine"
 	"lucascript/game/variable"
 	"lucascript/script"
 )
@@ -9,6 +10,9 @@ type Context struct {
 	Script *script.ScriptFile
 	// 运行时变量存储
 	Variable *variable.VariableStore
+
+	// 引擎前端
+	Engine *engine.Engine
 	// 当前下标
 	CIndex int
 	// 下一步执行下标
