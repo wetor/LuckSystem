@@ -25,10 +25,10 @@ func (g *SP) MESSAGE(ctx *context.Context) engine.HandlerFunc {
 	var msgStr string
 	var end uint16
 
-	next := GetParam(code.CodeBytes, &voiceId)
-	next = GetParam(code.CodeBytes, &msgStr, next, 0, g.TextCharset)
-	GetParam(code.CodeBytes, &end, next)
-
+	next := GetParam(code.ParamBytes, &voiceId)
+	next = GetParam(code.ParamBytes, &msgStr, next, 0, g.TextCharset)
+	GetParam(code.ParamBytes, &end, next)
+	ctx.Script.AddCodeParams(ctx.CIndex, "MESSAGE", voiceId, msgStr)
 	return func() {
 		// 这里是执行内容
 		ctx.Engine.MESSAGE(voiceId, msgStr)

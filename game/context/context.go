@@ -6,6 +6,14 @@ import (
 	"lucascript/script"
 )
 
+type VMRunMode int8
+
+const (
+	VMRun VMRunMode = iota
+	VMRunExport
+	VMRunImport
+)
+
 type Context struct {
 	Script *script.ScriptFile
 	// 运行时变量存储
@@ -22,6 +30,9 @@ type Context struct {
 	KeyPress chan int
 	// 等待阻塞
 	ChanEIP chan int
+
+	// 运行模式
+	RunMode VMRunMode
 }
 
 // Code 获取当前code

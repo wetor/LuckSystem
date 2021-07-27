@@ -26,7 +26,7 @@ type VM struct {
 	EIP int
 }
 
-func NewVM(script *script.ScriptFile) *VM {
+func NewVM(script *script.ScriptFile, mode context.VMRunMode) *VM {
 	vm := &VM{}
 	switch script.GameName {
 	case "LB_EN":
@@ -39,6 +39,7 @@ func NewVM(script *script.ScriptFile) *VM {
 		Engine:   &engine.Engine{},
 		KeyPress: make(chan int),
 		ChanEIP:  make(chan int),
+		RunMode:  mode,
 	}
 	vm.Variable = &variable.VariableStore{}
 	vm.Variable.Init()
@@ -110,7 +111,7 @@ func (vm *VM) Run() {
 			// 方法未定义，调用UNDEFINE
 			operat = reflect.ValueOf(vm.Operate).MethodByName("UNDEFINE")
 			in = make([]reflect.Value, 2)
-			in[0] = reflect.ValueOf(code)
+			in[0] = reflect.ValueOf(vm.Context)
 			in[1] = reflect.ValueOf(opname)
 		}
 		fun := operat.Call(in) // 反射调用 operater，并返回一个function.HandlerFunc
@@ -118,15 +119,15 @@ func (vm *VM) Run() {
 		next := vm.getNextPos() // 取得下一句位置
 		utils.LogTf("Index:%d Position:%d", vm.CIndex, code.Pos)
 		if fun[0].Kind() == reflect.Func {
-			go fun[0].Interface().(engine.HandlerFunc)() // 调用，默认传递参数列表
-			eip := <-vm.Context.ChanEIP                  // 取得跳转的位置
+			eip := 0
+			if vm.RunMode == context.VMRun {
+				go fun[0].Interface().(engine.HandlerFunc)() // 调用，默认传递参数列表
+				eip = <-vm.Context.ChanEIP                   // 取得跳转的位置
+			}
 
 			if eip > 0 { // 为0则默认下一句
 				next = eip
 			}
-		} else {
-			utils.Log(fun[0].String())
-
 		}
 		utils.LogT("\tnext:", next)
 

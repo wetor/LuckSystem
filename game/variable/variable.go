@@ -1,5 +1,7 @@
 package variable
 
+import "lucascript/game/expr"
+
 // VariableStore 储存运行时变量的结构
 type VariableStore struct {
 	ValueMap map[string]int
@@ -9,8 +11,8 @@ func (v *VariableStore) Init() {
 	v.ValueMap = make(map[string]int)
 }
 
-func (v *VariableStore) TestExpr(expr string) bool {
-	return false
+func (v *VariableStore) TestExpr(exprStr string) (bool, error) {
+	return expr.RunExpr(exprStr, v.ValueMap)
 }
 
 func (v *VariableStore) Set(key string, value int) (create bool) {

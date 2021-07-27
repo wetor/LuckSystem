@@ -26,10 +26,10 @@ func (g *LB_EN) MESSAGE(ctx *context.Context) engine.HandlerFunc {
 	var msgStr_jp string
 	var msgStr_en string
 
-	next := GetParam(code.CodeBytes, &voiceId)
-	next = GetParam(code.CodeBytes, &msgStr_jp, next, 0, g.TextCharset)
-	GetParam(code.CodeBytes, &msgStr_en, next, 0, g.TextCharset)
-
+	next := GetParam(code.ParamBytes, &voiceId)
+	next = GetParam(code.ParamBytes, &msgStr_jp, next, 0, g.TextCharset)
+	GetParam(code.ParamBytes, &msgStr_en, next, 0, g.TextCharset)
+	ctx.Script.AddCodeParams(ctx.CIndex, "MESSAGE", voiceId, msgStr_jp, msgStr_en)
 	return func() {
 		// 这里是执行内容
 		ctx.Engine.MESSAGE(voiceId, msgStr_jp)
@@ -45,13 +45,13 @@ func (g *LB_EN) SELECT(ctx *context.Context) engine.HandlerFunc {
 	var msgStr_jp string
 	var msgStr_en string
 
-	next := GetParam(code.CodeBytes, &varID)
-	next = GetParam(code.CodeBytes, &var0, next)
-	next = GetParam(code.CodeBytes, &var1, next)
-	next = GetParam(code.CodeBytes, &var2, next)
-	next = GetParam(code.CodeBytes, &msgStr_jp, next, 0, g.TextCharset)
-	GetParam(code.CodeBytes, &msgStr_en, next, 0, g.TextCharset)
-
+	next := GetParam(code.ParamBytes, &varID)
+	next = GetParam(code.ParamBytes, &var0, next)
+	next = GetParam(code.ParamBytes, &var1, next)
+	next = GetParam(code.ParamBytes, &var2, next)
+	next = GetParam(code.ParamBytes, &msgStr_jp, next, 0, g.TextCharset)
+	GetParam(code.ParamBytes, &msgStr_en, next, 0, g.TextCharset)
+	ctx.Script.AddCodeParams(ctx.CIndex, "SELECT", varID, msgStr_jp, msgStr_en)
 	return func() {
 
 		selectID := ctx.Engine.SELECT(msgStr_jp)
