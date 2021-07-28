@@ -17,14 +17,18 @@ type Operater interface {
 // LucaOperater 通用指令
 type LucaOperater interface {
 	UNDEFINE(ctx *context.Context, opname string) engine.HandlerFunc
+	UNKNOW0(ctx *context.Context) engine.HandlerFunc
 	EQU(ctx *context.Context) engine.HandlerFunc
 	EQUN(ctx *context.Context) engine.HandlerFunc
-	// ADD(code *script.CodeLine) string
+	ADD(ctx *context.Context) engine.HandlerFunc
+	RANDOM(ctx *context.Context) engine.HandlerFunc
 	IFN(ctx *context.Context) engine.HandlerFunc
 	IFY(ctx *context.Context) engine.HandlerFunc
 	GOTO(ctx *context.Context) engine.HandlerFunc
 	JUMP(ctx *context.Context) engine.HandlerFunc
 	FARCALL(ctx *context.Context) engine.HandlerFunc
+
+	MOVE(ctx *context.Context) engine.HandlerFunc
 }
 
 // LucaOperate 通用指令
@@ -50,15 +54,36 @@ func (g *LucaOperate) UNDEFINE(ctx *context.Context, opcode string) engine.Handl
 		ctx.ChanEIP <- 0
 	}
 }
+
+func (g *LucaOperate) UNKNOW0(ctx *context.Context) engine.HandlerFunc {
+	code := ctx.Code()
+	var value uint16
+	var exprStr string
+
+	next := GetParam(code.ParamBytes, &value)
+	GetParam(code.ParamBytes, &exprStr, next, 0, g.ExprCharset)
+	ctx.Script.AddCodeParams(ctx.CIndex, "UNKNOW0", value, exprStr)
+	return func() {
+		// 这里是执行 与虚拟机逻辑有关的代码
+
+		// 下一步执行地址，为0则表示紧接着向下
+		ctx.ChanEIP <- 0
+	}
+}
+
 func (g *LucaOperate) EQU(ctx *context.Context) engine.HandlerFunc {
 	code := ctx.Code()
 	var key uint16
 	var value uint16
 
 	next := GetParam(code.ParamBytes, &key)
-	GetParam(code.ParamBytes, &value, next)
-	// 这里执行与游戏相关代码，内部与虚拟机无关联
-	ctx.Script.AddCodeParams(ctx.CIndex, "EQU", key, value)
+	if next < len(code.ParamBytes) {
+		GetParam(code.ParamBytes, &value, next)
+		ctx.Script.AddCodeParams(ctx.CIndex, "EQU", key, value)
+	} else {
+		ctx.Script.AddCodeParams(ctx.CIndex, "EQU", key)
+	}
+
 	//utils.Logf("EQU #%d = %d", key, value)
 	return func() {
 		// 这里是执行 与虚拟机逻辑有关的代码
@@ -82,9 +107,12 @@ func (g *LucaOperate) EQUN(ctx *context.Context) engine.HandlerFunc {
 	var value uint16
 
 	next := GetParam(code.ParamBytes, &key)
-	GetParam(code.ParamBytes, &value, next)
-	// 这里执行与游戏相关代码，内部与虚拟机无关联
-	ctx.Script.AddCodeParams(ctx.CIndex, "EQUN", key, value)
+	if next < len(code.ParamBytes) {
+		GetParam(code.ParamBytes, &value, next)
+		ctx.Script.AddCodeParams(ctx.CIndex, "EQUN", key, value)
+	} else {
+		ctx.Script.AddCodeParams(ctx.CIndex, "EQUN", key)
+	}
 	return func() {
 		// 这里是执行 与虚拟机逻辑有关的代码
 		var keyStr string
@@ -99,12 +127,38 @@ func (g *LucaOperate) EQUN(ctx *context.Context) engine.HandlerFunc {
 	}
 }
 
-// func (g *LucaOperate) ADD(code *script.CodeLine) string {
-// 	opcode := "add"
-// 	key := ToUint16(code.ParamBytes[0:2])
-// 	exprStr, _ := DecodeString(code.ParamBytes, 2, 0, g.ExprCharset)
-// 	return ToString(`%d:%s (#%d, %s)`, code.Pos, opcode, key, exprStr)
-// }
+func (g *LucaOperate) ADD(ctx *context.Context) engine.HandlerFunc {
+	code := ctx.Code()
+	var value uint16
+	var exprStr string
+
+	next := GetParam(code.ParamBytes, &value)
+	GetParam(code.ParamBytes, &exprStr, next, 0, g.ExprCharset)
+	ctx.Script.AddCodeParams(ctx.CIndex, "ADD", value, exprStr)
+	return func() {
+		// 这里是执行 与虚拟机逻辑有关的代码
+
+		// 下一步执行地址，为0则表示紧接着向下
+		ctx.ChanEIP <- 0
+	}
+}
+func (g *LucaOperate) RANDOM(ctx *context.Context) engine.HandlerFunc {
+	code := ctx.Code()
+	var value uint16
+	var lowerStr string
+	var upperStr string
+
+	next := GetParam(code.ParamBytes, &value)
+	next = GetParam(code.ParamBytes, &lowerStr, next, 0, g.ExprCharset)
+	GetParam(code.ParamBytes, &upperStr, next, 0, g.ExprCharset)
+	ctx.Script.AddCodeParams(ctx.CIndex, "RANDOM", value, lowerStr, upperStr)
+	return func() {
+		// 这里是执行 与虚拟机逻辑有关的代码
+
+		// 下一步执行地址，为0则表示紧接着向下
+		ctx.ChanEIP <- 0
+	}
+}
 
 func (g *LucaOperate) IFN(ctx *context.Context) engine.HandlerFunc {
 	code := ctx.Code()
@@ -198,12 +252,16 @@ func (g *LucaOperate) JUMP(ctx *context.Context) engine.HandlerFunc {
 	var jumpPos uint32
 
 	next := GetParam(code.ParamBytes, &fileStr, 0, 0, g.ExprCharset)
-	GetParam(code.ParamBytes, &jumpPos, next, 4)
+	if next < len(code.ParamBytes) {
+		GetParam(code.ParamBytes, &jumpPos, next, 4)
+		ctx.Script.AddCodeParams(ctx.CIndex, "JUMP", fileStr, jumpPos)
+	} else {
+		ctx.Script.AddCodeParams(ctx.CIndex, "JUMP", fileStr)
+	}
 	// ctx.Script.AddCodeParams(ctx.CIndex, "JUMP", &script.JumpParam{
 	// 	ScriptName: fileStr,
 	// 	Position:   int(jumpPos),
 	// })
-	ctx.Script.AddCodeParams(ctx.CIndex, "JUMP", fileStr, jumpPos)
 	return func() {
 		// 这里是执行内容
 
@@ -211,4 +269,26 @@ func (g *LucaOperate) JUMP(ctx *context.Context) engine.HandlerFunc {
 		ctx.ChanEIP <- 0
 	}
 
+}
+
+func (g *LucaOperate) MOVE(ctx *context.Context) engine.HandlerFunc {
+	code := ctx.Code()
+	var val1 uint8
+	var val2 uint16
+	var val3 uint16
+	var height uint16
+	var width uint16
+
+	next := GetParam(code.ParamBytes, &val1)
+	next = GetParam(code.ParamBytes, &val2, next)
+	next = GetParam(code.ParamBytes, &val3, next)
+	next = GetParam(code.ParamBytes, &height, next)
+	GetParam(code.ParamBytes, &width, next)
+	ctx.Script.AddCodeParams(ctx.CIndex, "MOVE", val1, val2, val3, height, width)
+	return func() {
+		// 这里是执行 与虚拟机逻辑有关的代码
+
+		// 下一步执行地址，为0则表示紧接着向下
+		ctx.ChanEIP <- 0
+	}
 }

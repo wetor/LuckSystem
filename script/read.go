@@ -34,15 +34,18 @@ func (s *ScriptFile) Read() error {
 				code.FixedParam = make([]uint16, 2)
 				code.FixedParam[0] = binary.LittleEndian.Uint16(code.RawBytes[0:2])
 				code.FixedParam[1] = binary.LittleEndian.Uint16(code.RawBytes[2:4])
-				code.ParamBytes = code.RawBytes[4:]
+				code.ParamBytes = make([]byte, len(code.RawBytes)-4)
+				copy(code.ParamBytes, code.RawBytes[4:])
 
 			} else {
 				code.FixedParam = make([]uint16, 1)
 				code.FixedParam[0] = binary.LittleEndian.Uint16(code.RawBytes[0:2])
-				code.ParamBytes = code.RawBytes[2:]
+				code.ParamBytes = make([]byte, len(code.RawBytes)-2)
+				copy(code.ParamBytes, code.RawBytes[2:])
 			}
 		} else {
-			code.ParamBytes = code.RawBytes
+			code.ParamBytes = make([]byte, len(code.RawBytes))
+			copy(code.ParamBytes, code.RawBytes)
 		}
 	}
 	return nil

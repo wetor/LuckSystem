@@ -6,6 +6,8 @@ import (
 	"lucascript/charset"
 )
 
+type lstring string // len + string
+
 // DecodeString 从指定位置读取一个指定编码字符串
 // 以"0x00 0x00"结尾
 //   1.bytes 要读取的字节数据
@@ -119,6 +121,9 @@ func GetParam(codeBytes []byte, data ...interface{}) int {
 	}
 
 	switch value := data[0].(type) {
+	case *uint8:
+		*value = codeBytes[start]
+		return start + 1
 	case *uint16:
 		if size == 0 {
 			size = 2
@@ -135,12 +140,12 @@ func GetParam(codeBytes []byte, data ...interface{}) int {
 		tmp, next := DecodeString(codeBytes, start, size, coding)
 		*value = tmp
 		return next
+	case *lstring:
+		size = int(ToUint16(codeBytes[start:start+2])) * 2
+		tmp, next := DecodeString(codeBytes, start+2, size, coding)
+		*value = lstring(tmp)
+		return next
 	default:
-		if size == 0 {
-			size = 1
-		}
-		tmp := codeBytes[start : start+size]
-		value = &tmp
-		return start + size
+		return start
 	}
 }

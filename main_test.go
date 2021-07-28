@@ -16,11 +16,26 @@ func Test11(t *testing.T) {
 	fmt.Println(strconv.ParseInt("c9", 16, 32))
 }
 
+type lenString string
+
+func Test22(t *testing.T) {
+	var val1 lenString = "test"
+	val2 := "test2"
+	iface := []interface{}{val1, val2}
+	for _, i := range iface {
+		switch val := i.(type) {
+		case string:
+			fmt.Println("string", val)
+		case lenString:
+			fmt.Println("lenString", val)
+		}
+	}
+}
 func TestLB_EN(t *testing.T) {
 	restruct.EnableExprBeta()
 
 	script := script.NewScript(script.ScriptFileOptions{
-		FileName: "data/LB_EN/SCRIPT/SEEN0514",
+		FileName: "data/LB_EN/SCRIPT/SEEN0513",
 		GameName: "LB_EN",
 		Version:  3,
 	})
@@ -34,7 +49,7 @@ func TestLB_EN(t *testing.T) {
 		panic(err)
 	}
 	vm.Run()
-	script.Export("data/LB_EN/SCRIPT/SEEN0514.txt")
+	script.Export("data/LB_EN/TXT/SEEN0513.txt")
 
 }
 
@@ -59,5 +74,5 @@ func TestSP(t *testing.T) {
 	}
 	vm.Run()
 	//fmt.Println(vm.Context.Variable.ValueMap)
-	script.Export("data/SP/SCRIPT/10_日常0729.txt")
+	script.Export("data/SP/TXT/10_日常0729.txt")
 }

@@ -15,5 +15,6 @@
 # vendor/
 .DS_Store
 data/*/SCRIPT/
+data/*/TXT/
 lucascript
 main
