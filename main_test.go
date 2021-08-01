@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	vm "lucascript/game/VM"
-	"lucascript/game/context"
+	"lucascript/game/enum"
 	"lucascript/script"
 	"lucascript/utils"
 	"strconv"
@@ -42,7 +42,7 @@ func TestLB_EN(t *testing.T) {
 
 	script.Read()
 	utils.Debug = utils.DebugNone
-	vm := vm.NewVM(script, context.VMRunExport)
+	vm := vm.NewVM(script, enum.VMRunExport)
 	err := vm.LoadOpcode("data/LB_EN/OPCODE.txt")
 	if err != nil {
 		fmt.Println(err.Error())
@@ -63,7 +63,7 @@ func TestSP(t *testing.T) {
 
 	script.Read()
 	utils.Debug = utils.DebugNone
-	vm := vm.NewVM(script, context.VMRunExport)
+	vm := vm.NewVM(script, enum.VMRunExport)
 	err := vm.LoadOpcode("data/SP/OPCODE.txt")
 	// game := game.NewGame("SP")
 	// err := game.LoadOpcode("data/SP/OPCODE.txt")
@@ -75,4 +75,45 @@ func TestSP(t *testing.T) {
 	vm.Run()
 	//fmt.Println(vm.Context.Variable.ValueMap)
 	script.Export("data/SP/TXT/10_日常0729.txt")
+}
+
+func TestLoadSP(t *testing.T) {
+	restruct.EnableExprBeta()
+	script := script.NewScript(script.ScriptFileOptions{
+		FileName: "data/SP/SCRIPT/10_日常0729",
+		GameName: "SP",
+		Version:  3,
+	})
+
+	script.Read()
+	utils.Debug = utils.DebugNone
+	err := script.Import("data/SP/TXT/10_日常0729.txt")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	vm := vm.NewVM(script, enum.VMRunImport)
+	err = vm.LoadOpcode("data/SP/OPCODE.txt")
+
+	if err != nil {
+		fmt.Println(err.Error())
+		panic(err)
+	}
+	vm.Run()
+}
+
+func foo(data []byte) {
+
+	data = data[0:0]
+	data = append(data, 1)
+	data = append(data, 2)
+	data = append(data, 3)
+	fmt.Printf("%p %d\n", data, len(data))
+}
+func TestFuncName(t *testing.T) {
+	data := make([]byte, 0, 10)
+	data = append(data, 5)
+	data = append(data, 6)
+	foo(data)
+	fmt.Printf("%p %d\n", data, len(data))
 }

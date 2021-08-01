@@ -45,9 +45,9 @@ func (g *LucaOperate) UNDEFINE(ctx *context.Context, opcode string) engine.Handl
 	}
 	list, end := AllToUint16(code.ParamBytes)
 	if end > 0 {
-		ctx.Script.AddCodeParams(ctx.CIndex, opcode, list, code.ParamBytes[end])
+		ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, opcode, list, code.ParamBytes[end])
 	} else {
-		ctx.Script.AddCodeParams(ctx.CIndex, opcode, list)
+		ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, opcode, list)
 	}
 	return func() {
 		// 下一步执行地址，为0则表示紧接着向下
@@ -62,7 +62,7 @@ func (g *LucaOperate) UNKNOW0(ctx *context.Context) engine.HandlerFunc {
 
 	next := GetParam(code.ParamBytes, &value)
 	GetParam(code.ParamBytes, &exprStr, next, 0, g.ExprCharset)
-	ctx.Script.AddCodeParams(ctx.CIndex, "UNKNOW0", value, exprStr)
+	ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), value, exprStr, g.ExprCharset)
 	return func() {
 		// 这里是执行 与虚拟机逻辑有关的代码
 
@@ -79,9 +79,9 @@ func (g *LucaOperate) EQU(ctx *context.Context) engine.HandlerFunc {
 	next := GetParam(code.ParamBytes, &key)
 	if next < len(code.ParamBytes) {
 		GetParam(code.ParamBytes, &value, next)
-		ctx.Script.AddCodeParams(ctx.CIndex, "EQU", key, value)
+		ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), key, value)
 	} else {
-		ctx.Script.AddCodeParams(ctx.CIndex, "EQU", key)
+		ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), key)
 	}
 
 	//utils.Logf("EQU #%d = %d", key, value)
@@ -109,9 +109,9 @@ func (g *LucaOperate) EQUN(ctx *context.Context) engine.HandlerFunc {
 	next := GetParam(code.ParamBytes, &key)
 	if next < len(code.ParamBytes) {
 		GetParam(code.ParamBytes, &value, next)
-		ctx.Script.AddCodeParams(ctx.CIndex, "EQUN", key, value)
+		ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), key, value)
 	} else {
-		ctx.Script.AddCodeParams(ctx.CIndex, "EQUN", key)
+		ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), key)
 	}
 	return func() {
 		// 这里是执行 与虚拟机逻辑有关的代码
@@ -134,7 +134,7 @@ func (g *LucaOperate) ADD(ctx *context.Context) engine.HandlerFunc {
 
 	next := GetParam(code.ParamBytes, &value)
 	GetParam(code.ParamBytes, &exprStr, next, 0, g.ExprCharset)
-	ctx.Script.AddCodeParams(ctx.CIndex, "ADD", value, exprStr)
+	ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), value, exprStr, g.ExprCharset)
 	return func() {
 		// 这里是执行 与虚拟机逻辑有关的代码
 
@@ -151,7 +151,7 @@ func (g *LucaOperate) RANDOM(ctx *context.Context) engine.HandlerFunc {
 	next := GetParam(code.ParamBytes, &value)
 	next = GetParam(code.ParamBytes, &lowerStr, next, 0, g.ExprCharset)
 	GetParam(code.ParamBytes, &upperStr, next, 0, g.ExprCharset)
-	ctx.Script.AddCodeParams(ctx.CIndex, "RANDOM", value, lowerStr, upperStr)
+	ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), value, lowerStr, upperStr, g.ExprCharset)
 	return func() {
 		// 这里是执行 与虚拟机逻辑有关的代码
 
@@ -167,9 +167,9 @@ func (g *LucaOperate) IFN(ctx *context.Context) engine.HandlerFunc {
 
 	next := GetParam(code.ParamBytes, &exprStr, 0, 0, g.ExprCharset)
 	GetParam(code.ParamBytes, &jumpPos, next, 4)
-	ctx.Script.AddCodeParams(ctx.CIndex, "IFN", exprStr, &script.JumpParam{
+	ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), exprStr, &script.JumpParam{
 		Position: int(jumpPos),
-	})
+	}, g.ExprCharset)
 	return func() {
 		// 这里是执行 与虚拟机逻辑有关的代码
 		eip := 0
@@ -194,9 +194,9 @@ func (g *LucaOperate) IFY(ctx *context.Context) engine.HandlerFunc {
 
 	next := GetParam(code.ParamBytes, &exprStr, 0, 0, g.ExprCharset)
 	GetParam(code.ParamBytes, &jumpPos, next, 4)
-	ctx.Script.AddCodeParams(ctx.CIndex, "IFY", exprStr, &script.JumpParam{
+	ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), exprStr, &script.JumpParam{
 		Position: int(jumpPos),
-	})
+	}, g.ExprCharset)
 	return func() {
 		// 这里是执行 与虚拟机逻辑有关的代码
 		eip := 0
@@ -218,12 +218,12 @@ func (g *LucaOperate) FARCALL(ctx *context.Context) engine.HandlerFunc {
 	next := GetParam(code.ParamBytes, &index)
 	next = GetParam(code.ParamBytes, &fileStr, next, 0, g.ExprCharset)
 	GetParam(code.ParamBytes, &jumpPos, next)
-	// ctx.Script.AddCodeParams(ctx.CIndex, "FARCALL", index, &script.JumpParam{
+	// ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), index, &script.JumpParam{
 	// 	ScriptName: fileStr,
 	// 	Position:   int(jumpPos),
 	// })
 	// 文件外跳转
-	ctx.Script.AddCodeParams(ctx.CIndex, "FARCALL", index, fileStr, jumpPos)
+	ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), index, fileStr, jumpPos, g.ExprCharset)
 	return func() {
 		// 这里是执行内容
 
@@ -237,7 +237,7 @@ func (g *LucaOperate) GOTO(ctx *context.Context) engine.HandlerFunc {
 
 	var jumpPos uint32
 	GetParam(code.ParamBytes, &jumpPos)
-	ctx.Script.AddCodeParams(ctx.CIndex, "GOTO", &script.JumpParam{
+	ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), &script.JumpParam{
 		Position: int(jumpPos),
 	})
 	return func() {
@@ -254,11 +254,11 @@ func (g *LucaOperate) JUMP(ctx *context.Context) engine.HandlerFunc {
 	next := GetParam(code.ParamBytes, &fileStr, 0, 0, g.ExprCharset)
 	if next < len(code.ParamBytes) {
 		GetParam(code.ParamBytes, &jumpPos, next, 4)
-		ctx.Script.AddCodeParams(ctx.CIndex, "JUMP", fileStr, jumpPos)
+		ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), fileStr, jumpPos, g.ExprCharset)
 	} else {
-		ctx.Script.AddCodeParams(ctx.CIndex, "JUMP", fileStr)
+		ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), fileStr, g.ExprCharset)
 	}
-	// ctx.Script.AddCodeParams(ctx.CIndex, "JUMP", &script.JumpParam{
+	// ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), &script.JumpParam{
 	// 	ScriptName: fileStr,
 	// 	Position:   int(jumpPos),
 	// })
@@ -284,7 +284,7 @@ func (g *LucaOperate) MOVE(ctx *context.Context) engine.HandlerFunc {
 	next = GetParam(code.ParamBytes, &val3, next)
 	next = GetParam(code.ParamBytes, &height, next)
 	GetParam(code.ParamBytes, &width, next)
-	ctx.Script.AddCodeParams(ctx.CIndex, "MOVE", val1, val2, val3, height, width)
+	ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), val1, val2, val3, height, width)
 	return func() {
 		// 这里是执行 与虚拟机逻辑有关的代码
 

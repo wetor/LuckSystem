@@ -2,16 +2,9 @@ package context
 
 import (
 	"lucascript/game/engine"
+	"lucascript/game/enum"
 	"lucascript/game/variable"
 	"lucascript/script"
-)
-
-type VMRunMode int8
-
-const (
-	VMRun VMRunMode = iota
-	VMRunExport
-	VMRunImport
 )
 
 type Context struct {
@@ -32,7 +25,7 @@ type Context struct {
 	ChanEIP chan int
 
 	// 运行模式
-	RunMode VMRunMode
+	RunMode enum.VMRunMode
 }
 
 // Code 获取当前code

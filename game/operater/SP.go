@@ -4,6 +4,7 @@ import (
 	"lucascript/charset"
 	"lucascript/game/context"
 	"lucascript/game/engine"
+	"lucascript/script"
 	"lucascript/utils"
 )
 
@@ -29,7 +30,11 @@ func (g *SP) MESSAGE(ctx *context.Context) engine.HandlerFunc {
 	next := GetParam(code.ParamBytes, &voiceId)
 	next = GetParam(code.ParamBytes, &msgStr, next, 0, g.TextCharset)
 	GetParam(code.ParamBytes, &end, next)
-	ctx.Script.AddCodeParams(ctx.CIndex, "MESSAGE", voiceId, string(msgStr))
+	ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), voiceId, &script.StringParam{
+		Data:   string(msgStr),
+		Coding: g.TextCharset,
+		HasLen: true,
+	}, end, []bool{true, true, false})
 	return func() {
 		// 这里是执行内容
 		ctx.Engine.MESSAGE(voiceId, msgStr)
@@ -50,7 +55,10 @@ func (g *SP) SELECT(ctx *context.Context) engine.HandlerFunc {
 	next = GetParam(code.ParamBytes, &var1, next)
 	next = GetParam(code.ParamBytes, &var2, next)
 	GetParam(code.ParamBytes, &msgStr, next, 0, g.TextCharset)
-	ctx.Script.AddCodeParams(ctx.CIndex, "SELECT", varID, msgStr)
+	ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), varID, var0, var1, var2, &script.StringParam{
+		Data:   msgStr,
+		Coding: g.TextCharset,
+	}, []bool{true, false, false, false, true})
 	return func() {
 
 		selectID := ctx.Engine.SELECT(msgStr)

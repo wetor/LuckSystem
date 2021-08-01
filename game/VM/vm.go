@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"lucascript/game/context"
 	"lucascript/game/engine"
+	"lucascript/game/enum"
 	"lucascript/game/operater"
 	"lucascript/game/variable"
 	"lucascript/script"
@@ -26,7 +27,7 @@ type VM struct {
 	EIP int
 }
 
-func NewVM(script *script.ScriptFile, mode context.VMRunMode) *VM {
+func NewVM(script *script.ScriptFile, mode enum.VMRunMode) *VM {
 	vm := &VM{}
 	switch script.GameName {
 	case "LB_EN":
@@ -120,7 +121,7 @@ func (vm *VM) Run() {
 		utils.LogTf("Index:%d Position:%d", vm.CIndex, code.Pos)
 		if fun[0].Kind() == reflect.Func {
 			eip := 0
-			if vm.RunMode == context.VMRun {
+			if vm.RunMode == enum.VMRun {
 				go fun[0].Interface().(engine.HandlerFunc)() // 调用，默认传递参数列表
 				eip = <-vm.Context.ChanEIP                   // 取得跳转的位置
 			}

@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"lucascript/charset"
+	"runtime"
+	"strings"
 )
 
 type lstring string // len + string
@@ -62,6 +64,7 @@ func DecodeString(bytes []byte, start, slen int, coding charset.Charset) (string
 	str, _ := charset.ToUTF8(coding, bytes[start:end])
 	return str, end + eofLen
 }
+
 func ToUint8(data byte) uint8 {
 	return uint8(data)
 }
@@ -92,12 +95,12 @@ func AllToUint16(data []byte) (list []uint16, end int) {
 	return list, end
 }
 
-// GetParam 解析一个参数
+// SetParam 参数转为字节
 //   1.codeBytes 完整的参数字节数据
 //   2.data[0] Paramter类型指针
-//   3.data[1] 可空，默认0。当前参数开始位置
-//   4.data[2] 可空，默认对于Paramter类型长度。当前参数字节长度
-//   5.data[3] 可空，默认Unicode。LString类型编码
+//   3.data[1] start 可空，默认0。当前参数开始位置
+//   4.data[2] size 可空，默认对于Paramter类型长度。当前参数字节长度
+//   5.data[3] coding 可空，默认Unicode。LString类型编码
 //   return start+size，即下个参数的start
 func GetParam(codeBytes []byte, data ...interface{}) int {
 	var start, size int
@@ -148,4 +151,12 @@ func GetParam(codeBytes []byte, data ...interface{}) int {
 	default:
 		return start
 	}
+}
+
+func GetOperateName() string {
+	pc := make([]uintptr, 1)
+	runtime.Callers(2, pc)
+	f := runtime.FuncForPC(pc[0])
+	name := f.Name()
+	return name[strings.LastIndex(name, ".")+1:]
 }

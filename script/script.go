@@ -2,10 +2,13 @@ package script
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io"
+	"lucascript/charset"
+	"lucascript/game/enum"
 	"os"
 	"strconv"
-	"strings"
 )
 
 type ScriptFileOptions struct {
@@ -16,6 +19,12 @@ type ScriptFileOptions struct {
 type JumpParam struct {
 	ScriptName string
 	Position   int
+}
+
+type StringParam struct {
+	Data   string
+	Coding charset.Charset
+	HasLen bool
 }
 
 // ScriptFile 从文件中直接读取到的代码结构
@@ -33,6 +42,15 @@ type ScriptInfo struct {
 	CodeNum  int
 }
 
+// 导出逻辑
+// 1.读入脚本文件，解析为[]CodeLine
+// 2.vm运行，解析ParamBytes得到完整参数列表
+// 3.将制定导出参数加入到Params，转为字符串导出
+
+// 导入逻辑
+// 1.读入脚本文件，解析为[]CodeLine
+// 2.解析文本，添加进对应的Params中
+// 3.vm运行，将Params中的参数替换到完整参数列表中，并转为ParamBytes
 type CodeLine struct {
 	CodeInfo   `struct:"-"`  // CodeLine信息
 	FixedParam []uint16      `struct:"-"` // RawBytes数据，根据FixedFlag来解析
@@ -84,7 +102,7 @@ func (e *ScriptEntry) InitEntry() {
 	e.IndexNext = 1
 }
 
-func (e *ScriptEntry) AddExportGotoLabel(codeIndex, pos int) int {
+func (e *ScriptEntry) addExportGotoLabel(codeIndex, pos int) int {
 
 	val, has := e.ELabelMap[pos]
 	if has {
@@ -106,69 +124,114 @@ func NewScript(opt ScriptFileOptions) *ScriptFile {
 	return script
 }
 
-func (s *ScriptFile) AddCodeParams(index int, op string, params ...interface{}) {
-
-	paramList := make([]interface{}, 0, len(params))
-	for i := 0; i < len(params); i++ {
-		switch param := params[i].(type) {
-		case []uint16:
-			for _, val := range param {
-				paramList = append(paramList, val)
+// SetOperateParams 设置需要导出的变量值
+// 若为导入模式，则会校验读取到的参数列表，与导出的变量值，转换类型并且替换为导入参数
+func (s *ScriptFile) SetOperateParams(index int, mode enum.VMRunMode, op string, params ...interface{}) error {
+	paramNum := len(params)
+	var paramsExport []bool // 导出参数列表
+	strCharset := charset.UTF_8
+	if paramNum > 0 {
+		if val, ok := params[paramNum-1].(charset.Charset); ok { // 最后一个参数为编码类型
+			strCharset = val // 编码
+			paramNum--
+		}
+		if val, ok := params[paramNum-1].([]bool); ok { // 最后一个参数为导出列表
+			paramsExport = val // 导出参数列表
+			paramNum--
+		} else {
+			// 默认全部导出
+			paramsExport = make([]bool, paramNum)
+			for i := 0; i < paramNum; i++ {
+				paramsExport[i] = true
 			}
-		case *JumpParam:
-			paramList = append(paramList, param)
-			s.AddExportGotoLabel(index, param.Position)
-		default:
-			paramList = append(paramList, param)
-
 		}
 	}
-	s.Codes[index].Params = paramList
-	s.Codes[index].OpStr = op
+	code := s.Codes[index]
 
-}
-func (s *ScriptFile) ToStringCodeParams(code *CodeLine) string {
-	paramStr := make([]string, 0, len(code.Params))
-	for i := 0; i < len(code.Params); i++ {
-		switch param := code.Params[i].(type) {
-		case []uint16:
-			for _, val := range param {
-				paramStr = append(paramStr, strconv.FormatInt(int64(val), 10))
+	paramList := make([]interface{}, 0, paramNum)
+
+	for i := 0; i < paramNum; i++ {
+		if paramsExport[i] {
+			switch param := params[i].(type) {
+			case []uint16:
+				for _, val := range param {
+					paramList = append(paramList, val)
+				}
+			case *JumpParam:
+				paramList = append(paramList, param)
+				s.addExportGotoLabel(index, param.Position)
+			case *StringParam:
+				paramList = append(paramList, param.Data)
+			default:
+				paramList = append(paramList, param)
 			}
-		case byte:
-			paramStr = append(paramStr, fmt.Sprintf("0x%X", param))
-		case string:
-			paramStr = append(paramStr, `"`+param+`"`)
-		case *JumpParam:
-			if code.GotoIndex > 0 {
-				if len(param.ScriptName) > 0 {
-					paramStr = append(paramStr, fmt.Sprintf(`{goto "%s" label%d}`, param.ScriptName, code.GotoIndex))
-				} else {
-					paramStr = append(paramStr, fmt.Sprintf("{goto label%d}", code.GotoIndex))
+		}
+
+	}
+
+	if mode == enum.VMRunExport {
+		code.Params = paramList
+		code.OpStr = op
+	} else if mode == enum.VMRunImport {
+		// 导入模式
+		if len(paramList) != len(code.Params) {
+			panic("导入参数数量不匹配 " + strconv.Itoa(index))
+		}
+		// 导入数据类型转化
+		for i := 0; i < len(paramList); i++ {
+			switch paramList[i].(type) {
+			case byte:
+				val, _ := strconv.ParseUint(code.Params[i].(string), 16, 8)
+				code.Params[i] = byte(val)
+			case uint16:
+				val, _ := strconv.ParseUint(code.Params[i].(string), 10, 16)
+				code.Params[i] = uint16(val)
+			case uint32:
+				val, _ := strconv.ParseUint(code.Params[i].(string), 10, 16)
+				code.Params[i] = uint32(val)
+			}
+			//fmt.Println(code.OpStr, code.Params[i], paramList[i])
+		}
+
+		// 将导入数据合并为列表
+		allParamList := make([]interface{}, 0, paramNum)
+		pi := 0
+		for i := 0; i < paramNum; i++ {
+			if paramsExport[i] { // 导出标记为true，则替换数据
+				switch param := params[i].(type) {
+				case []uint16:
+					for j := range param {
+						allParamList = append(allParamList, code.Params[pi])
+						pi++
+						_ = j
+					}
+				case *StringParam:
+					param.Data = code.Params[pi].(string)
+					allParamList = append(allParamList, param)
+					pi++
+				default:
+					allParamList = append(allParamList, code.Params[pi])
+					pi++
 				}
 			} else {
-				if len(param.ScriptName) > 0 {
-					paramStr = append(paramStr, fmt.Sprintf(`{goto "%s" %d}`, param.ScriptName, param.Position))
-				} else {
-					paramStr = append(paramStr, fmt.Sprintf("{goto %d}", param.Position))
+				switch param := params[i].(type) {
+				case []uint16:
+					for _, val := range param {
+						allParamList = append(allParamList, val)
+					}
+				case charset.Charset:
+					// 忽略
+				case *StringParam:
+					allParamList = append(allParamList, param)
+				default:
+					allParamList = append(allParamList, param)
 				}
 			}
-		default:
-			paramStr = append(paramStr, fmt.Sprintf("%v", param))
-
 		}
+		// 将完整参数列表转为[]byte
+		CodeParamsToBytes(code, strCharset, allParamList)
 	}
-	str := strings.Join(paramStr, ", ")
-
-	if code.LabelIndex > 0 {
-		return fmt.Sprintf(`label%d: %s (%s)`, code.LabelIndex, code.OpStr, str)
-	} else {
-		return fmt.Sprintf(`%s (%s)`, code.OpStr, str)
-	}
-}
-
-func (s *ScriptFile) ParseCodeParams(index int, codeStr string) {
-
+	return nil
 }
 
 // Export 导出可编辑脚本
@@ -192,20 +255,43 @@ func (s *ScriptFile) Export(file string) error {
 
 	w := bufio.NewWriter(f)
 	for i, code := range s.Codes {
-		str := s.ToStringCodeParams(code)
-		fmt.Println(i, str)
+		str := ToStringCodeParams(code)
 		fmt.Fprintln(w, str)
+
+		fmt.Println(i, str)
 	}
 	return w.Flush()
 
 }
 
 // Import 导入可编辑脚本
-func (s *ScriptFile) Import() {
+func (s *ScriptFile) Import(file string) error {
+	f, err := os.Open(file)
+	if err != nil {
+		return err
+	}
+	r := bufio.NewReader(f)
+	for i, code := range s.Codes {
+		line, err := r.ReadString('\n')
+		if len(line) <= 1 {
+			return errors.New("文本行不能为空 " + strconv.Itoa(i))
+		} else if err == io.EOF {
+			return errors.New("文本行数不匹配 " + strconv.Itoa(i))
+		} else if err != nil {
+			return err
+		}
+		ParseCodeParams(code, line)
 
-}
+		fmt.Print(i)
+		if code.LabelIndex > 0 {
+			fmt.Printf(" label%d:", code.LabelIndex)
+		}
+		fmt.Printf(" %s %v", code.OpStr, code.Params)
+		if code.GotoIndex > 0 {
+			fmt.Printf(" {goto label%d}", code.GotoIndex)
+		}
+		fmt.Print("\n")
 
-// Save 保存为脚本文件
-func (s *ScriptFile) Save() {
-
+	}
+	return nil
 }
