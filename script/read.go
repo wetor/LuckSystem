@@ -2,12 +2,18 @@ package script
 
 import (
 	"encoding/binary"
+	"fmt"
+	"lucascript/pak"
 	"lucascript/utils"
 	"os"
 
 	"github.com/go-restruct/restruct"
 )
 
+func (s *ScriptFile) ReadByEntry(entry *pak.FileEntry) error {
+	s.FileName = entry.Name
+	return s.ReadData(entry.Data)
+}
 func (s *ScriptFile) Read() error {
 
 	data, err := os.ReadFile(s.FileName)
@@ -15,7 +21,12 @@ func (s *ScriptFile) Read() error {
 		utils.Log("os.ReadFile", err.Error())
 		return err
 	}
-	err = restruct.Unpack(data, binary.LittleEndian, s)
+	return s.ReadData(data)
+}
+
+func (s *ScriptFile) ReadData(data []byte) error {
+	fmt.Println(len(data))
+	err := restruct.Unpack(data, binary.LittleEndian, s)
 	if err != nil {
 		utils.Log("restruct.Unpack", err.Error())
 		// return err

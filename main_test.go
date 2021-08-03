@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"lucascript/charset"
 	vm "lucascript/game/VM"
 	"lucascript/game/enum"
+	"lucascript/pak"
 	"lucascript/script"
 	"lucascript/utils"
 	"strconv"
@@ -55,16 +57,31 @@ func TestLB_EN(t *testing.T) {
 
 func TestSP(t *testing.T) {
 	restruct.EnableExprBeta()
+
+	pak := pak.NewPak(&pak.PakFileOptions{
+		FileName: "data/SP/SCRIPT.PAK",
+		Coding:   charset.ShiftJIS,
+	})
+	err := pak.Open()
+	if err != nil {
+		fmt.Println(err)
+	}
+
 	script := script.NewScript(script.ScriptFileOptions{
 		FileName: "data/SP/SCRIPT/10_日常0729",
 		GameName: "SP",
 		Version:  3,
 	})
 
-	script.Read()
+	entry, err := pak.Get("10_日常0730")
+	if err != nil {
+		fmt.Println(err.Error())
+		panic(err)
+	}
+	script.ReadByEntry(entry)
 	utils.Debug = utils.DebugNone
 	vm := vm.NewVM(script, enum.VMRunExport)
-	err := vm.LoadOpcode("data/SP/OPCODE.txt")
+	err = vm.LoadOpcode("data/SP/OPCODE.txt")
 	// game := game.NewGame("SP")
 	// err := game.LoadOpcode("data/SP/OPCODE.txt")
 

@@ -16,5 +16,6 @@
 .DS_Store
 data/*/SCRIPT/
 data/*/TXT/
+data/*/SCRIPT.PAK
 lucascript
 main
