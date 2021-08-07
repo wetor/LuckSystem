@@ -3,8 +3,11 @@ package game
 import (
 	"fmt"
 	"lucascript/charset"
+	"lucascript/game/enum"
 	"lucascript/game/operater"
 	"testing"
+
+	"github.com/go-restruct/restruct"
 )
 
 func TestGame(t *testing.T) {
@@ -22,4 +25,15 @@ func TestGameJIS(t *testing.T) {
 	str, n := operater.DecodeString(by, 0, 0, charset.ShiftJIS)
 	fmt.Println(str, n)
 
+}
+func TestLoadPak(t *testing.T) {
+	restruct.EnableExprBeta()
+	game := NewGame(&GameOptions{
+		GameName:     "SP",
+		Version:      3,
+		ResourcesDir: "../data/SP",
+		Coding:       charset.ShiftJIS,
+		Mode:         enum.VMRun,
+	})
+	game.LoadResources()
 }

@@ -4,6 +4,7 @@ import (
 	"lucascript/charset"
 	"lucascript/game/context"
 	"lucascript/game/engine"
+	"lucascript/script"
 	"lucascript/utils"
 )
 
@@ -25,11 +26,24 @@ func (g *LB_EN) MESSAGE(ctx *context.Context) engine.HandlerFunc {
 	var voiceId uint16
 	var msgStr_jp string
 	var msgStr_en string
+	var end uint8
 
 	next := GetParam(code.ParamBytes, &voiceId)
 	next = GetParam(code.ParamBytes, &msgStr_jp, next, 0, g.TextCharset)
-	GetParam(code.ParamBytes, &msgStr_en, next, 0, g.TextCharset)
-	ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, "MESSAGE", voiceId, msgStr_jp, msgStr_en)
+	next = GetParam(code.ParamBytes, &msgStr_en, next, 0, g.TextCharset)
+	GetParam(code.ParamBytes, &end, next)
+	ctx.Script().SetOperateParams(ctx.CIndex, ctx.RunMode,
+		voiceId,
+		&script.StringParam{
+			Data:   msgStr_jp,
+			Coding: g.TextCharset,
+		}, &script.StringParam{
+			Data:   msgStr_en,
+			Coding: g.TextCharset,
+		},
+		end,
+		[]bool{true, true, true, false},
+	)
 	return func() {
 		// 这里是执行内容
 		ctx.Engine.MESSAGE(voiceId, msgStr_jp)
@@ -44,14 +58,37 @@ func (g *LB_EN) SELECT(ctx *context.Context) engine.HandlerFunc {
 	var var2 uint16
 	var msgStr_jp string
 	var msgStr_en string
+	var var3 uint16
+	var var4 uint16
+	var var5 uint16
 
 	next := GetParam(code.ParamBytes, &varID)
 	next = GetParam(code.ParamBytes, &var0, next)
 	next = GetParam(code.ParamBytes, &var1, next)
 	next = GetParam(code.ParamBytes, &var2, next)
 	next = GetParam(code.ParamBytes, &msgStr_jp, next, 0, g.TextCharset)
-	GetParam(code.ParamBytes, &msgStr_en, next, 0, g.TextCharset)
-	ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, "SELECT", varID, msgStr_jp, msgStr_en)
+	next = GetParam(code.ParamBytes, &msgStr_en, next, 0, g.TextCharset)
+
+	next = GetParam(code.ParamBytes, &var3, next)
+	next = GetParam(code.ParamBytes, &var4, next)
+	GetParam(code.ParamBytes, &var5, next)
+	ctx.Script().SetOperateParams(ctx.CIndex, ctx.RunMode,
+		varID,
+		var0,
+		var1,
+		var2,
+		&script.StringParam{
+			Data:   msgStr_jp,
+			Coding: g.TextCharset,
+		}, &script.StringParam{
+			Data:   msgStr_en,
+			Coding: g.TextCharset,
+		},
+		var3,
+		var4,
+		var5,
+		[]bool{true, false, false, false, true, true, false, false, false},
+	)
 	return func() {
 
 		selectID := ctx.Engine.SELECT(msgStr_jp)

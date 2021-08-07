@@ -4,8 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"lucascript/charset"
-	"runtime"
-	"strings"
 )
 
 type lstring string // len + string
@@ -151,12 +149,4 @@ func GetParam(codeBytes []byte, data ...interface{}) int {
 	default:
 		return start
 	}
-}
-
-func GetOperateName() string {
-	pc := make([]uintptr, 1)
-	runtime.Callers(2, pc)
-	f := runtime.FuncForPC(pc[0])
-	name := f.Name()
-	return name[strings.LastIndex(name, ".")+1:]
 }

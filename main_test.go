@@ -36,8 +36,8 @@ func Test22(t *testing.T) {
 func TestLB_EN(t *testing.T) {
 	restruct.EnableExprBeta()
 
-	script := script.NewScript(script.ScriptFileOptions{
-		FileName: "data/LB_EN/SCRIPT/SEEN0513",
+	script := script.NewScriptFile(script.ScriptFileOptions{
+		FileName: "data/LB_EN/SCRIPT/SEEN0514",
 		GameName: "LB_EN",
 		Version:  3,
 	})
@@ -51,10 +51,38 @@ func TestLB_EN(t *testing.T) {
 		panic(err)
 	}
 	vm.Run()
-	script.Export("data/LB_EN/TXT/SEEN0513.txt")
+	script.Export("data/LB_EN/TXT/SEEN0514.txt")
 
 }
 
+func TestLoadLB_EN(t *testing.T) {
+	restruct.EnableExprBeta()
+	script := script.NewScriptFile(script.ScriptFileOptions{
+		FileName: "data/LB_EN/SCRIPT/SEEN0514",
+		GameName: "LB_EN",
+		Version:  3,
+	})
+
+	script.Read()
+	utils.Debug = utils.DebugNone
+	err := script.Import("data/LB_EN/TXT/SEEN0514.txt")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	vm := vm.NewVM(script, enum.VMRunImport)
+	err = vm.LoadOpcode("data/LB_EN/OPCODE.txt")
+
+	if err != nil {
+		fmt.Println(err.Error())
+		panic(err)
+	}
+	vm.Run()
+	err = script.Write()
+	if err != nil {
+		fmt.Println(err)
+	}
+}
 func TestSP(t *testing.T) {
 	restruct.EnableExprBeta()
 
@@ -67,18 +95,19 @@ func TestSP(t *testing.T) {
 		fmt.Println(err)
 	}
 
-	script := script.NewScript(script.ScriptFileOptions{
+	script := script.NewScriptFile(script.ScriptFileOptions{
 		FileName: "data/SP/SCRIPT/10_日常0729",
 		GameName: "SP",
 		Version:  3,
 	})
 
-	entry, err := pak.Get("10_日常0730")
-	if err != nil {
-		fmt.Println(err.Error())
-		panic(err)
-	}
-	script.ReadByEntry(entry)
+	// entry, err := pak.Get("10_日常0730")
+	// if err != nil {
+	// 	fmt.Println(err.Error())
+	// 	panic(err)
+	// }
+	// script.ReadByEntry(entry)
+	script.Read()
 	utils.Debug = utils.DebugNone
 	vm := vm.NewVM(script, enum.VMRunExport)
 	err = vm.LoadOpcode("data/SP/OPCODE.txt")
@@ -96,7 +125,7 @@ func TestSP(t *testing.T) {
 
 func TestLoadSP(t *testing.T) {
 	restruct.EnableExprBeta()
-	script := script.NewScript(script.ScriptFileOptions{
+	script := script.NewScriptFile(script.ScriptFileOptions{
 		FileName: "data/SP/SCRIPT/10_日常0729",
 		GameName: "SP",
 		Version:  3,
@@ -117,6 +146,10 @@ func TestLoadSP(t *testing.T) {
 		panic(err)
 	}
 	vm.Run()
+	err = script.Write()
+	if err != nil {
+		fmt.Println(err)
+	}
 }
 
 func foo(data []byte) {

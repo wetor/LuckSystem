@@ -8,12 +8,14 @@ import (
 )
 
 type Context struct {
-	Script *script.ScriptFile
+	Scripts map[string]*script.ScriptFile
 	// 运行时变量存储
 	Variable *variable.VariableStore
 
 	// 引擎前端
 	Engine *engine.Engine
+	// 当前脚本名
+	CScriptName string
 	// 当前下标
 	CIndex int
 	// 下一步执行下标
@@ -28,7 +30,12 @@ type Context struct {
 	RunMode enum.VMRunMode
 }
 
+// Script 获取当前script
+func (ctx *Context) Script() *script.ScriptFile {
+	return ctx.Scripts[ctx.CScriptName]
+}
+
 // Code 获取当前code
 func (ctx *Context) Code() *script.CodeLine {
-	return ctx.Script.Codes[ctx.CIndex]
+	return ctx.Scripts[ctx.CScriptName].Codes[ctx.CIndex]
 }

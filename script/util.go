@@ -1,9 +1,8 @@
 package script
 
 import (
-	"bytes"
 	"fmt"
-	"lucascript/charset"
+	"runtime"
 	"strconv"
 	"strings"
 )
@@ -46,18 +45,6 @@ func ToStringCodeParams(code *CodeLine) string {
 	} else {
 		return fmt.Sprintf(`%s (%s)`, code.OpStr, str)
 	}
-}
-
-func CodeParamsToBytes(code *CodeLine, coding charset.Charset, params []interface{}) {
-	buf := &bytes.Buffer{}
-	size := 0
-	for _, param := range params {
-		size += SetParam(buf, param, coding)
-	}
-	//if code.OpStr == "MESSAGE" {
-	fmt.Printf("%v %v\n\t%v %v\n\t%v %v\n", code.OpStr, params, size, buf.Bytes(), len(code.ParamBytes), code.ParamBytes)
-	//}
-
 }
 
 func ParseCodeParams(code *CodeLine, codeStr string) {
@@ -132,4 +119,11 @@ func ParseCodeParams(code *CodeLine, codeStr string) {
 	// }
 	// fmt.Print("\n")
 	// _, _, _ = labelIndex, gotoIndex, params
+}
+func GetOperateName() string {
+	pc := make([]uintptr, 1)
+	runtime.Callers(3, pc)
+	f := runtime.FuncForPC(pc[0])
+	name := f.Name()
+	return name[strings.LastIndex(name, ".")+1:]
 }

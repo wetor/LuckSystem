@@ -27,9 +27,9 @@ type VM struct {
 	EIP int
 }
 
-func NewVM(script *script.ScriptFile, mode enum.VMRunMode) *VM {
+func NewVM(_script *script.ScriptFile, mode enum.VMRunMode) *VM {
 	vm := &VM{}
-	switch script.GameName {
+	switch _script.GameName {
 	case "LB_EN":
 		vm.Operate = operater.GetLB_EN()
 
@@ -38,35 +38,38 @@ func NewVM(script *script.ScriptFile, mode enum.VMRunMode) *VM {
 	}
 	vm.Context = &context.Context{
 		Engine:   &engine.Engine{},
+		Scripts:  make(map[string]*script.ScriptFile),
 		KeyPress: make(chan int),
 		ChanEIP:  make(chan int),
 		RunMode:  mode,
 	}
 	vm.Variable = &variable.VariableStore{}
 	vm.Variable.Init()
-	vm.Script = script
+	vm.CScriptName = _script.Name
+	vm.Scripts[_script.Name] = _script
 	return vm
 }
 
 // 在对EIP修改后调用，查找下一条具体指令，返回指令序号
 func (vm *VM) findCode(oldEIP int) int {
 	index := vm.CIndex
+	_script := vm.Script()
 	if vm.EIP > oldEIP {
 		// 向下查找
-		for index < len(vm.Script.Codes) && vm.Script.Codes[index].Pos < vm.EIP {
+		for index < _script.CodeNum && _script.Codes[index].Pos < vm.EIP {
 			index++
 		}
-		if vm.Script.Codes[index].Pos == vm.EIP {
+		if _script.Codes[index].Pos == vm.EIP {
 			return index
 		} else {
 			panic(fmt.Sprintf("未找到跳转位置 [%d]%d -> %d", vm.CIndex, oldEIP, vm.EIP))
 		}
 	} else if vm.EIP < oldEIP {
 		// 向上查找
-		for index >= 0 && vm.Script.Codes[index].Pos > vm.EIP {
+		for index >= 0 && _script.Codes[index].Pos > vm.EIP {
 			index--
 		}
-		if vm.Script.Codes[index].Pos == vm.EIP {
+		if _script.Codes[index].Pos == vm.EIP {
 			return index
 		} else {
 			panic(fmt.Sprintf("未找到跳转位置 [%d]%d -> %d", vm.CIndex, oldEIP, vm.EIP))
@@ -78,10 +81,10 @@ func (vm *VM) findCode(oldEIP int) int {
 }
 
 func (vm *VM) getNextPos() int {
-	if vm.CIndex+1 >= vm.Script.CodeNum {
+	if vm.CIndex+1 >= vm.Script().CodeNum {
 		return 0
 	} else {
-		return vm.Script.Codes[vm.CIndex+1].Pos
+		return vm.Script().Codes[vm.CIndex+1].Pos
 	}
 
 }
@@ -94,7 +97,7 @@ func (vm *VM) Run() {
 	var code *script.CodeLine
 	for {
 		vm.CIndex = vm.CNext
-		code = vm.Script.Codes[vm.CIndex]
+		code = vm.Script().Codes[vm.CIndex]
 		opname, ok := vm.OpcodeMap[code.Opcode]
 		if !ok {
 			utils.LogA(vm.CIndex, "Opcode不存在", code.Opcode)

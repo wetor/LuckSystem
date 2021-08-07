@@ -64,7 +64,7 @@ func (p *PakFile) Open() error {
 		utils.Log("restruct.Unpack", err.Error())
 		// return err
 	}
-
+	fmt.Println(p.PakHeader)
 	// 读取文件名
 	named := (p.Flags & 512) != 0
 	fmt.Println(p.NameOffset)
@@ -80,7 +80,7 @@ func (p *PakFile) Open() error {
 			if err != nil {
 				return err
 			}
-			fmt.Println(file.Name, file.Offset, file.Length)
+			// fmt.Println(file.Name, file.Offset, file.Length)
 			offset += size + 1
 			size = 0
 

@@ -30,11 +30,16 @@ func (g *SP) MESSAGE(ctx *context.Context) engine.HandlerFunc {
 	next := GetParam(code.ParamBytes, &voiceId)
 	next = GetParam(code.ParamBytes, &msgStr, next, 0, g.TextCharset)
 	GetParam(code.ParamBytes, &end, next)
-	ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), voiceId, &script.StringParam{
-		Data:   string(msgStr),
-		Coding: g.TextCharset,
-		HasLen: true,
-	}, end, []bool{true, true, false})
+	ctx.Script().SetOperateParams(ctx.CIndex, ctx.RunMode,
+		voiceId,
+		&script.StringParam{
+			Data:   string(msgStr),
+			Coding: g.TextCharset,
+			HasLen: true,
+		},
+		end,
+		[]bool{true, true, false},
+	)
 	return func() {
 		// 这里是执行内容
 		ctx.Engine.MESSAGE(voiceId, msgStr)
@@ -48,17 +53,35 @@ func (g *SP) SELECT(ctx *context.Context) engine.HandlerFunc {
 	var var0 uint16
 	var var1 uint16
 	var var2 uint16
-	var msgStr string
+	var msgStr lstring
+	var var3 uint16
+	var var4 uint16
+	var var5 uint16
 
 	next := GetParam(code.ParamBytes, &varID)
 	next = GetParam(code.ParamBytes, &var0, next)
 	next = GetParam(code.ParamBytes, &var1, next)
 	next = GetParam(code.ParamBytes, &var2, next)
-	GetParam(code.ParamBytes, &msgStr, next, 0, g.TextCharset)
-	ctx.Script.SetOperateParams(ctx.CIndex, ctx.RunMode, GetOperateName(), varID, var0, var1, var2, &script.StringParam{
-		Data:   msgStr,
-		Coding: g.TextCharset,
-	}, []bool{true, false, false, false, true})
+	next = GetParam(code.ParamBytes, &msgStr, next, 0, g.TextCharset)
+
+	next = GetParam(code.ParamBytes, &var3, next)
+	next = GetParam(code.ParamBytes, &var4, next)
+	GetParam(code.ParamBytes, &var5, next)
+	ctx.Script().SetOperateParams(ctx.CIndex, ctx.RunMode,
+		varID,
+		var0,
+		var1,
+		var2,
+		&script.StringParam{
+			Data:   string(msgStr),
+			Coding: g.TextCharset,
+			HasLen: true,
+		},
+		var3,
+		var4,
+		var5,
+		[]bool{true, false, false, false, true, false, false, false},
+	)
 	return func() {
 
 		selectID := ctx.Engine.SELECT(msgStr)
