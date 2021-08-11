@@ -12,6 +12,8 @@ import (
 type Operater interface {
 	MESSAGE(ctx *context.Context) engine.HandlerFunc
 	SELECT(ctx *context.Context) engine.HandlerFunc
+
+	IMAGELOAD(ctx *context.Context) engine.HandlerFunc
 }
 
 // LucaOperater 通用指令

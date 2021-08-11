@@ -16,6 +16,8 @@ const (
 	ResImage  = "BG.PAK"
 )
 
+var ScriptBlackList = []string{"_VARNUM", "_CGMODE", "_SCR_LABEL", "_VOICE_PARAM", "_BUILD_COUNT", "_TASK"}
+
 type GameOptions struct {
 	GameName     string
 	Version      uint8
@@ -60,16 +62,28 @@ func NewGame(opt *GameOptions) *Game {
 
 func (g *Game) LoadResources() {
 	var err error
-	for key, pak := range g.Resources {
-		pak.Open()
+
+	for key, p := range g.Resources {
+		p.Open()
 		switch key {
 		case ResScript:
-			for _, entry := range pak.Files {
-				fmt.Println(entry.Name)
-				g.Context.Scripts[entry.Name], err = script.OpenScriptFile(entry)
+			var entry *pak.FileEntry
+			for i := 0; i < int(p.FileCount); i++ {
+				entry, err = p.GetById(i)
 				if err != nil {
 					panic(err)
 				}
+				if !ScriptCanLoad(entry.Name) {
+					fmt.Println("Pass", entry.Name)
+					continue
+				}
+				fmt.Printf("%v %v ", entry.Name, len(entry.Data))
+				scr, err := script.OpenScriptFile(entry)
+				if err != nil {
+					panic(err)
+				}
+				g.Context.Scripts[entry.Name] = scr
+				fmt.Println(scr.CodeNum)
 			}
 		}
 

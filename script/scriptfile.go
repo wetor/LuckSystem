@@ -39,7 +39,7 @@ type StringParam struct {
 type ScriptFile struct {
 	ScriptInfo  `struct:"-"`
 	ScriptEntry `struct:"-"`
-	Codes       []*CodeLine `struct:"while=true"`
+	Codes       []*CodeLine `struct:"while=!_eof"`
 }
 
 type ScriptInfo struct {
@@ -144,6 +144,32 @@ func NewScriptFile(opt ScriptFileOptions) *ScriptFile {
 	script.Version = opt.Version
 	script.InitEntry()
 	return script
+}
+
+func OpenScriptFile(entry *pak.FileEntry) (*ScriptFile, error) {
+
+	script := &ScriptFile{}
+	script.Name = entry.Name
+	err := script.ReadData(entry.Data)
+	if err != nil {
+		return nil, err
+	}
+	return script, nil
+}
+
+func (s *ScriptFile) ReadByEntry(entry *pak.FileEntry) error {
+	s.Name = entry.Name
+	return s.ReadData(entry.Data)
+}
+
+func (s *ScriptFile) Read() error {
+
+	data, err := os.ReadFile(s.FileName)
+	if err != nil {
+		utils.Log("os.ReadFile", err.Error())
+		return err
+	}
+	return s.ReadData(data)
 }
 
 // SetOperateParams 设置需要导入导出的变量数据
@@ -351,37 +377,12 @@ func (s *ScriptFile) Import(file string) error {
 	}
 	return nil
 }
-func OpenScriptFile(entry *pak.FileEntry) (*ScriptFile, error) {
-	script := &ScriptFile{}
-	script.Name = entry.Name
-	err := script.ReadData(entry.Data)
-	if err != nil {
-		return nil, err
-	}
-	return script, nil
-}
-
-// Read
-func (s *ScriptFile) ReadByEntry(entry *pak.FileEntry) error {
-	s.Name = entry.Name
-	return s.ReadData(entry.Data)
-}
-func (s *ScriptFile) Read() error {
-
-	data, err := os.ReadFile(s.FileName)
-	if err != nil {
-		utils.Log("os.ReadFile", err.Error())
-		return err
-	}
-	return s.ReadData(data)
-}
 
 func (s *ScriptFile) ReadData(data []byte) error {
-	fmt.Println(len(data))
+
 	err := restruct.Unpack(data, binary.LittleEndian, s)
 	if err != nil {
-		utils.Log("restruct.Unpack", err.Error())
-		// return err
+		return err
 	}
 	s.CodeNum = len(s.Codes)
 	// s.FormatCodes = make([]string, s.CodeNum)

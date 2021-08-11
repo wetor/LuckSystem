@@ -2,10 +2,8 @@ package main
 
 import (
 	"fmt"
-	"lucascript/charset"
 	vm "lucascript/game/VM"
 	"lucascript/game/enum"
-	"lucascript/pak"
 	"lucascript/script"
 	"lucascript/utils"
 	"strconv"
@@ -37,7 +35,7 @@ func TestLB_EN(t *testing.T) {
 	restruct.EnableExprBeta()
 
 	script := script.NewScriptFile(script.ScriptFileOptions{
-		FileName: "data/LB_EN/SCRIPT/SEEN0514",
+		FileName: "data/LB_EN/SCRIPT/SEEN0513",
 		GameName: "LB_EN",
 		Version:  3,
 	})
@@ -48,10 +46,9 @@ func TestLB_EN(t *testing.T) {
 	err := vm.LoadOpcode("data/LB_EN/OPCODE.txt")
 	if err != nil {
 		fmt.Println(err.Error())
-		panic(err)
 	}
 	vm.Run()
-	script.Export("data/LB_EN/TXT/SEEN0514.txt")
+	script.Export("data/LB_EN/TXT/SEEN0513.txt")
 
 }
 
@@ -86,14 +83,15 @@ func TestLoadLB_EN(t *testing.T) {
 func TestSP(t *testing.T) {
 	restruct.EnableExprBeta()
 
-	pak := pak.NewPak(&pak.PakFileOptions{
-		FileName: "data/SP/SCRIPT.PAK",
-		Coding:   charset.ShiftJIS,
-	})
-	err := pak.Open()
-	if err != nil {
-		fmt.Println(err)
-	}
+	var err error
+	// pak := pak.NewPak(&pak.PakFileOptions{
+	// 	FileName: "data/SP/SCRIPT.PAK",
+	// 	Coding:   charset.ShiftJIS,
+	// })
+	// err = pak.Open()
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
 
 	script := script.NewScriptFile(script.ScriptFileOptions{
 		FileName: "data/SP/SCRIPT/10_日常0729",
@@ -150,20 +148,4 @@ func TestLoadSP(t *testing.T) {
 	if err != nil {
 		fmt.Println(err)
 	}
-}
-
-func foo(data []byte) {
-
-	data = data[0:0]
-	data = append(data, 1)
-	data = append(data, 2)
-	data = append(data, 3)
-	fmt.Printf("%p %d\n", data, len(data))
-}
-func TestFuncName(t *testing.T) {
-	data := make([]byte, 0, 10)
-	data = append(data, 5)
-	data = append(data, 6)
-	foo(data)
-	fmt.Printf("%p %d\n", data, len(data))
 }

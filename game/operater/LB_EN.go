@@ -99,3 +99,41 @@ func (g *LB_EN) SELECT(ctx *context.Context) engine.HandlerFunc {
 		ctx.ChanEIP <- 0
 	}
 }
+
+func (g *LB_EN) IMAGELOAD(ctx *context.Context) engine.HandlerFunc {
+	code := ctx.Code()
+	var mode uint16
+	var imgID uint16
+	var var1 uint16
+	var xPos uint16
+	var yPos uint16
+
+	next := GetParam(code.ParamBytes, &mode)
+	next = GetParam(code.ParamBytes, &imgID, next)
+	if mode == 0 {
+		// 背景
+		ctx.Script().SetOperateParams(ctx.CIndex, ctx.RunMode,
+			mode,
+			imgID,
+		)
+	} else if mode == 1 {
+		// 立绘
+		next = GetParam(code.ParamBytes, &var1, next)
+		next = GetParam(code.ParamBytes, &xPos, next)
+		GetParam(code.ParamBytes, &yPos, next)
+		ctx.Script().SetOperateParams(ctx.CIndex, ctx.RunMode,
+			mode,
+			imgID,
+			var1,
+			xPos,
+			yPos,
+		)
+	}
+
+	return func() {
+		// 这里是执行 与虚拟机逻辑有关的代码
+
+		// 下一步执行地址，为0则表示紧接着向下
+		ctx.ChanEIP <- 0
+	}
+}

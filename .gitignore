@@ -15,7 +15,9 @@
 # vendor/
 .DS_Store
 data/*/SCRIPT/
+data/*/VOICE/
+data/*/IMAGE/
 data/*/TXT/
-data/*/SCRIPT.PAK
+data/*/*.PAK
 lucascript
 main
