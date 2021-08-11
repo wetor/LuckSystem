@@ -2,7 +2,6 @@ package czimage
 
 import (
 	"image"
-	"image/color"
 	"math"
 )
 
@@ -21,23 +20,28 @@ func LineDiff(header *CzHeader, data []byte) image.Image {
 				currLine[x] += preLine[x]
 			}
 		}
-		for x := 0; x < int(header.Width); x++ {
-			if pixelByteCount == 4 {
-				pic.SetRGBA(x, y, color.RGBA{
-					R: currLine[x*pixelByteCount+0],
-					G: currLine[x*pixelByteCount+1],
-					B: currLine[x*pixelByteCount+2],
-					A: currLine[x*pixelByteCount+3],
-				})
-			} else if pixelByteCount == 3 {
-				pic.SetRGBA(x, y, color.RGBA{
-					R: currLine[x*pixelByteCount+0],
-					G: currLine[x*pixelByteCount+1],
-					B: currLine[x*pixelByteCount+2],
-					A: 0xFF,
-				})
-			}
+		if pixelByteCount == 4 {
+			// y*pic.Stride : (y+1)*pic.Stride
+			copy(pic.Pix[i:i+lineByteCount], currLine)
 		}
+
+		// for x := 0; x < int(header.Width); x++ {
+		// 	if pixelByteCount == 4 {
+		// 		pic.SetRGBA(x, y, color.RGBA{
+		// 			R: currLine[x*pixelByteCount+0],
+		// 			G: currLine[x*pixelByteCount+1],
+		// 			B: currLine[x*pixelByteCount+2],
+		// 			A: currLine[x*pixelByteCount+3],
+		// 		})
+		// 	} else if pixelByteCount == 3 {
+		// 		pic.SetRGBA(x, y, color.RGBA{
+		// 			R: currLine[x*pixelByteCount+0],
+		// 			G: currLine[x*pixelByteCount+1],
+		// 			B: currLine[x*pixelByteCount+2],
+		// 			A: 0xFF,
+		// 		})
+		// 	}
+		// }
 		preLine = currLine
 		i += lineByteCount
 	}
