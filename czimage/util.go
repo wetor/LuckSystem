@@ -37,7 +37,7 @@ func Decompress(data []byte) []byte {
 		}
 	}
 
-	fmt.Println(outputInfo)
+	fmt.Println("uncompress info", outputInfo)
 	outputBuf := &bytes.Buffer{}
 	for i := 0; i < int(fileCount); i++ {
 		lzwBuf := make([]int, int(compressedSizeList[i]))

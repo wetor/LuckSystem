@@ -79,3 +79,28 @@ func TestCGPak(t *testing.T) {
 	}
 
 }
+func TestFontPak(t *testing.T) {
+	restruct.EnableExprBeta()
+	pak := NewPak(&PakFileOptions{
+		FileName: "../data/LB_EN/FONT.PAK",
+		Coding:   charset.UTF_8,
+	})
+	err := pak.Open()
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Printf("%v\n", pak.PakHeader)
+	for _, f := range pak.Files {
+		fmt.Println(f.Index, f.Name, f.Offset, f.Length)
+	}
+	// list := []string{"info20", "info24", "明朝24", "明朝20"}
+	// for _, name := range list {
+
+	// 	e, _ := pak.Get(name)
+	// 	f, _ := os.Create("../data/LB_EN/IMAGE/" + e.Name + ".cz1")
+	// 	f.Write(e.Data)
+	// 	f.Close()
+
+	// }
+
+}
