@@ -1,6 +1,6 @@
 package variable
 
-import "lucascript/game/expr"
+import "lucksystem/game/expr"
 
 // VariableStore 储存运行时变量的结构
 type VariableStore struct {

@@ -2,7 +2,7 @@ package voice
 
 import (
 	"encoding/binary"
-	"lucascript/utils"
+	"lucksystem/utils"
 
 	"github.com/go-restruct/restruct"
 )

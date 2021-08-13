@@ -1,8 +1,8 @@
 package game
 
 import (
-	"lucascript/charset"
-	"lucascript/game/enum"
+	"lucksystem/charset"
+	"lucksystem/game/enum"
 	"testing"
 
 	"github.com/go-restruct/restruct"

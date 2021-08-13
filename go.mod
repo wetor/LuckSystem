@@ -1,4 +1,4 @@
-module lucascript
+module lucksystem
 
 go 1.16
 

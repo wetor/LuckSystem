@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"lucascript/utils"
+	"lucksystem/utils"
 
 	"github.com/go-restruct/restruct"
 )

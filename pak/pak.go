@@ -3,8 +3,8 @@ package pak
 import (
 	"encoding/binary"
 	"errors"
-	"lucascript/charset"
-	"lucascript/utils"
+	"lucksystem/charset"
+	"lucksystem/utils"
 	"os"
 	"strconv"
 

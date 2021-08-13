@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
-	vm "lucascript/game/VM"
-	"lucascript/game/enum"
-	"lucascript/script"
-	"lucascript/utils"
+	"lucksystem/game/VM"
+	"lucksystem/game/enum"
+	"lucksystem/script"
+	"lucksystem/utils"
 	"strconv"
 	"testing"
 
@@ -42,7 +42,7 @@ func TestLB_EN(t *testing.T) {
 
 	script.Read()
 	utils.Debug = utils.DebugNone
-	vm := vm.NewVM(script, enum.VMRunExport)
+	vm := VM.NewVM(script, enum.VMRunExport)
 	err := vm.LoadOpcode("data/LB_EN/OPCODE.txt")
 	if err != nil {
 		fmt.Println(err.Error())
@@ -67,7 +67,7 @@ func TestLoadLB_EN(t *testing.T) {
 		fmt.Println(err)
 	}
 
-	vm := vm.NewVM(script, enum.VMRunImport)
+	vm := VM.NewVM(script, enum.VMRunImport)
 	err = vm.LoadOpcode("data/LB_EN/OPCODE.txt")
 
 	if err != nil {
@@ -107,7 +107,7 @@ func TestSP(t *testing.T) {
 	// script.ReadByEntry(entry)
 	script.Read()
 	utils.Debug = utils.DebugNone
-	vm := vm.NewVM(script, enum.VMRunExport)
+	vm := VM.NewVM(script, enum.VMRunExport)
 	err = vm.LoadOpcode("data/SP/OPCODE.txt")
 	// game := game.NewGame("SP")
 	// err := game.LoadOpcode("data/SP/OPCODE.txt")
@@ -136,7 +136,7 @@ func TestLoadSP(t *testing.T) {
 		fmt.Println(err)
 	}
 
-	vm := vm.NewVM(script, enum.VMRunImport)
+	vm := VM.NewVM(script, enum.VMRunImport)
 	err = vm.LoadOpcode("data/SP/OPCODE.txt")
 
 	if err != nil {

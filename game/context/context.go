@@ -1,10 +1,10 @@
 package context
 
 import (
-	"lucascript/game/engine"
-	"lucascript/game/enum"
-	"lucascript/game/variable"
-	"lucascript/script"
+	"lucksystem/game/engine"
+	"lucksystem/game/enum"
+	"lucksystem/game/variable"
+	"lucksystem/script"
 )
 
 type Context struct {

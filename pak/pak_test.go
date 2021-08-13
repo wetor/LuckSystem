@@ -2,8 +2,8 @@ package pak
 
 import (
 	"fmt"
-	"lucascript/charset"
-	"lucascript/voice"
+	"lucksystem/charset"
+	"lucksystem/voice"
 	"os"
 	"strconv"
 	"testing"

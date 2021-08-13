@@ -2,7 +2,8 @@ package font
 
 import (
 	"encoding/binary"
-	"lucascript/utils"
+	"fmt"
+	"lucksystem/utils"
 
 	"github.com/go-restruct/restruct"
 )
@@ -42,7 +43,7 @@ func LoadFontInfo(data []byte) *FontInfo {
 			info.FontMap[rune(i)] = ch
 		}
 	}
-	// fmt.Println(count)
+	fmt.Println("font info", info.CharNum, len(info.FontMap))
 	return info
 	// for unicode, index := range info.FontMap {
 

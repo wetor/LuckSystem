@@ -2,12 +2,12 @@ package game
 
 import (
 	"fmt"
-	"lucascript/charset"
-	"lucascript/game/context"
-	"lucascript/game/engine"
-	"lucascript/game/enum"
-	"lucascript/pak"
-	"lucascript/script"
+	"lucksystem/charset"
+	"lucksystem/game/context"
+	"lucksystem/game/engine"
+	"lucksystem/game/enum"
+	"lucksystem/pak"
+	"lucksystem/script"
 	"path/filepath"
 )
 

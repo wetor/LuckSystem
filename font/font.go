@@ -3,8 +3,8 @@ package font
 import (
 	"image"
 	"image/draw"
-	"lucascript/czimage"
-	"lucascript/pak"
+	"lucksystem/czimage"
+	"lucksystem/pak"
 	"strconv"
 )
 
@@ -32,28 +32,35 @@ func LoadLucaFont(pak *pak.PakFile, name string, size int) *LucaFont {
 	font.Image = font.CzImage.Get().(*image.RGBA)
 	return font
 }
-func (f *LucaFont) GetCharImage(unicode rune) image.Image {
+func (f *LucaFont) GetCharImage(unicode rune) (image.Image, DrawSize) {
 
-	index, _ := f.Info.Get(unicode)
+	index, draw := f.Info.Get(unicode)
 	size := int(f.Info.CharSize)
 	y := index / 100
 	x := index % 100
-	return f.Image.SubImage(image.Rect(x*size, y*size, (x+1)*size, (y+1)*size))
+	return f.Image.SubImage(image.Rect(x*size, y*size, (x+1)*size, (y+1)*size)), draw
 }
-func (f *LucaFont) GetStringImageList(str string) []image.Image {
+func (f *LucaFont) GetStringImageList(str string) ([]image.Image, []DrawSize) {
 	imgs := make([]image.Image, 0, len(str))
+	draws := make([]DrawSize, 0, len(str))
 	for _, r := range str {
-		imgs = append(imgs, f.GetCharImage(r))
+		img, draw := f.GetCharImage(r)
+		imgs = append(imgs, img)
+		draws = append(draws, draw)
 	}
-	return imgs
+	return imgs, draws
 }
 
 func (f *LucaFont) GetStringImage(str string) image.Image {
 	imgW := int(f.Info.CharSize)
-	imgs := f.GetStringImageList(str)
+	imgs, draws := f.GetStringImageList(str)
 	pic := image.NewRGBA(image.Rect(0, 0, len(imgs)*imgW, imgW))
+	X := 0
 	for i, img := range imgs {
-		draw.Draw(pic, pic.Bounds().Add(image.Pt(i*imgW, 0)), img, img.Bounds().Min, draw.Src)
+
+		draw.Draw(pic, pic.Bounds().Add(image.Pt(X+int(draws[i].X), int(draws[i].Y))), img, img.Bounds().Min, draw.Src)
+		X += int(draws[i].W)
 	}
+	_ = draws
 	return pic
 }

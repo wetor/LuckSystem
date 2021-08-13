@@ -1,14 +1,14 @@
-package vm
+package VM
 
 import (
 	"fmt"
-	"lucascript/game/context"
-	"lucascript/game/engine"
-	"lucascript/game/enum"
-	"lucascript/game/operater"
-	"lucascript/game/variable"
-	"lucascript/script"
-	"lucascript/utils"
+	"lucksystem/game/context"
+	"lucksystem/game/engine"
+	"lucksystem/game/enum"
+	"lucksystem/game/operater"
+	"lucksystem/game/variable"
+	"lucksystem/script"
+	"lucksystem/utils"
 	"os"
 	"reflect"
 	"strings"

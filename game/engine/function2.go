@@ -1,7 +1,7 @@
 package engine
 
 import (
-	"lucascript/utils"
+	"lucksystem/utils"
 	"strings"
 )
 

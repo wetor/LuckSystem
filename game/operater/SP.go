@@ -1,11 +1,11 @@
 package operater
 
 import (
-	"lucascript/charset"
-	"lucascript/game/context"
-	"lucascript/game/engine"
-	"lucascript/script"
-	"lucascript/utils"
+	"lucksystem/charset"
+	"lucksystem/game/context"
+	"lucksystem/game/engine"
+	"lucksystem/script"
+	"lucksystem/utils"
 )
 
 type SP struct {

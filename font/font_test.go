@@ -3,8 +3,8 @@ package font
 import (
 	"fmt"
 	"image/png"
-	"lucascript/charset"
-	"lucascript/pak"
+	"lucksystem/charset"
+	"lucksystem/pak"
 	"os"
 	"testing"
 
@@ -24,8 +24,8 @@ func TestFont(t *testing.T) {
 	}
 	fmt.Println("pak header", pak.PakHeader)
 
-	font := LoadLucaFont(pak, "モダン", 36)
-	img := font.GetStringImage("理樹@「…は？　こんな夜に？　どこで？」")
+	font := LoadLucaFont(pak, "モダン", 32)
+	img := font.GetStringImage("#12ABjgkloa!.理樹@「…は？　こんな夜に？　どこで？」")
 	f, _ := os.Create("../data/LB_EN/IMAGE/str/str.png")
 	png.Encode(f, img)
 	f.Close()

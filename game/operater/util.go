@@ -3,7 +3,7 @@ package operater
 import (
 	"encoding/binary"
 	"fmt"
-	"lucascript/charset"
+	"lucksystem/charset"
 )
 
 type lstring string // len + string

@@ -3,7 +3,7 @@
 package engine
 
 import (
-	"lucascript/utils"
+	"lucksystem/utils"
 )
 
 func (Engine) FARCALL(params ...interface{}) int {
