@@ -6,14 +6,18 @@ import (
 	"lucksystem/game/enum"
 	"lucksystem/script"
 	"lucksystem/utils"
-	"strconv"
 	"testing"
 
 	"github.com/go-restruct/restruct"
 )
 
 func Test11(t *testing.T) {
-	fmt.Println(strconv.ParseInt("c9", 16, 32))
+	var offset uint32 = 33
+	var BlockSize uint32 = 32
+	if offset/BlockSize*BlockSize != offset {
+		offset = (offset/BlockSize + 1) * BlockSize
+	}
+	fmt.Println(offset)
 }
 
 type lenString string
@@ -45,7 +49,7 @@ func TestLB_EN(t *testing.T) {
 	vm := VM.NewVM(script, enum.VMRunExport)
 	err := vm.LoadOpcode("data/LB_EN/OPCODE.txt")
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Println(err)
 	}
 	vm.Run()
 	script.Export("data/LB_EN/TXT/SEEN0513.txt")
@@ -71,7 +75,7 @@ func TestLoadLB_EN(t *testing.T) {
 	err = vm.LoadOpcode("data/LB_EN/OPCODE.txt")
 
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Println(err)
 		panic(err)
 	}
 	vm.Run()
@@ -101,7 +105,7 @@ func TestSP(t *testing.T) {
 
 	// entry, err := pak.Get("10_日常0730")
 	// if err != nil {
-	// 	fmt.Println(err.Error())
+	// 	fmt.Println(err)
 	// 	panic(err)
 	// }
 	// script.ReadByEntry(entry)
@@ -113,7 +117,7 @@ func TestSP(t *testing.T) {
 	// err := game.LoadOpcode("data/SP/OPCODE.txt")
 
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Println(err)
 		panic(err)
 	}
 	vm.Run()
@@ -140,7 +144,7 @@ func TestLoadSP(t *testing.T) {
 	err = vm.LoadOpcode("data/SP/OPCODE.txt")
 
 	if err != nil {
-		fmt.Println(err.Error())
+		fmt.Println(err)
 		panic(err)
 	}
 	vm.Run()

@@ -104,3 +104,34 @@ func TestFontPak(t *testing.T) {
 	// }
 
 }
+func TestPakReplace(t *testing.T) {
+	restruct.EnableExprBeta()
+	pak := NewPak(&PakFileOptions{
+		FileName: "../data/LB_EN/SCRIPT.PAK",
+		Coding:   charset.ShiftJIS,
+	})
+	err := pak.Open()
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Printf("%v\n", pak.PakHeader)
+	for i, f := range pak.Files {
+		if i < 160 {
+			continue
+		}
+		fmt.Println(f.Index, f.Name, f.Offset, f.Length, f.Replace)
+	}
+	fmt.Printf("==============\n")
+
+	pak.SetById(166, "/Users/wetor/GoProjects/LuckSystem/LuckSystem/data/LB_EN/SCRIPT/_VARSTR")
+
+	pak.Write()
+
+	fmt.Printf("%v\n", pak.Rebuild)
+	for i, f := range pak.Files {
+		if i < 160 {
+			continue
+		}
+		fmt.Println(f.Index, f.Name, f.Offset, f.Length, f.Replace)
+	}
+}

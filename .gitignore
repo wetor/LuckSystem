@@ -19,5 +19,6 @@ data/*/VOICE/
 data/*/IMAGE/
 data/*/TXT/
 data/*/*.PAK
+data/*/*.out
 lucascript
 main

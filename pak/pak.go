@@ -3,6 +3,7 @@ package pak
 import (
 	"encoding/binary"
 	"errors"
+	"io"
 	"lucksystem/charset"
 	"lucksystem/utils"
 	"os"
@@ -37,11 +38,16 @@ type PakFile struct {
 	NameMap   map[string]int  `struct:"-"`
 	FileName  string          `struct:"-"`
 	Coding    charset.Charset `struct:"-"`
+	OffsetPos int64           `struct:"-"` // Files 数据开始位置
+	DataPos   int64           `struct:"-"` // Files.Data 数据开始位置
+	Rebuild   bool            `struct:"-"` // 替换数据后，是否需要重构pak
 }
 
 func NewPak(opt *PakFileOptions) *PakFile {
 
-	pakFile := &PakFile{}
+	pakFile := &PakFile{
+		Rebuild: false,
+	}
 	pakFile.FileName = opt.FileName
 	if opt.Coding != "" {
 		pakFile.Coding = opt.Coding
@@ -55,7 +61,7 @@ func (p *PakFile) Open() error {
 	f, err := os.Open(p.FileName)
 
 	if err != nil {
-		utils.Log("os.Open", err.Error())
+		utils.Log("os.Open", err)
 		return err
 	}
 	defer f.Close()
@@ -69,7 +75,7 @@ func (p *PakFile) Open() error {
 
 	err = restruct.Unpack(data, binary.LittleEndian, &p.PakHeader)
 	if err != nil {
-		utils.Log("restruct.Unpack1", err.Error())
+		utils.Log("restruct.Unpack1", err)
 		return err
 	}
 
@@ -82,10 +88,11 @@ func (p *PakFile) Open() error {
 	}
 
 	// 文件偏移 长度读取
+	p.OffsetPos = tempPos
 	offData := data[tempPos : tempPos+int64(8*p.FileCount)]
 	err = restruct.Unpack(offData, binary.LittleEndian, p)
 	if err != nil {
-		utils.Log("restruct.Unpack2", err.Error())
+		utils.Log("restruct.Unpack2", err)
 		return err
 	}
 	// 读取文件名
@@ -120,7 +127,12 @@ func (p *PakFile) Open() error {
 		file.Index = i
 		p.NameMap[file.Name] = i
 		file.Offset *= p.BlockSize
+		file.Replace = false
 		// file.Data = data[file.Offset : file.Offset+file.Length]
+
+		if i == 0 {
+			p.DataPos = int64(file.Offset) // 第一个文件数据的位置
+		}
 	}
 
 	return nil
@@ -132,33 +144,143 @@ func (p *PakFile) Get(name string) (*FileEntry, error) {
 	if !has {
 		return nil, errors.New("文件不存在")
 	}
-
-	f, err := os.Open(p.FileName)
-	if err != nil {
-		utils.Log("os.Open", err.Error())
-		return nil, err
-	}
-	defer f.Close()
-	entry := p.Files[index]
-	entry.Data = make([]byte, entry.Length)
-	f.ReadAt(entry.Data, int64(entry.Offset))
-
-	return entry, nil
+	return p.GetById(index)
 }
 func (p *PakFile) GetById(id int) (*FileEntry, error) {
 
 	if id < 0 || id >= int(p.FileCount) {
 		return nil, errors.New("文件id错误")
 	}
+
+	entry := p.Files[id]
+	if entry.Offset == 0 && entry.Data != nil && len(entry.Data) > 0 {
+		// 外部数据
+		return entry, nil
+	}
 	f, err := os.Open(p.FileName)
 	if err != nil {
-		utils.Log("os.Open", err.Error())
+		utils.Log("os.Open", err)
 		return nil, err
 	}
 	defer f.Close()
-	entry := p.Files[id]
+
 	entry.Data = make([]byte, entry.Length)
 	f.ReadAt(entry.Data, int64(entry.Offset))
 
 	return entry, nil
+}
+
+// Set 设置外部文件替换pak文件
+//  Description
+//  Receiver p *PakFile
+//  Param name string
+//  Param setFileName string
+//  Return error
+//
+func (p *PakFile) Set(name, setFileName string) error {
+	index, has := p.NameMap[name]
+	if !has {
+		return errors.New("文件不存在")
+	}
+	return p.SetById(index, setFileName)
+}
+
+func (p *PakFile) SetById(id int, setFileName string) error {
+	if id < 0 || id >= int(p.FileCount) {
+		return errors.New("文件id错误")
+	}
+	entry := p.Files[id]
+	newData, err := os.ReadFile(setFileName)
+	if err != nil {
+		utils.Log("os.ReadFile", err)
+		return err
+	}
+	alignLength := entry.Length
+	if alignLength/p.BlockSize*p.BlockSize != alignLength {
+		alignLength = (alignLength/p.BlockSize + 1) * p.BlockSize
+	}
+
+	p.Rebuild = alignLength < uint32(len(newData)) // 无法装下新数据内容，需要重构
+
+	entry.Replace = true
+	entry.Data = newData
+	entry.Length = uint32(len(newData))
+	return nil
+}
+
+func (p *PakFile) Write() error {
+
+	oldOffset := make(map[int]uint32, p.FileCount)
+	if p.Rebuild {
+		offset := uint32(0)
+		flag := false
+		for i, f := range p.Files {
+			if flag {
+				if offset/p.BlockSize*p.BlockSize != offset {
+					offset = (offset/p.BlockSize + 1) * p.BlockSize
+				}
+				oldOffset[i] = f.Offset //保存旧的offset
+				f.Offset = offset       // 更新Offset
+				offset += f.Length
+			}
+
+			if f.Replace { // 资源发生替换，从下一个开始，重新计算offset
+				flag = true
+				offset = f.Offset + f.Length
+			}
+		}
+	}
+	oldFile, err := os.Open(p.FileName)
+	if err != nil {
+		utils.Log("os.Open", err)
+		return err
+	}
+	defer oldFile.Close()
+
+	file, err := os.Create(p.FileName + ".out")
+	if err != nil {
+		utils.Log("os.Create", err)
+		return err
+	}
+	defer file.Close()
+
+	// 1. 复制文件全部内容
+	_, err = io.Copy(file, oldFile)
+	if err != nil {
+		utils.Log("io.Copy", err)
+		return err
+	}
+	// 2. 写入偏移和长度和数据
+	temp := make([]byte, 4)
+	flag := false
+	if p.Rebuild {
+		for i, f := range p.Files {
+			if f.Replace { // 资源发生替换，从这里开始写入数据
+				flag = true
+			}
+			if flag {
+				binary.LittleEndian.PutUint32(temp, f.Offset/p.BlockSize)
+				file.WriteAt(temp, p.OffsetPos+int64(i*8))
+				binary.LittleEndian.PutUint32(temp, f.Length)
+				file.WriteAt(temp, p.OffsetPos+int64(i*8+4))
+				if f.Replace {
+					file.WriteAt(f.Data, int64(f.Offset))
+				} else {
+					data := make([]byte, f.Length)
+					oldFile.ReadAt(data, int64(oldOffset[i]))
+					file.WriteAt(data, int64(f.Offset))
+				}
+			}
+		}
+	} else {
+		for i, f := range p.Files {
+			if f.Replace {
+				binary.LittleEndian.PutUint32(temp, f.Length)
+				file.WriteAt(temp, p.OffsetPos+int64(i*8+4))
+				file.WriteAt(f.Data, int64(f.Offset))
+			}
+		}
+	}
+
+	return nil
 }
