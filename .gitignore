@@ -14,11 +14,10 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 .DS_Store
-data/*/SCRIPT/
-data/*/VOICE/
-data/*/IMAGE/
-data/*/TXT/
-data/*/*.PAK
-data/*/*.out
+data/*/*
+!data/*/OPCODE.txt
+
 lucascript
+luckscript
 main
+czimage/cz2.go

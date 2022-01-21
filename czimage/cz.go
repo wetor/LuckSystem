@@ -35,6 +35,7 @@ type CzImage interface {
 	Load(header CzHeader, data []byte)
 	Get() image.Image
 	Save(path string)
+	Import(file string)
 }
 
 func LoadCzImage(data []byte) (CzImage, error) {
@@ -49,6 +50,9 @@ func LoadCzImage(data []byte) (CzImage, error) {
 	switch string(header.Magic[:3]) {
 	case "CZ1":
 		cz = new(Cz1Image)
+		cz.Load(header, data)
+	case "CZ2":
+		cz = new(Cz2Image)
 		cz.Load(header, data)
 	case "CZ3":
 		cz = new(Cz3Image)

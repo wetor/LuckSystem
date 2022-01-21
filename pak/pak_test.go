@@ -135,3 +135,26 @@ func TestPakReplace(t *testing.T) {
 		fmt.Println(f.Index, f.Name, f.Offset, f.Length, f.Replace)
 	}
 }
+
+func TestPakFindCZ2(t *testing.T) {
+
+	restruct.EnableExprBeta()
+	pak := NewPak(&PakFileOptions{
+		FileName: "/Volumes/NTFS/Download/Little.Busters.English.Edition/Little Busters! English Edition/files/FONT.PAK",
+		Coding:   charset.UTF_8,
+	})
+	err := pak.Open()
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Printf("%v\n", pak.PakHeader)
+	for _, f := range pak.Files {
+
+		e, _ := pak.GetById(f.Index)
+		if string(e.Data[:3]) == "CZ2" {
+			fmt.Println(f.Index, f.Name, f.Offset, f.Length, f.Replace)
+		}
+
+	}
+	fmt.Printf("==============\n")
+}

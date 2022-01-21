@@ -2,6 +2,7 @@ package czimage
 
 import (
 	"fmt"
+	"image/png"
 	"os"
 	"strconv"
 	"testing"
@@ -39,5 +40,32 @@ func TestCZ1(t *testing.T) {
 
 }
 func TestLineDiff(t *testing.T) {
-	fmt.Println(1)
+	restruct.EnableExprBeta()
+
+	data, _ := os.ReadFile("../data/LB_EN/IMAGE/2.cz3")
+	cz, err := LoadCzImage(data)
+	if err != nil {
+		panic(err)
+	}
+	cz3 := cz.(*Cz3Image)
+	//os.WriteFile("../data/LB_EN/IMAGE/2.ld", []byte(cz3.Image.(*image.RGBA).Pix), 0666)
+	f, _ := os.Open("../data/LB_EN/IMAGE/2.png")
+	defer f.Close()
+	img, _ := png.Decode(f)
+	data1 := DiffLine(&cz3.CzHeader, img)
+	fmt.Println(len(data1))
+	os.WriteFile("../data/LB_EN/IMAGE/2.dl", data1, 0666)
+
 }
+
+//func TestCZ2(t *testing.T) {
+//	restruct.EnableExprBeta()
+//	data, _ := os.ReadFile("../data/Other/CZ2/ゴシック14.cz2")
+//	cz, err := LoadCzImage(data)
+//	if err != nil {
+//		panic(err)
+//	}
+//	cz.Save("../data/Other/CZ2/ゴシック14.png")
+//	fmt.Println()
+//
+//}

@@ -106,3 +106,6 @@ func (cz *Cz1Image) Save(path string) {
 func (cz *Cz1Image) Get() image.Image {
 	return cz.Image
 }
+func (cz *Cz1Image) Import(file string) {
+
+}

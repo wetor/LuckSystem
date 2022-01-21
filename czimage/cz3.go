@@ -23,7 +23,8 @@ type Cz3Header struct {
 type Cz3Image struct {
 	CzHeader
 	Cz3Header
-	Image image.Image
+	Image    image.Image
+	PngImage image.Image
 }
 
 func (cz *Cz3Image) Load(header CzHeader, data []byte) {
@@ -45,4 +46,16 @@ func (cz *Cz3Image) Save(path string) {
 
 func (cz *Cz3Image) Get() image.Image {
 	return cz.Image
+}
+
+func (cz *Cz3Image) Import(file string) {
+	f, err := os.Open(file)
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+	cz.PngImage, err = png.Decode(f)
+	if err != nil {
+		panic(err)
+	}
 }
