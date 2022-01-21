@@ -16,25 +16,33 @@ type CzHeader struct {
 	Width        uint16
 	Heigth       uint16
 	Colorbits    uint16
-	Colorblock   uint8
+	Colorblock   uint16
+}
+
+type CzData struct {
+	Raw        []byte        // Load()
+	OutputInfo *CzOutputInfo // Load()
+	Image      image.Image   // Export()
+	PngImage   image.Image   // Import()
+
 }
 
 type CzBlockInfo struct {
-	BlockIndex     uint32
-	RawSize        uint32
 	CompressedSize uint32
+	RawSize        uint32
 }
 type CzOutputInfo struct {
-	TotalRawSize        uint32
-	TotalCompressedSize uint32
+	Offset              int `struct:"-"`
+	TotalRawSize        int `struct:"-"`
+	TotalCompressedSize int `struct:"-"`
 	FileCount           uint32
-	BlockInfo           []CzBlockInfo
+	BlockInfo           []CzBlockInfo `struct:"size=FileCount"`
 }
 
 type CzImage interface {
 	Load(header CzHeader, data []byte)
-	Get() image.Image
-	Save(path string)
+	GetImage() image.Image
+	Export(path string)
 	Import(file string)
 }
 
@@ -51,9 +59,9 @@ func LoadCzImage(data []byte) (CzImage, error) {
 	case "CZ1":
 		cz = new(Cz1Image)
 		cz.Load(header, data)
-	case "CZ2":
-		cz = new(Cz2Image)
-		cz.Load(header, data)
+	//case "CZ2":
+	//	cz = new(Cz2Image)
+	//	cz.Load(header, data)
 	case "CZ3":
 		cz = new(Cz3Image)
 		cz.Load(header, data)

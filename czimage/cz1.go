@@ -1,17 +1,19 @@
 package czimage
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 	"image/png"
+	"lucksystem/utils"
 	"os"
 )
 
+// Cz1Image
+//  Description Cz1.Load() 载入并解压数据，转化成Image
 type Cz1Image struct {
 	CzHeader
 	ColorPanel [][]byte // []BGRA
-	Image      image.Image
+	CzData
 }
 
 func (cz *Cz1Image) Load(header CzHeader, data []byte) {
@@ -26,9 +28,10 @@ func (cz *Cz1Image) Load(header CzHeader, data []byte) {
 			cz.ColorPanel[i] = data[offset : offset+4]
 			offset += 4
 		}
-		fmt.Println("cz1 colorPanel", len(cz.ColorPanel))
-		buf := Decompress(data[offset:])
-		fmt.Println("uncompress size", len(buf))
+		utils.LogA("cz1 colorPanel", len(cz.ColorPanel))
+		cz.OutputInfo = GetOutputInfo(data[offset:])
+		buf := Decompress(data[offset+cz.OutputInfo.Offset:], cz.OutputInfo)
+		utils.LogA("uncompress size", len(buf))
 		i := 0
 		var index uint8
 		for y := 0; y < int(header.Heigth); y++ {
@@ -53,9 +56,10 @@ func (cz *Cz1Image) Load(header CzHeader, data []byte) {
 			cz.ColorPanel[i] = data[offset : offset+4]
 			offset += 4
 		}
-		fmt.Println("cz1 colorPanel", len(cz.ColorPanel))
-		buf := Decompress(data[offset:])
-		fmt.Println("uncompress size", len(buf))
+		utils.LogA("cz1 colorPanel", len(cz.ColorPanel))
+		cz.OutputInfo = GetOutputInfo(data[offset:])
+		buf := Decompress(data[offset+cz.OutputInfo.Offset:], cz.OutputInfo)
+		utils.LogA("uncompress size", len(buf))
 		// B,G,R,A
 		// 0,1,2,3
 		i := 0
@@ -73,8 +77,9 @@ func (cz *Cz1Image) Load(header CzHeader, data []byte) {
 	case 24:
 		// TODO 未测试
 		// RGB
-		buf := Decompress(data[offset:])
-		fmt.Println("uncompress size", len(buf))
+		cz.OutputInfo = GetOutputInfo(data[offset:])
+		buf := Decompress(data[offset+cz.OutputInfo.Offset:], cz.OutputInfo)
+		utils.LogA("uncompress size", len(buf))
 		i := 0
 		for y := 0; y < int(header.Heigth); y++ {
 			for x := 0; x < int(header.Width); x++ {
@@ -90,20 +95,21 @@ func (cz *Cz1Image) Load(header CzHeader, data []byte) {
 	case 32:
 		// TODO 未测试
 		// RGBA
-		buf := Decompress(data[offset:])
-		fmt.Println("uncompress size", len(buf))
+		cz.OutputInfo = GetOutputInfo(data[offset:])
+		buf := Decompress(data[offset+cz.OutputInfo.Offset:], cz.OutputInfo)
+		utils.LogA("uncompress size", len(buf))
 		pic.Pix = buf
 	}
 
 	cz.Image = pic
 }
-func (cz *Cz1Image) Save(path string) {
+func (cz *Cz1Image) Export(path string) {
 	f, _ := os.Create(path)
 	defer f.Close()
 	png.Encode(f, cz.Image)
 }
 
-func (cz *Cz1Image) Get() image.Image {
+func (cz *Cz1Image) GetImage() image.Image {
 	return cz.Image
 }
 func (cz *Cz1Image) Import(file string) {

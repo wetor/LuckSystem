@@ -18,7 +18,7 @@ func TestCZ3(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		cz.Save("../data/LB_EN/IMAGE/" + strconv.Itoa(i) + ".png")
+		cz.Export("../data/LB_EN/IMAGE/" + strconv.Itoa(i) + ".png")
 		fmt.Println()
 	}
 
@@ -33,7 +33,7 @@ func TestCZ1(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		cz.Save("../data/LB_EN/IMAGE/" + name + ".png")
+		cz.Export("../data/LB_EN/IMAGE/" + name + ".png")
 		fmt.Println()
 
 	}
@@ -44,6 +44,7 @@ func TestLineDiff(t *testing.T) {
 
 	data, _ := os.ReadFile("../data/LB_EN/IMAGE/2.cz3")
 	cz, err := LoadCzImage(data)
+	//cz.GetImage()
 	if err != nil {
 		panic(err)
 	}
@@ -52,7 +53,7 @@ func TestLineDiff(t *testing.T) {
 	f, _ := os.Open("../data/LB_EN/IMAGE/2.png")
 	defer f.Close()
 	img, _ := png.Decode(f)
-	data1 := DiffLine(&cz3.CzHeader, img)
+	data1 := DiffLine(cz3.CzHeader, img)
 	fmt.Println(len(data1))
 	os.WriteFile("../data/LB_EN/IMAGE/2.dl", data1, 0666)
 
@@ -69,3 +70,16 @@ func TestLineDiff(t *testing.T) {
 //	fmt.Println()
 //
 //}
+
+func TestCz3Image_Import(t *testing.T) {
+	restruct.EnableExprBeta()
+	data, _ := os.ReadFile("../data/LB_EN/IMAGE/4.cz3")
+	cz, err := LoadCzImage(data)
+	if err != nil {
+		panic(err)
+	}
+	cz.Export("../data/LB_EN/IMAGE/4.png")
+	cz.Import("../data/LB_EN/IMAGE/4.png")
+	fmt.Println()
+
+}

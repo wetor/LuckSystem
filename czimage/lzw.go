@@ -4,29 +4,51 @@ import (
 	"fmt"
 )
 
-func compressLZW(data []byte) []uint16 {
+func compressLZW(data []byte, size int, last string) (count int, compressed []uint16, lastElement string) {
+	count = 0
 	dictionary := make(map[string]uint16)
 	for i := 0; i < 256; i++ {
 		dictionary[string(byte(i))] = uint16(i)
 	}
-	code := uint16(len(dictionary) + 1)
-	currChar := ""
-	result := make([]uint16, 0)
+	dictionaryCount := uint16(len(dictionary) + 1)
+	element := ""
+	if len(last) != 0 {
+		element = last
+	}
+	compressed = make([]uint16, 0, size)
 	for _, c := range data {
-		phrase := currChar + string(c)
-		if _, isTrue := dictionary[phrase]; isTrue {
-			currChar = phrase
+		entry := element + string(c)
+		if _, isTrue := dictionary[entry]; isTrue {
+			element = entry
 		} else {
-			result = append(result, dictionary[currChar])
-			dictionary[phrase] = code
-			currChar = string(c)
-			code++
+			compressed = append(compressed, dictionary[element])
+			dictionary[entry] = dictionaryCount
+			element = string(c)
+			dictionaryCount++
+		}
+		count++
+		if size > 0 && len(compressed) == size {
+			break
 		}
 	}
-	if currChar != "" {
-		result = append(result, dictionary[currChar])
+	lastElement = element
+	if len(compressed) == 0 {
+		if len(lastElement) != 0 {
+			// 数据在上一片压缩完毕，此次压缩无数据，剩余lastElement，拆分加入
+			for _, c := range lastElement {
+				compressed = append(compressed, dictionary[string(c)])
+			}
+		}
+		return count, compressed, ""
+	} else if len(compressed) < size {
+		// 数据压缩完毕，未达到size，则为最后一片，直接加入剩余数据
+		if len(lastElement) != 0 {
+			compressed = append(compressed, dictionary[lastElement])
+		}
+		return count, compressed, ""
 	}
-	return result
+	// 数据压缩完毕，达到size，剩余数据交给下一片
+	return count, compressed, lastElement
 }
 
 // decompressLZW cz1 cz3
@@ -36,7 +58,7 @@ func decompressLZW(compressed []uint16, size int) []byte {
 	for i := 0; i < 256; i++ {
 		dictionary[uint16(i)] = []byte{byte(i)}
 	}
-	code := uint16(len(dictionary))
+	dictionaryCount := uint16(len(dictionary))
 	w := dictionary[compressed[0]]
 	decompressed := make([]byte, 0, size)
 	for _, element := range compressed {
@@ -44,7 +66,7 @@ func decompressLZW(compressed []uint16, size int) []byte {
 		if x, ok := dictionary[element]; ok {
 			entry = make([]byte, len(x))
 			copy(entry, x)
-		} else if element == code {
+		} else if element == dictionaryCount {
 			entry = make([]byte, len(w), len(w)+1)
 			copy(entry, w)
 			entry = append(entry, w[0])
@@ -53,8 +75,8 @@ func decompressLZW(compressed []uint16, size int) []byte {
 		}
 		decompressed = append(decompressed, entry...)
 		w = append(w, entry[0])
-		dictionary[code] = w
-		code++
+		dictionary[dictionaryCount] = w
+		dictionaryCount++
 
 		w = entry
 	}
@@ -68,7 +90,7 @@ func decompressLZW2(compressed []uint16, size int) []byte {
 	for i := 0; i < 256; i++ {
 		dictionary[uint16(i)] = []byte{byte(i)}
 	}
-	code := uint16(len(dictionary))
+	dictionaryCount := uint16(len(dictionary))
 	w := dictionary[compressed[0]]
 	decompressed := make([]byte, 0, size)
 	for _, element := range compressed {
@@ -77,7 +99,7 @@ func decompressLZW2(compressed []uint16, size int) []byte {
 		if x, ok := dictionary[element]; ok {
 			entry = make([]byte, len(x))
 			copy(entry, x)
-		} else if element == code {
+		} else if element == dictionaryCount {
 			entry = make([]byte, len(w), len(w)+1)
 			copy(entry, w)
 			entry = append(entry, w[0])
@@ -86,8 +108,8 @@ func decompressLZW2(compressed []uint16, size int) []byte {
 		}
 		decompressed = append(decompressed, entry...)
 		w = append(w, entry[0])
-		dictionary[code] = w
-		code++
+		dictionary[dictionaryCount] = w
+		dictionaryCount++
 
 		w = entry
 	}

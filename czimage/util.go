@@ -3,52 +3,76 @@ package czimage
 import (
 	"bytes"
 	"encoding/binary"
+	"github.com/go-restruct/restruct"
+	"io"
 	"os"
-	"strconv"
 )
 
-func Decompress(data []byte) []byte {
-	offset := 0
-	fileCount := binary.LittleEndian.Uint32(data[offset : offset+4])
-	offset += 4
-	rawSizeList := make(map[int]uint32)
-	compressedSizeList := make(map[int]uint32)
-	outputInfo := CzOutputInfo{
-		FileCount:           fileCount,
-		TotalRawSize:        0,
-		TotalCompressedSize: 0,
-		BlockInfo:           make([]CzBlockInfo, fileCount),
+//func GetOutputInfo(data []byte) (outputInfo *CzOutputInfo) {
+//	fileCount := int(binary.LittleEndian.Uint32(data[0:4]))
+//	outputInfo = &CzOutputInfo{
+//		Offset:              4,
+//		FileCount:           fileCount,
+//		TotalRawSize:        0,
+//		TotalCompressedSize: 0,
+//		BlockInfo:           make([]CzBlockInfo, fileCount),
+//	}
+//
+//	for i := 0; i < int(fileCount); i++ {
+//		fileCompressedSize := int(binary.LittleEndian.Uint32(data[outputInfo.Offset : outputInfo.Offset+4]))
+//		outputInfo.Offset += 4
+//		fileRawSize := int(binary.LittleEndian.Uint32(data[outputInfo.Offset : outputInfo.Offset+4]))
+//		outputInfo.Offset += 4
+//
+//		outputInfo.TotalRawSize += fileRawSize
+//		outputInfo.TotalCompressedSize += fileCompressedSize
+//		outputInfo.BlockInfo[i] = CzBlockInfo{
+//			RawSize:        fileRawSize,
+//			CompressedSize: fileCompressedSize,
+//		}
+//	}
+//	return outputInfo
+//}
+
+func GetOutputInfo(data []byte) (outputInfo *CzOutputInfo) {
+	outputInfo = &CzOutputInfo{}
+	err := restruct.Unpack(data, binary.LittleEndian, outputInfo)
+	if err != nil {
+		panic(err)
 	}
+	for _, block := range outputInfo.BlockInfo {
+		outputInfo.TotalRawSize += int(block.RawSize)
+		outputInfo.TotalCompressedSize += int(block.CompressedSize)
+	}
+	outputInfo.Offset = 4 + int(outputInfo.FileCount)*8
+	return outputInfo
+}
 
-	for i := 0; i < int(fileCount); i++ {
-		fileCompressedSize := binary.LittleEndian.Uint32(data[offset : offset+4])
-		offset += 4
-		fileRawSize := binary.LittleEndian.Uint32(data[offset : offset+4])
-		offset += 4
-
-		rawSizeList[i] = fileRawSize
-		compressedSizeList[i] = fileCompressedSize
-
-		outputInfo.TotalRawSize += fileRawSize
-		outputInfo.TotalCompressedSize += fileCompressedSize
-		outputInfo.BlockInfo[i] = CzBlockInfo{
-			BlockIndex:     uint32(i),
-			RawSize:        fileRawSize,
-			CompressedSize: fileCompressedSize,
+func WriteStruct(writer io.Writer, list ...interface{}) error {
+	for _, v := range list {
+		temp, err := restruct.Pack(binary.LittleEndian, v)
+		if err != nil {
+			return err
 		}
+		writer.Write(temp)
 	}
+	return nil
+}
+
+func Decompress(data []byte, outputInfo *CzOutputInfo) []byte {
+	offset := 0
 
 	// fmt.Println("uncompress info", outputInfo)
 	outputBuf := &bytes.Buffer{}
-	for i := 0; i < int(fileCount); i++ {
-		lzwBuf := make([]uint16, int(compressedSizeList[i]))
+	for _, block := range outputInfo.BlockInfo {
+		lzwBuf := make([]uint16, int(block.CompressedSize))
 		//offsetTemp := offset
-		for j := 0; j < int(compressedSizeList[i]); j++ {
+		for j := 0; j < int(block.CompressedSize); j++ {
 			lzwBuf[j] = binary.LittleEndian.Uint16(data[offset : offset+2])
 			offset += 2
 		}
 		//os.WriteFile("../data/LB_EN/IMAGE/2.ori.lzw", data[offsetTemp:offset], 0666)
-		rawBuf := decompressLZW(lzwBuf, int(rawSizeList[i]))
+		rawBuf := decompressLZW(lzwBuf, int(block.RawSize))
 		//os.WriteFile("../data/LB_EN/IMAGE/2.ori", rawBuf, 0666)
 		//panic("11")
 		outputBuf.Write(rawBuf)
@@ -61,8 +85,8 @@ func Decompress2(data []byte) []byte {
 	offset := 0
 	fileCount := binary.LittleEndian.Uint32(data[offset : offset+4])
 	offset += 4
-	rawSizeList := make(map[int]uint32)
-	compressedSizeList := make(map[int]uint32)
+	rawSizeList := make(map[int]int)
+	compressedSizeList := make(map[int]int)
 	outputInfo := CzOutputInfo{
 		FileCount:           fileCount,
 		TotalRawSize:        0,
@@ -71,9 +95,9 @@ func Decompress2(data []byte) []byte {
 	}
 
 	for i := 0; i < int(fileCount); i++ {
-		fileCompressedSize := binary.LittleEndian.Uint32(data[offset : offset+4])
+		fileCompressedSize := int(binary.LittleEndian.Uint32(data[offset : offset+4]))
 		offset += 4
-		fileRawSize := binary.LittleEndian.Uint32(data[offset : offset+4])
+		fileRawSize := int(binary.LittleEndian.Uint32(data[offset : offset+4]))
 		offset += 4
 
 		rawSizeList[i] = fileRawSize
@@ -82,9 +106,8 @@ func Decompress2(data []byte) []byte {
 		outputInfo.TotalRawSize += fileRawSize
 		outputInfo.TotalCompressedSize += fileCompressedSize
 		outputInfo.BlockInfo[i] = CzBlockInfo{
-			BlockIndex:     uint32(i),
-			RawSize:        fileRawSize,
-			CompressedSize: fileCompressedSize,
+			RawSize:        uint32(fileRawSize),
+			CompressedSize: uint32(fileCompressedSize),
 		}
 	}
 
@@ -127,34 +150,45 @@ func Decompress2(data []byte) []byte {
 	return outputBuf.Bytes()
 
 }
-func Compress(data []byte, maxCount int) []byte {
+func Compress(data []byte, size int) (compressed []byte, outputInfo *CzOutputInfo) {
 
-	for {
-		code := 256
-		count := 0
-		dictionary := make(map[string]int)
-		for i := 0; i < 256; i++ {
-			dictionary[strconv.Itoa(i)] = i
-		}
-
-		currChar := ""
-		result := make([]int, 0)
-		for _, c := range data {
-			phrase := currChar + string(c)
-			if _, isTrue := dictionary[phrase]; isTrue {
-				currChar = phrase
-			} else {
-				result = append(result, dictionary[currChar])
-				dictionary[phrase] = code
-				code++
-				currChar = string(c)
-			}
-			count++
-			if len(result) == maxCount {
-				break
-			}
-
-		}
+	if size == 0 {
+		size = 0xFEFD
 	}
-	return nil
+	//if len(outputInfo.BlockInfo) != 0 {
+	//	blockSize = int(outputInfo.BlockInfo[0].CompressedSize)
+	//}
+	var partData []uint16
+	offset := 0
+	count := 0
+	last := ""
+	tmp := make([]byte, 2)
+	outputBuf := &bytes.Buffer{}
+	outputInfo = &CzOutputInfo{
+		Offset:              0,
+		FileCount:           0,
+		TotalRawSize:        len(data),
+		TotalCompressedSize: 0,
+		BlockInfo:           make([]CzBlockInfo, 0),
+	}
+	for {
+		count, partData, last = compressLZW(data[offset:], size, last)
+		if count == 0 {
+			break
+		}
+		offset += count
+		for _, d := range partData {
+			binary.LittleEndian.PutUint16(tmp, d)
+			outputBuf.Write(tmp)
+		}
+
+		outputInfo.BlockInfo = append(outputInfo.BlockInfo, CzBlockInfo{
+			CompressedSize: uint32(len(partData)),
+			RawSize:        uint32(count),
+		})
+		outputInfo.FileCount++
+	}
+	outputInfo.TotalCompressedSize = outputBuf.Len() / 2
+
+	return outputBuf.Bytes(), outputInfo
 }

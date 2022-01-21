@@ -29,7 +29,7 @@ func PanelImage(header *CzHeader, colorPanel [][]byte, data []byte) image.Image 
 }
 
 // DiffLine png->data
-func DiffLine(header *CzHeader, img image.Image) (data []byte) {
+func DiffLine(header CzHeader, img image.Image) (data []byte) {
 	width := int(header.Width)
 	height := int(header.Heigth)
 
