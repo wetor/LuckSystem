@@ -1,7 +1,7 @@
 package game
 
 import (
-	"fmt"
+	"github.com/golang/glog"
 	"lucksystem/charset"
 	"lucksystem/game/context"
 	"lucksystem/game/engine"
@@ -74,16 +74,16 @@ func (g *Game) LoadResources() {
 					panic(err)
 				}
 				if !ScriptCanLoad(entry.Name) {
-					fmt.Println("Pass", entry.Name)
+					glog.V(4).Infoln("Pass", entry.Name)
 					continue
 				}
-				fmt.Printf("%v %v ", entry.Name, len(entry.Data))
+				glog.V(4).Infof("%v %v\n", entry.Name, len(entry.Data))
 				scr, err := script.OpenScriptFile(entry)
 				if err != nil {
 					panic(err)
 				}
 				g.Context.Scripts[entry.Name] = scr
-				fmt.Println(scr.CodeNum)
+				glog.V(4).Infoln(scr.CodeNum)
 			}
 		}
 

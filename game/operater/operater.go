@@ -1,11 +1,11 @@
 package operater
 
 import (
+	"github.com/golang/glog"
 	"lucksystem/charset"
 	"lucksystem/game/context"
 	"lucksystem/game/engine"
 	"lucksystem/script"
-	"lucksystem/utils"
 )
 
 // Operater 需定制指令
@@ -215,7 +215,7 @@ func (g *LucaOperate) IFN(ctx *context.Context) engine.HandlerFunc {
 			panic(err)
 		}
 		if !res {
-			utils.Logf("IFN %s => %d", exprStr, !res)
+			glog.V(3).Infof("IFN %s => %d\n", exprStr, !res)
 			eip = int(jumpPos)
 		}
 		// 这里执行与游戏相关代码，内部与虚拟机无关联

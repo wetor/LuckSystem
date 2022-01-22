@@ -2,13 +2,13 @@ package VM
 
 import (
 	"fmt"
+	"github.com/golang/glog"
 	"lucksystem/game/context"
 	"lucksystem/game/engine"
 	"lucksystem/game/enum"
 	"lucksystem/game/operater"
 	"lucksystem/game/variable"
 	"lucksystem/script"
-	"lucksystem/utils"
 	"os"
 	"reflect"
 	"strings"
@@ -100,7 +100,7 @@ func (vm *VM) Run() {
 		code = vm.Script().Codes[vm.CIndex]
 		opname, ok := vm.OpcodeMap[code.Opcode]
 		if !ok {
-			utils.LogA(vm.CIndex, "Opcode不存在", code.Opcode)
+			glog.V(5).Infoln(vm.CIndex, "Opcode不存在", code.Opcode)
 			opname = fmt.Sprintf("0x%X", code.Opcode)
 			//vm.CNext++
 			//continue
@@ -111,7 +111,7 @@ func (vm *VM) Run() {
 			in = make([]reflect.Value, 1)
 			in[0] = reflect.ValueOf(vm.Context)
 		} else {
-			utils.LogA(vm.CIndex, "Operation不存在", opname)
+			glog.V(5).Infoln(vm.CIndex, "Operation不存在", opname)
 			// 方法未定义，调用UNDEFINE
 			operat = reflect.ValueOf(vm.Operate).MethodByName("UNDEFINE")
 			in = make([]reflect.Value, 2)
@@ -121,7 +121,7 @@ func (vm *VM) Run() {
 		fun := operat.Call(in) // 反射调用 operater，并返回一个function.HandlerFunc
 
 		next := vm.getNextPos() // 取得下一句位置
-		utils.LogTf("Index:%d Position:%d", vm.CIndex, code.Pos)
+		glog.V(4).Infof("Index:%d Position:%d \n", vm.CIndex, code.Pos)
 		if fun[0].Kind() == reflect.Func {
 			eip := 0
 			if vm.RunMode == enum.VMRun {
@@ -133,7 +133,7 @@ func (vm *VM) Run() {
 				next = eip
 			}
 		}
-		utils.LogT("\tnext:", next)
+		glog.V(4).Infoln("\tnext:", next)
 
 		if next == 0 || opname == "END" {
 			break // 结束
@@ -145,7 +145,7 @@ func (vm *VM) Run() {
 func (vm *VM) LoadOpcode(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		utils.Log("os.ReadFile", err.Error())
+		glog.V(8).Infof("os.ReadFile", err)
 		return err
 	}
 	strlines := strings.Split(string(data), "\n")

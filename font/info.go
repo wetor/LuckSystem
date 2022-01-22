@@ -2,10 +2,8 @@ package font
 
 import (
 	"encoding/binary"
-	"fmt"
-	"lucksystem/utils"
-
 	"github.com/go-restruct/restruct"
+	"github.com/golang/glog"
 )
 
 type DrawSize struct {
@@ -32,8 +30,7 @@ func LoadFontInfo(data []byte) *FontInfo {
 	info := new(FontInfo)
 	err := restruct.Unpack(data, binary.LittleEndian, info)
 	if err != nil {
-		utils.Log("restruct.Unpack", err.Error())
-		panic(err)
+		glog.Fatalln("restruct.Unpack", err)
 	}
 	info.FontMap = make(map[rune]uint16)
 	// 6 + 3*7112
@@ -43,7 +40,7 @@ func LoadFontInfo(data []byte) *FontInfo {
 			info.FontMap[rune(i)] = ch
 		}
 	}
-	fmt.Println("font info", info.CharNum, len(info.FontMap))
+	glog.V(6).Infoln("font info", info.CharNum, len(info.FontMap))
 	return info
 	// for unicode, index := range info.FontMap {
 

@@ -16,7 +16,7 @@
 .DS_Store
 data/*/*
 !data/*/OPCODE.txt
-
+log/
 lucascript
 luckscript
 main

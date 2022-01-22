@@ -1,9 +1,9 @@
 package czimage
 
 import (
+	"github.com/golang/glog"
 	"image"
 	"image/color"
-	"lucksystem/utils"
 	"math"
 )
 
@@ -28,14 +28,19 @@ func PanelImage(header *CzHeader, colorPanel [][]byte, data []byte) image.Image 
 	return pic
 }
 
-// DiffLine png->data
+// DiffLine 图像拆分
+//  Description 图像拆分，cz3用 png->data
+//  Param header CzHeader
+//  Param img image.Image
+//  Return data
+//
 func DiffLine(header CzHeader, img image.Image) (data []byte) {
 	width := int(header.Width)
 	height := int(header.Heigth)
 
 	pic := img.(*image.RGBA)
 	if width != pic.Rect.Size().X || height != pic.Rect.Size().Y {
-		utils.Logf("图片大小不匹配，应该为 w%d h%d", width, height)
+		glog.V(2).Infof("图片大小不匹配，应该为 w%d h%d\n", width, height)
 		return nil
 	}
 	data = make([]byte, len(pic.Pix))
@@ -65,7 +70,12 @@ func DiffLine(header CzHeader, img image.Image) (data []byte) {
 	return data
 }
 
-// LineDiff data->png
+// LineDiff 拆分图像还原
+//  Description 拆分图像还原，cz3用 data->png
+//  Param header *CzHeader
+//  Param data []byte
+//  Return image.Image
+//
 func LineDiff(header *CzHeader, data []byte) image.Image {
 	//os.WriteFile("../data/LB_EN/IMAGE/ld.data", data, 0666)
 	width := int(header.Width)

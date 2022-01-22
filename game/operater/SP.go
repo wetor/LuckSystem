@@ -1,11 +1,11 @@
 package operater
 
 import (
+	"github.com/golang/glog"
 	"lucksystem/charset"
 	"lucksystem/game/context"
 	"lucksystem/game/engine"
 	"lucksystem/script"
-	"lucksystem/utils"
 )
 
 type SP struct {
@@ -87,7 +87,7 @@ func (g *SP) SELECT(ctx *context.Context) engine.HandlerFunc {
 		selectID := ctx.Engine.SELECT(msgStr)
 
 		//fun.Call(&varID, msgStr_en)
-		utils.Logf("SELECT #%d = %d", varID, selectID)
+		glog.V(3).Infof("SELECT #%d = %d\n", varID, selectID)
 		ctx.Variable.Set(ToString("#%d", varID), selectID)
 		ctx.ChanEIP <- 0
 	}

@@ -16,8 +16,6 @@ type LucaFont struct {
 	Image   *image.RGBA
 }
 
-var FONT_PAK = "../data/LB_EN/FONT.PAK"
-
 // モダン/明朝/丸ゴシック/ゴシック
 // 12 14 16 18 20 24 28 30 32 36 72
 func LoadLucaFont(pak *pak.PakFile, name string, size int) *LucaFont {
@@ -29,7 +27,7 @@ func LoadLucaFont(pak *pak.PakFile, name string, size int) *LucaFont {
 	imageFile, _ := pak.Get(name + strconv.Itoa(size))
 	font.CzImage, _ = czimage.LoadCzImage(imageFile.Data)
 
-	font.Image = font.CzImage.Get().(*image.RGBA)
+	font.Image = font.CzImage.GetImage().(*image.RGBA)
 	return font
 }
 func (f *LucaFont) GetCharImage(unicode rune) (image.Image, DrawSize) {

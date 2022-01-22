@@ -6,11 +6,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/golang/glog"
 	"io"
 	"lucksystem/charset"
 	"lucksystem/game/enum"
 	"lucksystem/pak"
-	"lucksystem/utils"
 	"os"
 	"path"
 	"strconv"
@@ -166,7 +166,7 @@ func (s *ScriptFile) Read() error {
 
 	data, err := os.ReadFile(s.FileName)
 	if err != nil {
-		utils.Log("os.ReadFile", err.Error())
+		glog.V(8).Infoln("os.ReadFile", err)
 		return err
 	}
 	return s.ReadData(data)
@@ -340,7 +340,7 @@ func (s *ScriptFile) Export(file string) error {
 		str := ToStringCodeParams(code)
 		fmt.Fprintln(w, str)
 
-		fmt.Println(i, str)
+		glog.V(6).Infoln(i, str)
 	}
 	return w.Flush()
 

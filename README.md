@@ -15,11 +15,13 @@ LucaSystem 引擎解析工具
 
 #### CZ0
 
-- LucaSystemTools中完成
+- 导出完成 32位
+- 导入完成 32位
 
 #### CZ1
 
-- 导出完成
+- 导出完成 8位
+- 导入完成 8位
 
 #### CZ2
 
@@ -27,7 +29,8 @@ LucaSystem 引擎解析工具
 
 #### CZ3
 
-- 导出完成
+- 导出完成 32位
+- 导入完成 32位
 
 #### CZ4
 
@@ -80,6 +83,7 @@ LucaSystem 引擎解析工具
 - SELECT (LB_EN、SP)
 - IMAGELOAD (LB_EN、SP)
 
+- BATTLE (LB_EN)
 - UNKNOW0 (仅LB_EN出现)
 - EQU
 - EQUN
@@ -98,9 +102,16 @@ LucaSystem 引擎解析工具
 
 ### 未来
 
-- 支持cz图像的生成
-- 支持命令行使用（现在需要使用test来调用各种功能模块）
+- 支持命令行使用或tui使用（现在需要使用test来调用各种功能模块）
 - 支持更多LucaSystem引擎的游戏资源解析
+
+### 1.22
+- 完成CZ1导入
+- 完成CZ0导出导入
+- 支持LB_EN BATTLE指令
+- 修正PAK文件ID，与脚本中的ID对应
+- 更换日志库为glog
+- 引入tui库tview
 
 ### 1.21
 - 完成LZW压缩

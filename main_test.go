@@ -1,16 +1,26 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"lucksystem/game/VM"
 	"lucksystem/game/enum"
 	"lucksystem/script"
-	"lucksystem/utils"
+	"os"
 	"testing"
 
 	"github.com/go-restruct/restruct"
 )
 
+func TestMain(m *testing.M) {
+	flag.Set("alsologtostderr", "true")
+	flag.Set("log_dir", "log")
+	flag.Set("v", "10")
+	flag.Parse()
+
+	ret := m.Run()
+	os.Exit(ret)
+}
 func Test11(t *testing.T) {
 	var offset uint32 = 33
 	var BlockSize uint32 = 32
@@ -39,20 +49,19 @@ func TestLB_EN(t *testing.T) {
 	restruct.EnableExprBeta()
 
 	script := script.NewScriptFile(script.ScriptFileOptions{
-		FileName: "data/LB_EN/SCRIPT/SEEN0513",
+		FileName: "data/LB_EN/SCRIPT/_SAYAVOICE",
 		GameName: "LB_EN",
 		Version:  3,
 	})
 
 	script.Read()
-	utils.Debug = utils.DebugNone
 	vm := VM.NewVM(script, enum.VMRunExport)
 	err := vm.LoadOpcode("data/LB_EN/OPCODE.txt")
 	if err != nil {
 		fmt.Println(err)
 	}
 	vm.Run()
-	script.Export("data/LB_EN/TXT/SEEN0513.txt")
+	script.Export("data/LB_EN/TXT/_SAYAVOICE.txt")
 
 }
 
@@ -65,7 +74,6 @@ func TestLoadLB_EN(t *testing.T) {
 	})
 
 	script.Read()
-	utils.Debug = utils.DebugNone
 	err := script.Import("data/LB_EN/TXT/SEEN0514.txt")
 	if err != nil {
 		fmt.Println(err)
@@ -110,7 +118,6 @@ func TestSP(t *testing.T) {
 	// }
 	// script.ReadByEntry(entry)
 	script.Read()
-	utils.Debug = utils.DebugNone
 	vm := VM.NewVM(script, enum.VMRunExport)
 	err = vm.LoadOpcode("data/SP/OPCODE.txt")
 	// game := game.NewGame("SP")
@@ -134,7 +141,6 @@ func TestLoadSP(t *testing.T) {
 	})
 
 	script.Read()
-	utils.Debug = utils.DebugNone
 	err := script.Import("data/SP/TXT/10_日常0729.txt")
 	if err != nil {
 		fmt.Println(err)

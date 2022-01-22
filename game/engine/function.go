@@ -3,7 +3,7 @@
 package engine
 
 import (
-	"lucksystem/utils"
+	"github.com/golang/glog"
 )
 
 func (Engine) FARCALL(params ...interface{}) int {
@@ -13,7 +13,7 @@ func (Engine) FARCALL(params ...interface{}) int {
 	index := params[0].(uint16)
 	fileStr := params[1].(string)
 	jumpPos := params[2].(uint32)
-	utils.Logf("Engine: FARCALL (%d) {goto \"%s\", %d}", index, fileStr, jumpPos)
+	glog.V(3).Infof("Engine: FARCALL (%d) {goto \"%s\", %d}\n", index, fileStr, jumpPos)
 	return 0 // 向下执行
 }
 
@@ -24,6 +24,6 @@ func (Engine) JUMP(params ...interface{}) int {
 
 	fileStr := params[0].(string)
 	jumpPos := params[1].(uint32)
-	utils.Logf("Engine: JUMP {goto \"%s\", %d}", fileStr, jumpPos)
+	glog.V(3).Infof("Engine: JUMP {goto \"%s\", %d}\n", fileStr, jumpPos)
 	return 0 // 向下执行
 }

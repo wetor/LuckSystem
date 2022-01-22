@@ -2,9 +2,8 @@ package voice
 
 import (
 	"encoding/binary"
-	"lucksystem/utils"
-
 	"github.com/go-restruct/restruct"
+	"github.com/golang/glog"
 )
 
 type OggPak struct {
@@ -22,7 +21,7 @@ func LoadOggPak(index int, data []byte) (*OggPak, error) {
 	oggPak := &OggPak{}
 	err := restruct.Unpack(data, binary.LittleEndian, oggPak)
 	if err != nil {
-		utils.Log("restruct.Unpack", err.Error())
+		glog.V(8).Infoln("restruct.Unpack", err.Error())
 		return nil, err
 	}
 	oggPak.Index = index
