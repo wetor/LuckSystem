@@ -1,6 +1,7 @@
 package czimage
 
 import (
+	"flag"
 	"fmt"
 	"image/png"
 	"os"
@@ -82,4 +83,51 @@ func TestCz3Image_Import(t *testing.T) {
 	cz.Import("../data/LB_EN/IMAGE/4.png")
 	fmt.Println()
 
+}
+
+func TestCz1Image_Import(t *testing.T) {
+	restruct.EnableExprBeta()
+	data, _ := os.ReadFile("../data/LB_EN/IMAGE/明朝20.cz1")
+	cz, err := LoadCzImage(data)
+	if err != nil {
+		panic(err)
+	}
+	cz.Export("../data/LB_EN/IMAGE/明朝20.png")
+	cz.Import("../data/LB_EN/IMAGE/明朝20.png")
+	fmt.Println()
+	//data, _ = os.ReadFile("../data/LB_EN/IMAGE/明朝20.png.cz1")
+	//cz, err = LoadCzImage(data)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//cz.Export("../data/LB_EN/IMAGE/明朝20.cz1.png")
+
+}
+func TestCz0Image_Export(t *testing.T) {
+	restruct.EnableExprBeta()
+	data, _ := os.ReadFile("../data/LB_EN/IMAGE/10.cz0")
+	cz, err := LoadCzImage(data)
+	if err != nil {
+		panic(err)
+	}
+	cz.Export("../data/LB_EN/IMAGE/10.cz0.png")
+}
+func TestMain(m *testing.M) {
+	flag.Set("alsologtostderr", "true")
+	flag.Set("log_dir", "log")
+	flag.Set("v", "10")
+	flag.Parse()
+
+	ret := m.Run()
+	os.Exit(ret)
+}
+func TestCz0Image_Import(t *testing.T) {
+	restruct.EnableExprBeta()
+	data, _ := os.ReadFile("../data/LB_EN/IMAGE/10.cz0")
+	cz, err := LoadCzImage(data)
+	if err != nil {
+		panic(err)
+	}
+	cz.Export("../data/LB_EN/IMAGE/10.cz0.png")
+	cz.Import("../data/LB_EN/IMAGE/10.cz0.png")
 }

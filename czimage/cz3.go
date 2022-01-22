@@ -2,16 +2,16 @@ package czimage
 
 import (
 	"encoding/binary"
-	"fmt"
+	"github.com/golang/glog"
 	"image"
 	"image/png"
-	"lucksystem/utils"
 	"os"
 
 	"github.com/go-restruct/restruct"
 )
 
 type Cz3Header struct {
+	Flag    uint8
 	X       uint16
 	Y       uint16
 	Width1  uint16
@@ -34,18 +34,18 @@ type Cz3Image struct {
 func (cz *Cz3Image) Load(header CzHeader, data []byte) {
 	cz.CzHeader = header
 	cz.Raw = data
-	err := restruct.Unpack(cz.Raw[16:], binary.LittleEndian, &cz.Cz3Header)
+	err := restruct.Unpack(cz.Raw[15:], binary.LittleEndian, &cz.Cz3Header)
 	if err != nil {
 		panic(err)
 	}
-	utils.LogA("cz3 header ", cz.Cz3Header)
+	glog.V(6).Infoln("cz3 header ", cz.Cz3Header)
 	cz.OutputInfo = GetOutputInfo(cz.Raw[int(cz.HeaderLength):])
 }
 
 func (cz *Cz3Image) decompress() {
 	//os.WriteFile("../data/LB_EN/IMAGE/2.lzw", cz.Raw[int(cz.HeaderLength)+cz.OutputInfo.Offset:], 0666)
 	buf := Decompress(cz.Raw[int(cz.HeaderLength)+cz.OutputInfo.Offset:], cz.OutputInfo)
-	utils.LogA("uncompress size ", len(buf))
+	glog.V(6).Infoln("uncompress size ", len(buf))
 	cz.Image = LineDiff(&cz.CzHeader, buf)
 }
 
@@ -76,19 +76,23 @@ func (cz *Cz3Image) Import(file string) {
 		panic(err)
 	}
 	data := DiffLine(cz.CzHeader, cz.PngImage)
-	compressed, info := Compress(data, 0)
+	blockSize := 0
+	if len(cz.OutputInfo.BlockInfo) != 0 {
+		blockSize = int(cz.OutputInfo.BlockInfo[0].CompressedSize)
+	}
+	compressed, info := Compress(data, blockSize)
 
 	cz3File, _ := os.Create(file + ".cz3")
 	defer cz3File.Close()
-	fmt.Println(cz.CzHeader)
+	glog.V(6).Infoln(cz.CzHeader)
 	err = WriteStruct(cz3File, &cz.CzHeader, &cz.Cz3Header, info)
 
 	if err != nil {
 		panic(err)
 	}
 	cz3File.Write(compressed)
-	fmt.Println(cz.OutputInfo)
-	fmt.Println(info)
+	glog.V(6).Infoln(cz.OutputInfo)
+	glog.V(6).Infoln(info)
 	cz.OutputInfo.TotalRawSize = 0
 	cz.OutputInfo.TotalCompressedSize = 0
 	for _, block := range info.BlockInfo {

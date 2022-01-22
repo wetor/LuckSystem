@@ -4,6 +4,15 @@ import (
 	"fmt"
 )
 
+// compressLZW lzw压缩
+//  Description lzw压缩一块
+//  Param data []byte 未压缩数据
+//  Param size int 压缩后数据的大小限制
+//  Param last string 上一个lzw压缩剩余的element
+//  Return count 使用数据量
+//  Return compressed 压缩后的数据
+//  Return lastElement lzw压缩剩余的element
+//
 func compressLZW(data []byte, size int, last string) (count int, compressed []uint16, lastElement string) {
 	count = 0
 	dictionary := make(map[string]uint16)
@@ -51,7 +60,12 @@ func compressLZW(data []byte, size int, last string) (count int, compressed []ui
 	return count, compressed, lastElement
 }
 
-// decompressLZW cz1 cz3
+// decompressLZW lzw解压
+//  Description lzw解压一块
+//  Param compressed []uint16 压缩的数据
+//  Param size int 未压缩数据大小，可超过
+//  Return []byte 解压后的数据
+//
 func decompressLZW(compressed []uint16, size int) []byte {
 
 	dictionary := make(map[uint16][]byte)
@@ -77,67 +91,6 @@ func decompressLZW(compressed []uint16, size int) []byte {
 		w = append(w, entry[0])
 		dictionary[dictionaryCount] = w
 		dictionaryCount++
-
-		w = entry
-	}
-	return decompressed
-}
-
-// decompressLZW2 cz2
-func decompressLZW2(compressed []uint16, size int) []byte {
-
-	dictionary := make(map[uint16][]byte)
-	for i := 0; i < 256; i++ {
-		dictionary[uint16(i)] = []byte{byte(i)}
-	}
-	dictionaryCount := uint16(len(dictionary))
-	w := dictionary[compressed[0]]
-	decompressed := make([]byte, 0, size)
-	for _, element := range compressed {
-		element /= 2
-		var entry []byte
-		if x, ok := dictionary[element]; ok {
-			entry = make([]byte, len(x))
-			copy(entry, x)
-		} else if element == dictionaryCount {
-			entry = make([]byte, len(w), len(w)+1)
-			copy(entry, w)
-			entry = append(entry, w[0])
-		} else {
-			panic(fmt.Sprintf("Bad compressed element: %d", element))
-		}
-		decompressed = append(decompressed, entry...)
-		w = append(w, entry[0])
-		dictionary[dictionaryCount] = w
-		dictionaryCount++
-
-		w = entry
-	}
-	return decompressed
-}
-
-// decompressLZW_2 fast 有问题
-func decompressLZW_2(compressed []uint16, size int) []byte {
-
-	dictionary := make(map[uint16]string)
-	for i := 0; i < 256; i++ {
-		dictionary[uint16(i)] = string(byte(i))
-	}
-	code := uint16(len(dictionary))
-	w := dictionary[compressed[0]]
-	decompressed := make([]byte, 0, size)
-	for _, element := range compressed {
-		var entry string
-		if x, ok := dictionary[element]; ok {
-			entry = x
-		} else if element == code {
-			entry = w + string(w[0])
-		} else {
-			panic(fmt.Sprintf("Bad compressed element: %d", element))
-		}
-		decompressed = append(decompressed, entry...)
-		dictionary[code] = w + string(entry[0])
-		code++
 
 		w = entry
 	}

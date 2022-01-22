@@ -1,10 +1,10 @@
 package czimage
 
 import (
+	"github.com/golang/glog"
 	"image"
 	"image/color"
 	"image/png"
-	"lucksystem/utils"
 	"os"
 )
 
@@ -28,10 +28,10 @@ func (cz *Cz1Image) Load(header CzHeader, data []byte) {
 			cz.ColorPanel[i] = data[offset : offset+4]
 			offset += 4
 		}
-		utils.LogA("cz1 colorPanel", len(cz.ColorPanel))
+		glog.V(6).Infoln("cz1 colorPanel", len(cz.ColorPanel))
 		cz.OutputInfo = GetOutputInfo(data[offset:])
 		buf := Decompress(data[offset+cz.OutputInfo.Offset:], cz.OutputInfo)
-		utils.LogA("uncompress size", len(buf))
+		glog.V(6).Infoln("uncompress size", len(buf))
 		i := 0
 		var index uint8
 		for y := 0; y < int(header.Heigth); y++ {
@@ -56,10 +56,10 @@ func (cz *Cz1Image) Load(header CzHeader, data []byte) {
 			cz.ColorPanel[i] = data[offset : offset+4]
 			offset += 4
 		}
-		utils.LogA("cz1 colorPanel", len(cz.ColorPanel))
+		glog.V(6).Infoln("cz1 colorPanel", len(cz.ColorPanel))
 		cz.OutputInfo = GetOutputInfo(data[offset:])
 		buf := Decompress(data[offset+cz.OutputInfo.Offset:], cz.OutputInfo)
-		utils.LogA("uncompress size", len(buf))
+		glog.V(6).Infoln("uncompress size", len(buf))
 		// B,G,R,A
 		// 0,1,2,3
 		i := 0
@@ -79,7 +79,7 @@ func (cz *Cz1Image) Load(header CzHeader, data []byte) {
 		// RGB
 		cz.OutputInfo = GetOutputInfo(data[offset:])
 		buf := Decompress(data[offset+cz.OutputInfo.Offset:], cz.OutputInfo)
-		utils.LogA("uncompress size", len(buf))
+		glog.V(6).Infoln("uncompress size", len(buf))
 		i := 0
 		for y := 0; y < int(header.Heigth); y++ {
 			for x := 0; x < int(header.Width); x++ {
@@ -97,7 +97,7 @@ func (cz *Cz1Image) Load(header CzHeader, data []byte) {
 		// RGBA
 		cz.OutputInfo = GetOutputInfo(data[offset:])
 		buf := Decompress(data[offset+cz.OutputInfo.Offset:], cz.OutputInfo)
-		utils.LogA("uncompress size", len(buf))
+		glog.V(6).Infoln("uncompress size", len(buf))
 		pic.Pix = buf
 	}
 
@@ -113,5 +113,52 @@ func (cz *Cz1Image) GetImage() image.Image {
 	return cz.Image
 }
 func (cz *Cz1Image) Import(file string) {
+	pngFile, err := os.Open(file)
+	if err != nil {
+		panic(err)
+	}
+	defer pngFile.Close()
+	cz.PngImage, err = png.Decode(pngFile)
+	if err != nil {
+		panic(err)
+	}
+	pic := cz.PngImage.(*image.NRGBA)
+	width := int(cz.Width)
+	height := int(cz.Heigth)
+	if width != pic.Rect.Size().X || height != pic.Rect.Size().Y {
+		glog.V(2).Infof("图片大小不匹配，应该为 w%d h%d\n", width, height)
+		return
+	}
+	data := make([]byte, width*height)
+	i := 0
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			data[i] = pic.At(x, y).(color.NRGBA).A
+			i++
+		}
+	}
+	blockSize := 0
+	if len(cz.OutputInfo.BlockInfo) != 0 {
+		blockSize = int(cz.OutputInfo.BlockInfo[0].CompressedSize)
+	}
+	compressed, info := Compress(data, blockSize)
 
+	cz1File, _ := os.Create(file + ".cz1")
+	defer cz1File.Close()
+	glog.V(6).Infoln(cz.CzHeader)
+	err = WriteStruct(cz1File, &cz.CzHeader, cz.ColorPanel, info)
+
+	if err != nil {
+		panic(err)
+	}
+	cz1File.Write(compressed)
+	glog.V(6).Infoln(cz.OutputInfo)
+	glog.V(6).Infoln(info)
+	cz.OutputInfo.TotalRawSize = 0
+	cz.OutputInfo.TotalCompressedSize = 0
+	for _, block := range info.BlockInfo {
+		cz.OutputInfo.TotalRawSize += int(block.RawSize)
+		cz.OutputInfo.TotalCompressedSize += int(block.CompressedSize)
+	}
+	cz.OutputInfo.Offset = 4 + int(cz.OutputInfo.FileCount)*8
 }
