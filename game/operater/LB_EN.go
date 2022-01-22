@@ -1,11 +1,11 @@
 package operater
 
 import (
+	"github.com/golang/glog"
 	"lucksystem/charset"
 	"lucksystem/game/context"
 	"lucksystem/game/engine"
 	"lucksystem/script"
-	"lucksystem/utils"
 )
 
 type LB_EN struct {
@@ -94,7 +94,7 @@ func (g *LB_EN) SELECT(ctx *context.Context) engine.HandlerFunc {
 		selectID := ctx.Engine.SELECT(msgStr_jp)
 
 		//fun.Call(&varID, msgStr_en)
-		utils.Logf("SELECT #%d = %d", varID, selectID)
+		glog.V(3).Infof("SELECT #%d = %d\n", varID, selectID)
 		ctx.Variable.Set(ToString("#%d", varID), selectID)
 		ctx.ChanEIP <- 0
 	}
@@ -134,6 +134,56 @@ func (g *LB_EN) IMAGELOAD(ctx *context.Context) engine.HandlerFunc {
 		// 这里是执行 与虚拟机逻辑有关的代码
 
 		// 下一步执行地址，为0则表示紧接着向下
+		ctx.ChanEIP <- 0
+	}
+}
+func (g *LB_EN) BATTLE(ctx *context.Context) engine.HandlerFunc {
+	code := ctx.Code()
+	var battleId uint16
+	var msgStr_jp string
+	var msgStr_en string
+	var var1 uint16
+
+	next := GetParam(code.ParamBytes, &battleId)
+	if len(code.ParamBytes) <= next {
+		ctx.Script().SetOperateParams(ctx.CIndex, ctx.RunMode, battleId, []bool{true})
+
+	} else if battleId == 301 || battleId == 302 {
+		GetParam(code.ParamBytes, &var1, next)
+		ctx.Script().SetOperateParams(ctx.CIndex, ctx.RunMode,
+			battleId,
+			var1,
+			[]bool{true, true},
+		)
+	} else if battleId == 300 {
+		GetParam(code.ParamBytes, &msgStr_jp, next, 0, g.ExprCharset)
+		ctx.Script().SetOperateParams(ctx.CIndex, ctx.RunMode,
+			battleId,
+			&script.StringParam{
+				Data:   msgStr_jp,
+				Coding: g.ExprCharset,
+			},
+			[]bool{true, true},
+		)
+	} else {
+		next = GetParam(code.ParamBytes, &msgStr_jp, next, 0, g.TextCharset)
+		GetParam(code.ParamBytes, &msgStr_en, next, 0, g.TextCharset)
+		ctx.Script().SetOperateParams(ctx.CIndex, ctx.RunMode,
+			battleId,
+			&script.StringParam{
+				Data:   msgStr_jp,
+				Coding: g.TextCharset,
+			}, &script.StringParam{
+				Data:   msgStr_en,
+				Coding: g.TextCharset,
+			},
+			[]bool{true, true, true},
+		)
+	}
+
+	return func() {
+		// 这里是执行内容
+		ctx.Engine.MESSAGE(battleId, msgStr_jp)
 		ctx.ChanEIP <- 0
 	}
 }
