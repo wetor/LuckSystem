@@ -3,9 +3,9 @@ package pak
 import (
 	"encoding/binary"
 	"errors"
+	"github.com/golang/glog"
 	"io"
 	"lucksystem/charset"
-	"lucksystem/utils"
 	"os"
 	"strconv"
 
@@ -20,7 +20,7 @@ type PakFileOptions struct {
 type PakHeader struct {
 	HeaderLength uint32
 	FileCount    uint32
-	Unk1         uint32
+	IDStart      uint32 // 图像包中，id段开始
 	BlockSize    uint32
 
 	Unk2 uint32
@@ -31,6 +31,7 @@ type PakHeader struct {
 	Flags uint32
 	// 4 * 9 = 36
 }
+type PakType string
 
 type PakFile struct {
 	PakHeader `struct:"-"`
@@ -61,7 +62,7 @@ func (p *PakFile) Open() error {
 	f, err := os.Open(p.FileName)
 
 	if err != nil {
-		utils.Log("os.Open", err)
+		glog.V(8).Infoln("os.Open", err)
 		return err
 	}
 	defer f.Close()
@@ -75,7 +76,7 @@ func (p *PakFile) Open() error {
 
 	err = restruct.Unpack(data, binary.LittleEndian, &p.PakHeader)
 	if err != nil {
-		utils.Log("restruct.Unpack1", err)
+		glog.V(8).Infoln("restruct.Unpack1", err)
 		return err
 	}
 
@@ -92,7 +93,7 @@ func (p *PakFile) Open() error {
 	offData := data[tempPos : tempPos+int64(8*p.FileCount)]
 	err = restruct.Unpack(offData, binary.LittleEndian, p)
 	if err != nil {
-		utils.Log("restruct.Unpack2", err)
+		glog.V(8).Infoln("restruct.Unpack2", err)
 		return err
 	}
 	// 读取文件名
@@ -124,8 +125,10 @@ func (p *PakFile) Open() error {
 		if !named {
 			file.Name = strconv.Itoa(i)
 		}
-		file.Index = i
-		p.NameMap[file.Name] = i
+
+		file.ID = int(p.IDStart) + i
+
+		p.NameMap[file.Name] = file.ID
 		file.Offset *= p.BlockSize
 		file.Replace = false
 		// file.Data = data[file.Offset : file.Offset+file.Length]
@@ -140,14 +143,15 @@ func (p *PakFile) Open() error {
 
 func (p *PakFile) Get(name string) (*FileEntry, error) {
 
-	index, has := p.NameMap[name]
+	id, has := p.NameMap[name]
 	if !has {
 		return nil, errors.New("文件不存在")
 	}
-	return p.GetById(index)
+	return p.GetById(id)
 }
 func (p *PakFile) GetById(id int) (*FileEntry, error) {
 
+	id -= int(p.IDStart)
 	if id < 0 || id >= int(p.FileCount) {
 		return nil, errors.New("文件id错误")
 	}
@@ -159,7 +163,7 @@ func (p *PakFile) GetById(id int) (*FileEntry, error) {
 	}
 	f, err := os.Open(p.FileName)
 	if err != nil {
-		utils.Log("os.Open", err)
+		glog.V(8).Infoln("os.Open", err)
 		return nil, err
 	}
 	defer f.Close()
@@ -178,11 +182,11 @@ func (p *PakFile) GetById(id int) (*FileEntry, error) {
 //  Return error
 //
 func (p *PakFile) Set(name, setFileName string) error {
-	index, has := p.NameMap[name]
+	id, has := p.NameMap[name]
 	if !has {
 		return errors.New("文件不存在")
 	}
-	return p.SetById(index, setFileName)
+	return p.SetById(id, setFileName)
 }
 
 func (p *PakFile) SetById(id int, setFileName string) error {
@@ -192,7 +196,7 @@ func (p *PakFile) SetById(id int, setFileName string) error {
 	entry := p.Files[id]
 	newData, err := os.ReadFile(setFileName)
 	if err != nil {
-		utils.Log("os.ReadFile", err)
+		glog.V(8).Infoln("os.ReadFile", err)
 		return err
 	}
 	alignLength := entry.Length
@@ -232,14 +236,14 @@ func (p *PakFile) Write() error {
 	}
 	oldFile, err := os.Open(p.FileName)
 	if err != nil {
-		utils.Log("os.Open", err)
+		glog.V(8).Infoln("os.Open", err)
 		return err
 	}
 	defer oldFile.Close()
 
 	file, err := os.Create(p.FileName + ".out")
 	if err != nil {
-		utils.Log("os.Create", err)
+		glog.V(8).Infoln("os.Create", err)
 		return err
 	}
 	defer file.Close()
@@ -247,7 +251,7 @@ func (p *PakFile) Write() error {
 	// 1. 复制文件全部内容
 	_, err = io.Copy(file, oldFile)
 	if err != nil {
-		utils.Log("io.Copy", err)
+		glog.V(8).Infoln("io.Copy", err)
 		return err
 	}
 	// 2. 写入偏移和长度和数据

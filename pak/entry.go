@@ -5,7 +5,7 @@ type FileEntry struct {
 	Length  uint32
 	Data    []byte `struct:"-"`
 	Name    string `struct:"-"`
-	Index   int    `struct:"-"`
+	ID      int    `struct:"-"`
 	Replace bool   `struct:"-"`
 }
 

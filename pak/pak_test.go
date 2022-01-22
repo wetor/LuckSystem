@@ -23,7 +23,7 @@ func TestPak(t *testing.T) {
 	}
 	fmt.Printf("%v %v\n", pak.PakHeader, pak.Files[0].Name)
 	for _, f := range pak.Files {
-		fmt.Println(f.Index, f.Name, f.Offset, f.Length)
+		fmt.Println(f.ID, f.Name, f.Offset, f.Length)
 	}
 }
 
@@ -39,7 +39,7 @@ func TestVoicePak(t *testing.T) {
 	}
 	fmt.Printf("%v\n", pak.PakHeader)
 	// for _, f := range pak.Files {
-	// 	fmt.Println(f.Index, f.Name, f.Offset, f.Length)
+	// 	fmt.Println(f.ID, f.Name, f.Offset, f.Length)
 	// }
 	for i := 0; i < 3; i++ {
 
@@ -67,7 +67,7 @@ func TestCGPak(t *testing.T) {
 	}
 	fmt.Printf("%v\n", pak.PakHeader)
 	// for _, f := range pak.Files {
-	// 	fmt.Println(f.Index, f.Name, f.Offset, f.Length)
+	// 	fmt.Println(f.ID, f.Name, f.Offset, f.Length)
 	// }
 	for i := 0; i < 10; i++ {
 
@@ -91,7 +91,7 @@ func TestFontPak(t *testing.T) {
 	}
 	fmt.Printf("%v\n", pak.PakHeader)
 	for _, f := range pak.Files {
-		fmt.Println(f.Index, f.Name, f.Offset, f.Length)
+		fmt.Println(f.ID, f.Name, f.Offset, f.Length)
 	}
 	// list := []string{"info20", "info24", "明朝24", "明朝20"}
 	// for _, name := range list {
@@ -119,7 +119,7 @@ func TestPakReplace(t *testing.T) {
 		if i < 160 {
 			continue
 		}
-		fmt.Println(f.Index, f.Name, f.Offset, f.Length, f.Replace)
+		fmt.Println(f.ID, f.Name, f.Offset, f.Length, f.Replace)
 	}
 	fmt.Printf("==============\n")
 
@@ -132,15 +132,18 @@ func TestPakReplace(t *testing.T) {
 		if i < 160 {
 			continue
 		}
-		fmt.Println(f.Index, f.Name, f.Offset, f.Length, f.Replace)
+		fmt.Println(f.ID, f.Name, f.Offset, f.Length, f.Replace)
 	}
 }
 
 func TestPakFindCZ2(t *testing.T) {
-
+	//BGCG 266
+	//SYSCG 33
+	//SYSCG2 122
+	//CHARCG 1910
 	restruct.EnableExprBeta()
 	pak := NewPak(&PakFileOptions{
-		FileName: "/Volumes/NTFS/Download/Little.Busters.English.Edition/Little Busters! English Edition/files/FONT.PAK",
+		FileName: "/Volumes/NTFS/Download/Little.Busters.English.Edition/Little Busters! English Edition/files/CHARCG.PAK",
 		Coding:   charset.UTF_8,
 	})
 	err := pak.Open()
@@ -150,11 +153,40 @@ func TestPakFindCZ2(t *testing.T) {
 	fmt.Printf("%v\n", pak.PakHeader)
 	for _, f := range pak.Files {
 
-		e, _ := pak.GetById(f.Index)
-		if string(e.Data[:3]) == "CZ2" {
-			fmt.Println(f.Index, f.Name, f.Offset, f.Length, f.Replace)
-		}
+		e, _ := pak.GetById(f.ID)
+		fmt.Println(string(e.Data[:3]), f.ID, f.Name, f.Offset, f.Length, f.Replace)
 
 	}
 	fmt.Printf("==============\n")
+	//e, _ := pak.GetById(10)
+	//os.WriteFile("../data/LB_EN/IMAGE/10.cz0", e.Data, 0666)
+}
+func TestPakFindImage(t *testing.T) {
+
+	restruct.EnableExprBeta()
+	pak := NewPak(&PakFileOptions{
+		FileName: "/Volumes/NTFS/Download/Little.Busters.English.Edition/Little Busters! English Edition/files/CHARCG.PAK",
+		Coding:   charset.UTF_8,
+	})
+	err := pak.Open()
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Printf("%v\n", pak.PakHeader)
+	for _, f := range pak.Files {
+
+		fmt.Println(f.ID, f.Name, f.Offset, f.Length, f.Replace)
+
+	}
+	fmt.Printf("==============\n")
+	//for _, f := range pak.Files {
+	//	e, _ := pak.GetById(f.ID)
+	//
+	//	cz, err := czimage.LoadCzImage(e.Data)
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//	cz.Export("../data/LB_EN/IMAGE/char/" + strconv.Itoa(f.ID) + ".png")
+	//}
+
 }
