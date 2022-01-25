@@ -140,6 +140,19 @@ func (p *PakFile) Open() error {
 
 	return nil
 }
+func (p *PakFile) ReadAll() []*FileEntry {
+	f, err := os.Open(p.FileName)
+	if err != nil {
+		glog.V(8).Infoln("os.Open", err)
+		return nil
+	}
+	defer f.Close()
+	for _, e := range p.Files {
+		e.Data = make([]byte, e.Length)
+		f.ReadAt(e.Data, int64(e.Offset))
+	}
+	return p.Files
+}
 
 func (p *PakFile) Get(name string) (*FileEntry, error) {
 
@@ -149,14 +162,17 @@ func (p *PakFile) Get(name string) (*FileEntry, error) {
 	}
 	return p.GetById(id)
 }
-func (p *PakFile) GetById(id int) (*FileEntry, error) {
 
-	id -= int(p.IDStart)
-	if id < 0 || id >= int(p.FileCount) {
+func (p *PakFile) GetById(id int) (*FileEntry, error) {
+	return p.GetByIndex(id - int(p.IDStart))
+}
+func (p *PakFile) GetByIndex(index int) (*FileEntry, error) {
+
+	if index < 0 || index >= int(p.FileCount) {
 		return nil, errors.New("文件id错误")
 	}
 
-	entry := p.Files[id]
+	entry := p.Files[index]
 	if entry.Offset == 0 && entry.Data != nil && len(entry.Data) > 0 {
 		// 外部数据
 		return entry, nil
@@ -188,12 +204,14 @@ func (p *PakFile) Set(name, setFileName string) error {
 	}
 	return p.SetById(id, setFileName)
 }
-
 func (p *PakFile) SetById(id int, setFileName string) error {
-	if id < 0 || id >= int(p.FileCount) {
+	return p.SetByIndex(id-int(p.IDStart), setFileName)
+}
+func (p *PakFile) SetByIndex(index int, setFileName string) error {
+	if index < 0 || index >= int(p.FileCount) {
 		return errors.New("文件id错误")
 	}
-	entry := p.Files[id]
+	entry := p.Files[index]
 	newData, err := os.ReadFile(setFileName)
 	if err != nil {
 		glog.V(8).Infoln("os.ReadFile", err)
@@ -212,7 +230,7 @@ func (p *PakFile) SetById(id int, setFileName string) error {
 	return nil
 }
 
-func (p *PakFile) Write() error {
+func (p *PakFile) Write(filename string) error {
 
 	oldOffset := make(map[int]uint32, p.FileCount)
 	if p.Rebuild {
@@ -241,7 +259,7 @@ func (p *PakFile) Write() error {
 	}
 	defer oldFile.Close()
 
-	file, err := os.Create(p.FileName + ".out")
+	file, err := os.Create(filename)
 	if err != nil {
 		glog.V(8).Infoln("os.Create", err)
 		return err

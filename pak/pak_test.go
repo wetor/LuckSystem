@@ -14,7 +14,7 @@ import (
 func TestPak(t *testing.T) {
 	restruct.EnableExprBeta()
 	pak := NewPak(&PakFileOptions{
-		FileName: "../data/LB_EN/SCRIPT.PAK",
+		FileName: "../data/LB_EN/SCRIPT.PAK.out",
 		Coding:   charset.ShiftJIS,
 	})
 	err := pak.Open()
@@ -125,7 +125,7 @@ func TestPakReplace(t *testing.T) {
 
 	pak.SetById(166, "/Users/wetor/GoProjects/LuckSystem/LuckSystem/data/LB_EN/SCRIPT/_VARSTR")
 
-	pak.Write()
+	pak.Write("../data/LB_EN/SCRIPT.PAK.out")
 
 	fmt.Printf("%v\n", pak.Rebuild)
 	for i, f := range pak.Files {

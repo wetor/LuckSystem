@@ -1,9 +1,7 @@
 package main
 
 import (
-	"flag"
-	"github.com/golang/glog"
-	"github.com/rivo/tview"
+	"lucksystem/cmd"
 )
 
 // glog level:
@@ -17,21 +15,17 @@ import (
 //   8 错误信息（不panic，完全可忽略）
 
 func main() {
-	flag.Set("alsologtostderr", "true")
-	flag.Set("log_dir", "log")
-	flag.Set("v", "10")
-	flag.Parse()
-	glog.V(8).Infoln("helloworld")
-	app := tview.NewApplication()
-	list := tview.NewList().
-		AddItem("List item 1", "Some explanatory text", 'a', nil).
-		AddItem("List item 2", "Some explanatory text", 'b', nil).
-		AddItem("List item 3", "Some explanatory text", 'c', nil).
-		AddItem("List item 4", "Some explanatory text", 'd', nil).
-		AddItem("Quit", "Press to exit", 'q', func() {
-			app.Stop()
-		})
-	if err := app.SetRoot(list, true).EnableMouse(true).Run(); err != nil {
-		panic(err)
-	}
+
+	// Export all to folder
+	// go run . -type pak -i data/LB_EN/SCRIPT.PAK -o data/LB_EN/test  -charset=sjis  -mode export -config all
+	// Export file by index
+	// go run . -type pak -i data/LB_EN/SCRIPT.PAK -o data/LB_EN/test/001.scr  -charset=sjis  -mode export -config index,1
+	// Export file by name
+	// go run . -type pak -i data/LB_EN/SCRIPT.PAK -o data/LB_EN/test/001.scr  -charset=sjis  -mode export -config name,_BUILD_COUNT
+	// Folder import Pak
+	// go run . -type pak -i data/LB_EN/SCRIPT.PAK -o data/LB_EN/SCRIPT.PAK.out  -charset=sjis  -mode import -config data/LB_EN/test
+	// File import Pak
+	// go run . -type pak -i data/LB_EN/SCRIPT.PAK -o data/LB_EN/SCRIPT.PAK.out  -charset=sjis  -mode import -config data/LB_EN/test/_CGMODE
+	cmd.Cmd()
+
 }
