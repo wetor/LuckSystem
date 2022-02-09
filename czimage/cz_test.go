@@ -19,7 +19,9 @@ func TestCZ3(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		cz.Export("../data/LB_EN/IMAGE/" + strconv.Itoa(i) + ".png")
+		w, _ := os.Create("../data/LB_EN/IMAGE/" + strconv.Itoa(i) + ".png")
+		cz.Export(w)
+		w.Close()
 		fmt.Println()
 	}
 
@@ -34,10 +36,26 @@ func TestCZ1(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
-		cz.Export("../data/LB_EN/IMAGE/" + name + ".png")
+		w, _ := os.Create("../data/LB_EN/IMAGE/" + name + ".png")
+		cz.Export(w)
+		w.Close()
 		fmt.Println()
 
 	}
+
+}
+func TestCZ1_2(t *testing.T) {
+	restruct.EnableExprBeta()
+
+	data, _ := os.ReadFile("../data/Other/Font/モダン32e")
+	cz, err := LoadCzImage(data)
+	if err != nil {
+		panic(err)
+	}
+	w, _ := os.Create("../data/Other/Font/モダン32e.cz1.png")
+	cz.Export(w)
+	w.Close()
+	fmt.Println()
 
 }
 func TestLineDiff(t *testing.T) {
@@ -79,8 +97,15 @@ func TestCz3Image_Import(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	cz.Export("../data/LB_EN/IMAGE/4.png")
-	cz.Import("../data/LB_EN/IMAGE/4.png")
+	w, _ := os.Create("../data/LB_EN/IMAGE/4.png")
+	cz.Export(w)
+	w.Close()
+
+	r, _ := os.Open("../data/LB_EN/IMAGE/4.png")
+	defer r.Close()
+	w, _ = os.Create("../data/LB_EN/IMAGE/4.png.cz3")
+	defer w.Close()
+	cz.Import(r, w)
 	fmt.Println()
 
 }
@@ -92,8 +117,15 @@ func TestCz1Image_Import(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	cz.Export("../data/LB_EN/IMAGE/明朝20.png")
-	cz.Import("../data/LB_EN/IMAGE/明朝20.png")
+	w, _ := os.Create("../data/LB_EN/IMAGE/明朝20.png")
+	cz.Export(w)
+	w.Close()
+
+	r, _ := os.Open("../data/LB_EN/IMAGE/明朝20.png")
+	defer r.Close()
+	w, _ = os.Create("../data/LB_EN/IMAGE/明朝20.png.cz1")
+	defer w.Close()
+	cz.Import(r, w)
 	fmt.Println()
 	//data, _ = os.ReadFile("../data/LB_EN/IMAGE/明朝20.png.cz1")
 	//cz, err = LoadCzImage(data)
@@ -110,7 +142,10 @@ func TestCz0Image_Export(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	cz.Export("../data/LB_EN/IMAGE/10.cz0.png")
+
+	w, _ := os.Create("../data/LB_EN/IMAGE/10.cz0.png")
+	cz.Export(w)
+	w.Close()
 }
 func TestMain(m *testing.M) {
 	flag.Set("alsologtostderr", "true")
@@ -128,6 +163,15 @@ func TestCz0Image_Import(t *testing.T) {
 	if err != nil {
 		panic(err)
 	}
-	cz.Export("../data/LB_EN/IMAGE/10.cz0.png")
-	cz.Import("../data/LB_EN/IMAGE/10.cz0.png")
+
+	w, _ := os.Create("../data/LB_EN/IMAGE/10.cz0.png")
+	cz.Export(w)
+	w.Close()
+
+	r, _ := os.Open("../data/LB_EN/IMAGE/10.cz0.png")
+	defer r.Close()
+	w, _ = os.Create("../data/LB_EN/IMAGE/10.cz0.png.cz0")
+	defer w.Close()
+	cz.Import(r, w)
+	fmt.Println()
 }

@@ -5,7 +5,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
-	"os"
+	"io"
 )
 
 // Cz1Image
@@ -103,28 +103,35 @@ func (cz *Cz1Image) Load(header CzHeader, data []byte) {
 
 	cz.Image = pic
 }
-func (cz *Cz1Image) Export(path string) {
-	f, _ := os.Create(path)
-	defer f.Close()
-	png.Encode(f, cz.Image)
+func (cz *Cz1Image) Export(w io.Writer, opt ...interface{}) {
+	png.Encode(w, cz.Image)
 }
 
 func (cz *Cz1Image) GetImage() image.Image {
 	return cz.Image
 }
-func (cz *Cz1Image) Import(file string) {
-	pngFile, err := os.Open(file)
-	if err != nil {
-		panic(err)
-	}
-	defer pngFile.Close()
-	cz.PngImage, err = png.Decode(pngFile)
+
+// Import
+//  Description
+//  Receiver cz *Cz1Image
+//  Param file string
+//  Param opt ...interface{}
+//    opt[0] bool 是否填充大小
+//
+func (cz *Cz1Image) Import(r io.Reader, w io.Writer, opt ...interface{}) {
+	var err error
+	cz.PngImage, err = png.Decode(r)
 	if err != nil {
 		panic(err)
 	}
 	pic := cz.PngImage.(*image.NRGBA)
 	width := int(cz.Width)
 	height := int(cz.Heigth)
+	if len(opt) > 0 && opt[0].(bool) == true {
+		// 填充大小
+		pic = FillImage(pic, width, height)
+	}
+
 	if width != pic.Rect.Size().X || height != pic.Rect.Size().Y {
 		glog.V(2).Infof("图片大小不匹配，应该为 w%d h%d\n", width, height)
 		return
@@ -143,15 +150,13 @@ func (cz *Cz1Image) Import(file string) {
 	}
 	compressed, info := Compress(data, blockSize)
 
-	cz1File, _ := os.Create(file + ".cz1")
-	defer cz1File.Close()
 	glog.V(6).Infoln(cz.CzHeader)
-	err = WriteStruct(cz1File, &cz.CzHeader, cz.ColorPanel, info)
+	err = WriteStruct(w, &cz.CzHeader, cz.ColorPanel, info)
 
 	if err != nil {
 		panic(err)
 	}
-	cz1File.Write(compressed)
+	w.Write(compressed)
 	glog.V(6).Infoln(cz.OutputInfo)
 	glog.V(6).Infoln(info)
 	cz.OutputInfo.TotalRawSize = 0
