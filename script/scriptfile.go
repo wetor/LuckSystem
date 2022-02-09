@@ -14,6 +14,7 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"strings"
 
 	"github.com/go-restruct/restruct"
 )
@@ -338,6 +339,7 @@ func (s *ScriptFile) Export(file string) error {
 	w := bufio.NewWriter(f)
 	for i, code := range s.Codes {
 		str := ToStringCodeParams(code)
+		str = strings.Replace(str, "\n", "\\n", -1)
 		fmt.Fprintln(w, str)
 
 		glog.V(6).Infoln(i, str)
@@ -362,6 +364,8 @@ func (s *ScriptFile) Import(file string) error {
 		} else if err != nil {
 			return err
 		}
+		line = strings.Replace(line, "\\n", "\n", -1)
+		fmt.Println(line)
 		ParseCodeParams(code, line)
 
 		fmt.Print(i)

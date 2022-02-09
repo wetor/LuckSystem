@@ -60,6 +60,9 @@ func ParseCodeParams(code *CodeLine, codeStr string) {
 	for _, ch := range codeStr {
 		if isString {
 			if ch == '"' {
+				if len(word) == 0 { // 空字符串
+					word = append(word, '\x00')
+				}
 				isString = false
 				continue
 			}
@@ -71,6 +74,9 @@ func ParseCodeParams(code *CodeLine, codeStr string) {
 		case ' ', ',', '(', ')', '}', '\n':
 			if len(word) > 0 {
 				wordStr := string(word)
+				if word[0] == '\x00' {
+					wordStr = ""
+				}
 				if opStr == "" {
 					opStr = wordStr
 				} else if isSpecial {

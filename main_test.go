@@ -49,7 +49,7 @@ func TestLB_EN(t *testing.T) {
 	restruct.EnableExprBeta()
 
 	script := script.NewScriptFile(script.ScriptFileOptions{
-		FileName: "data/LB_EN/SCRIPT/_SAYAVOICE",
+		FileName: "data/LB_EN/SCRIPT/SEEN2005",
 		GameName: "LB_EN",
 		Version:  3,
 	})
@@ -61,20 +61,20 @@ func TestLB_EN(t *testing.T) {
 		fmt.Println(err)
 	}
 	vm.Run()
-	script.Export("data/LB_EN/TXT/_SAYAVOICE.txt")
+	script.Export("data/LB_EN/TXT/SEEN2005.txt")
 
 }
 
 func TestLoadLB_EN(t *testing.T) {
 	restruct.EnableExprBeta()
 	script := script.NewScriptFile(script.ScriptFileOptions{
-		FileName: "data/LB_EN/SCRIPT/SEEN0514",
+		FileName: "data/LB_EN/SCRIPT/SEEN2005",
 		GameName: "LB_EN",
 		Version:  3,
 	})
 
 	script.Read()
-	err := script.Import("data/LB_EN/TXT/SEEN0514.txt")
+	err := script.Import("data/LB_EN/TXT/SEEN2005.txt")
 	if err != nil {
 		fmt.Println(err)
 	}
