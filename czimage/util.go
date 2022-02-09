@@ -4,8 +4,16 @@ import (
 	"bytes"
 	"encoding/binary"
 	"github.com/go-restruct/restruct"
+	"image"
+	"image/draw"
 	"io"
 )
+
+func FillImage(src image.Image, width, height int) (dst *image.NRGBA) {
+	dst = image.NewNRGBA(image.Rect(0, 0, width, height))
+	draw.Draw(dst, dst.Bounds().Add(image.Pt(0, 0)), src, src.Bounds().Min, draw.Src)
+	return dst
+}
 
 // GetOutputInfo 读取分块信息
 //  Description 读取分块信息

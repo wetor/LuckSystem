@@ -2,12 +2,11 @@ package czimage
 
 import (
 	"encoding/binary"
+	"github.com/go-restruct/restruct"
 	"github.com/golang/glog"
 	"image"
 	"image/png"
-	"os"
-
-	"github.com/go-restruct/restruct"
+	"io"
 )
 
 type Cz3Header struct {
@@ -49,13 +48,11 @@ func (cz *Cz3Image) decompress() {
 	cz.Image = LineDiff(&cz.CzHeader, buf)
 }
 
-func (cz *Cz3Image) Export(path string) {
+func (cz *Cz3Image) Export(w io.Writer, opt ...interface{}) {
 	if cz.Image == nil {
 		cz.decompress()
 	}
-	f, _ := os.Create(path)
-	defer f.Close()
-	png.Encode(f, cz.Image)
+	png.Encode(w, cz.Image)
 }
 
 func (cz *Cz3Image) GetImage() image.Image {
@@ -65,13 +62,9 @@ func (cz *Cz3Image) GetImage() image.Image {
 	return cz.Image
 }
 
-func (cz *Cz3Image) Import(file string) {
-	pngFile, err := os.Open(file)
-	if err != nil {
-		panic(err)
-	}
-	defer pngFile.Close()
-	cz.PngImage, err = png.Decode(pngFile)
+func (cz *Cz3Image) Import(r io.Reader, w io.Writer, opt ...interface{}) {
+	var err error
+	cz.PngImage, err = png.Decode(r)
 	if err != nil {
 		panic(err)
 	}
@@ -82,15 +75,13 @@ func (cz *Cz3Image) Import(file string) {
 	}
 	compressed, info := Compress(data, blockSize)
 
-	cz3File, _ := os.Create(file + ".cz3")
-	defer cz3File.Close()
 	glog.V(6).Infoln(cz.CzHeader)
-	err = WriteStruct(cz3File, &cz.CzHeader, &cz.Cz3Header, info)
+	err = WriteStruct(w, &cz.CzHeader, &cz.Cz3Header, info)
 
 	if err != nil {
 		panic(err)
 	}
-	cz3File.Write(compressed)
+	w.Write(compressed)
 	glog.V(6).Infoln(cz.OutputInfo)
 	glog.V(6).Infoln(info)
 	cz.OutputInfo.TotalRawSize = 0

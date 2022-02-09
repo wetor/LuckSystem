@@ -6,6 +6,7 @@ import (
 	"github.com/go-restruct/restruct"
 	"github.com/golang/glog"
 	"image"
+	"io"
 )
 
 // CzHeader
@@ -49,8 +50,8 @@ type CzOutputInfo struct {
 type CzImage interface {
 	Load(header CzHeader, data []byte)
 	GetImage() image.Image
-	Export(path string)
-	Import(file string)
+	Export(w io.Writer, opt ...interface{})
+	Import(r io.Reader, w io.Writer, opt ...interface{})
 }
 
 func LoadCzImage(data []byte) (CzImage, error) {

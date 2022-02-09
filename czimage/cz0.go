@@ -2,13 +2,12 @@ package czimage
 
 import (
 	"encoding/binary"
+	"github.com/go-restruct/restruct"
 	"github.com/golang/glog"
 	"image"
 	"image/color"
 	"image/png"
-	"os"
-
-	"github.com/go-restruct/restruct"
+	"io"
 )
 
 type Cz0Header struct {
@@ -50,7 +49,7 @@ func (cz *Cz0Image) decompress() {
 	cz.Image = LineDiff(&cz.CzHeader, buf)
 }
 
-func (cz *Cz0Image) Export(path string) {
+func (cz *Cz0Image) Export(w io.Writer, opt ...interface{}) {
 	pic := image.NewRGBA(image.Rect(0, 0, int(cz.Width), int(cz.Heigth)))
 	offset := int(cz.HeaderLength)
 	switch cz.Colorbits {
@@ -68,9 +67,7 @@ func (cz *Cz0Image) Export(path string) {
 		}
 	}
 	cz.Image = pic
-	f, _ := os.Create(path)
-	defer f.Close()
-	png.Encode(f, cz.Image)
+	png.Encode(w, cz.Image)
 }
 
 func (cz *Cz0Image) GetImage() image.Image {
@@ -80,28 +77,22 @@ func (cz *Cz0Image) GetImage() image.Image {
 	return cz.Image
 }
 
-func (cz *Cz0Image) Import(file string) {
-	pngFile, err := os.Open(file)
-	if err != nil {
-		panic(err)
-	}
-	defer pngFile.Close()
-	cz.PngImage, err = png.Decode(pngFile)
+func (cz *Cz0Image) Import(r io.Reader, w io.Writer, opt ...interface{}) {
+	var err error
+	cz.PngImage, err = png.Decode(r)
 	if err != nil {
 		panic(err)
 	}
 
-	cz0File, _ := os.Create(file + ".cz0")
-	defer cz0File.Close()
 	glog.V(6).Infoln(cz.CzHeader)
-	err = WriteStruct(cz0File, &cz.CzHeader, &cz.Cz0Header)
+	err = WriteStruct(w, &cz.CzHeader, &cz.Cz0Header)
 	if err != nil {
 		panic(err)
 	}
 	pic := cz.PngImage.(*image.RGBA)
 	switch cz.Colorbits {
 	case 32:
-		cz0File.Write(pic.Pix)
+		w.Write(pic.Pix)
 	}
 
 }
