@@ -83,8 +83,13 @@ func TestFreeTypeFont(t *testing.T) {
 func TestCreateLucaFont(t *testing.T) {
 	restruct.EnableExprBeta()
 	f := CreateLucaFont(24, "../data/Other/Font/ARHei-400.ttf", " !@#$%.,abcdefgABCDEFG12345测试中文汉字")
-	f.Export("../data/Other/Font/ARHei-400.ttf.png", true)
-	f.Write("../data/Other/Font/ARHei-400.ttf.png", true)
+	pngFile, _ := os.Create("../data/Other/Font/ARHei-400.ttf.png")
+	txtFile, _ := os.Create("../data/Other/Font/ARHei-400.allChar.txt")
+	f.Export(pngFile, txtFile)
+
+	czFile, _ := os.Create("../data/Other/Font/ARHei-400.ttf.cz")
+	infoFile, _ := os.Create("../data/Other/Font/ARHei-400.ttf.info")
+	f.Write(czFile, infoFile)
 }
 
 func TestEidtLucaFont(t *testing.T) {
@@ -102,8 +107,14 @@ func TestEidtLucaFont(t *testing.T) {
 	f := LoadLucaFontPak(pak, "モダン", 32)
 	f.ReplaceChars("../data/Other/Font/ARHei-400.ttf", " !@#$%.,abcdefgABCDEFG12345测试中文汉字", 7113, false)
 	//f := CreateLucaFont("测试字体", 24, "../data/Other/Font/ARHei-400.ttf", " !@#$%.,abcdefgABCDEFG12345测试中文汉字")
-	f.Export("../data/Other/Font/モダン32e.png", true)
-	f.Write("../data/Other/Font/モダン32e", true)
+
+	pngFile, _ := os.Create("../data/Other/Font/モダン32e.png")
+	txtFile, _ := os.Create("../data/Other/Font/モダン32e.allChar.txt")
+	f.Export(pngFile, txtFile)
+
+	czFile, _ := os.Create("../data/Other/Font/モダン32e.cz")
+	infoFile, _ := os.Create("../data/Other/Font/モダン32e.info")
+	f.Write(czFile, infoFile)
 }
 func TestSPFont(t *testing.T) {
 
@@ -127,6 +138,8 @@ func TestSPFont(t *testing.T) {
 	}
 
 	f := LoadLucaFontPak(pak, "モダン", 32)
-	f.Export("../data/SP/IMAGE/モダン32.png")
+	file, _ := os.Create("../data/Other/Font/モダン32.png")
+	defer file.Close()
+	f.Export(file)
 
 }

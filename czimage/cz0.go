@@ -49,7 +49,7 @@ func (cz *Cz0Image) decompress() {
 	cz.Image = LineDiff(&cz.CzHeader, buf)
 }
 
-func (cz *Cz0Image) Export(w io.Writer, opt ...interface{}) {
+func (cz *Cz0Image) Export(w io.Writer, opt ...interface{}) error {
 	pic := image.NewRGBA(image.Rect(0, 0, int(cz.Width), int(cz.Heigth)))
 	offset := int(cz.HeaderLength)
 	switch cz.Colorbits {
@@ -67,7 +67,8 @@ func (cz *Cz0Image) Export(w io.Writer, opt ...interface{}) {
 		}
 	}
 	cz.Image = pic
-	png.Encode(w, cz.Image)
+	err := png.Encode(w, cz.Image)
+	return err
 }
 
 func (cz *Cz0Image) GetImage() image.Image {
@@ -77,22 +78,24 @@ func (cz *Cz0Image) GetImage() image.Image {
 	return cz.Image
 }
 
-func (cz *Cz0Image) Import(r io.Reader, w io.Writer, opt ...interface{}) {
+func (cz *Cz0Image) Import(r io.Reader, opt ...interface{}) error {
 	var err error
 	cz.PngImage, err = png.Decode(r)
-	if err != nil {
-		panic(err)
-	}
 
+	return err
+
+}
+func (cz *Cz0Image) Write(w io.Writer, opt ...interface{}) error {
+	var err error
 	glog.V(6).Infoln(cz.CzHeader)
 	err = WriteStruct(w, &cz.CzHeader, &cz.Cz0Header)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	pic := cz.PngImage.(*image.RGBA)
 	switch cz.Colorbits {
 	case 32:
-		w.Write(pic.Pix)
+		_, err = w.Write(pic.Pix)
 	}
-
+	return err
 }

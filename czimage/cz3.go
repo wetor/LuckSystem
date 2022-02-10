@@ -48,11 +48,11 @@ func (cz *Cz3Image) decompress() {
 	cz.Image = LineDiff(&cz.CzHeader, buf)
 }
 
-func (cz *Cz3Image) Export(w io.Writer, opt ...interface{}) {
+func (cz *Cz3Image) Export(w io.Writer, opt ...interface{}) error {
 	if cz.Image == nil {
 		cz.decompress()
 	}
-	png.Encode(w, cz.Image)
+	return png.Encode(w, cz.Image)
 }
 
 func (cz *Cz3Image) GetImage() image.Image {
@@ -62,33 +62,40 @@ func (cz *Cz3Image) GetImage() image.Image {
 	return cz.Image
 }
 
-func (cz *Cz3Image) Import(r io.Reader, w io.Writer, opt ...interface{}) {
+func (cz *Cz3Image) Import(r io.Reader, opt ...interface{}) error {
 	var err error
 	cz.PngImage, err = png.Decode(r)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	data := DiffLine(cz.CzHeader, cz.PngImage)
 	blockSize := 0
 	if len(cz.OutputInfo.BlockInfo) != 0 {
 		blockSize = int(cz.OutputInfo.BlockInfo[0].CompressedSize)
 	}
-	compressed, info := Compress(data, blockSize)
-
-	glog.V(6).Infoln(cz.CzHeader)
-	err = WriteStruct(w, &cz.CzHeader, &cz.Cz3Header, info)
-
-	if err != nil {
-		panic(err)
-	}
-	w.Write(compressed)
 	glog.V(6).Infoln(cz.OutputInfo)
-	glog.V(6).Infoln(info)
+	cz.Raw, cz.OutputInfo = Compress(data, blockSize)
+	glog.V(6).Infoln(cz.OutputInfo)
 	cz.OutputInfo.TotalRawSize = 0
 	cz.OutputInfo.TotalCompressedSize = 0
-	for _, block := range info.BlockInfo {
+	for _, block := range cz.OutputInfo.BlockInfo {
 		cz.OutputInfo.TotalRawSize += int(block.RawSize)
 		cz.OutputInfo.TotalCompressedSize += int(block.CompressedSize)
 	}
 	cz.OutputInfo.Offset = 4 + int(cz.OutputInfo.FileCount)*8
+
+	return nil
+}
+func (cz *Cz3Image) Write(w io.Writer, opt ...interface{}) error {
+	var err error
+	glog.V(6).Infoln(cz.CzHeader)
+	err = WriteStruct(w, &cz.CzHeader, &cz.Cz3Header, cz.OutputInfo)
+
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(cz.Raw)
+
+	return err
+
 }

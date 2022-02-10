@@ -6,6 +6,7 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
+	"io"
 	"os"
 )
 
@@ -200,34 +201,50 @@ func (i *Info) SetChars(fontFile, allChar string, startIndex int, reDraw bool) {
 	}
 
 }
+func (i *Info) Import(r io.Reader, opt ...interface{}) error {
+
+	return nil
+}
 
 // Export
 //  Description
 //  Receiver i *Info
-//  Param filename string
-//  Param opt ...interface{} nil
+//  Param w io.Writer
+//  Param opt ...interface{}
+//  Return error
 //
-func (i *Info) Export(filename string, opt ...interface{}) {
+func (i *Info) Export(w io.Writer, opt ...interface{}) error {
 
-	f, _ := os.Create(filename)
+	var err error
 	for _, char := range i.IndexUnicode {
 
 		if char == 0 {
-			f.WriteString(string('□'))
+			_, err = w.Write([]byte(string('□')))
 		} else {
-			f.WriteString(string(char))
+			_, err = w.Write([]byte(string(char)))
+		}
+		if err != nil {
+			return err
 		}
 	}
-	f.Close()
-
+	return nil
 }
-func (i *Info) Write(filename string, opt ...interface{}) {
 
-	f, _ := os.Create(filename)
-	defer f.Close()
+// Write
+//  Description
+//  Receiver i *Info
+//  Param w io.Writer
+//  Param opt ...interface{}
+//  Return error
+//
+func (i *Info) Write(w io.Writer, opt ...interface{}) error {
+
 	data, err := restruct.Pack(binary.LittleEndian, i)
 	if err != nil {
 		glog.Fatalln("restruct.Pack", err)
 	}
-	f.Write(data)
+	_, err = w.Write(data)
+
+	return err
+
 }

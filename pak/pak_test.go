@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/go-restruct/restruct"
 )
@@ -93,15 +94,15 @@ func TestFontPak(t *testing.T) {
 	for _, f := range pak.Files {
 		fmt.Println(f.ID, f.Name, f.Offset, f.Length)
 	}
-	// list := []string{"info20", "info24", "明朝24", "明朝20"}
-	// for _, name := range list {
-
-	// 	e, _ := pak.Get(name)
-	// 	f, _ := os.Create("../data/LB_EN/IMAGE/" + e.Name + ".cz1")
-	// 	f.Write(e.Data)
-	// 	f.Close()
-
-	// }
+	//list := []string{"info32", "info36"}
+	//for _, name := range list {
+	//
+	//	e, _ := pak.Get(name)
+	//	f, _ := os.Create("../data/LB_EN/IMAGE/" + e.Name)
+	//	f.Write(e.Data)
+	//	f.Close()
+	//
+	//}
 
 }
 func TestPakReplace(t *testing.T) {
@@ -123,10 +124,12 @@ func TestPakReplace(t *testing.T) {
 	}
 	fmt.Printf("==============\n")
 
-	pak.SetById(166, "/Users/wetor/GoProjects/LuckSystem/LuckSystem/data/LB_EN/SCRIPT/_VARSTR")
-
-	pak.Write("../data/LB_EN/SCRIPT.PAK.out")
-
+	f, _ := os.Open("/Users/wetor/GoProjects/LuckSystem/LuckSystem/data/LB_EN/SCRIPT/_VARSTR")
+	pak.SetById(166, f)
+	f.Close()
+	fs, _ := os.Create("../data/LB_EN/SCRIPT.PAK.out")
+	pak.Write(fs)
+	fs.Close()
 	fmt.Printf("%v\n", pak.Rebuild)
 	for i, f := range pak.Files {
 		if i < 160 {
@@ -188,5 +191,13 @@ func TestPakFindImage(t *testing.T) {
 	//	}
 	//	cz.Export("../data/LB_EN/IMAGE/char/" + strconv.Itoa(f.ID) + ".png")
 	//}
+
+}
+
+func Test1111(t *testing.T) {
+
+	timeString := time.Now().Format("2006-01-02 15:04:05")
+	fmt.Println(timeString)
+	fmt.Println(time.Now().Format("2017-09-07 18:05:32"))
 
 }

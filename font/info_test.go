@@ -25,9 +25,14 @@ func TestInfo(t *testing.T) {
 		file := "../data/LB_EN/IMAGE/" + name
 		data, _ := os.ReadFile(file)
 		info := LoadFontInfo(data)
-		info.Export(file + ".txt")
+		txtFile, _ := os.Create(file + ".txt")
+		info.Export(txtFile)
 		fmt.Println(info.CharNum, " ", len(info.IndexUnicode))
-		info.Write(file + ".out")
+		infoFile, _ := os.Create(file + ".out")
+		info.Write(infoFile)
+
+		infoFile.Close()
+		txtFile.Close()
 	}
 }
 func TestInfo2(t *testing.T) {
@@ -35,9 +40,11 @@ func TestInfo2(t *testing.T) {
 	file := "../data/Other/Font/info32e.info"
 	data, _ := os.ReadFile(file)
 	info := LoadFontInfo(data)
-	info.Export(file + ".txt")
+	txtFile, _ := os.Create(file + ".txt")
+	info.Export(txtFile)
 	fmt.Println(info.CharNum, " ", len(info.IndexUnicode))
-	info.Write(file + ".out")
+	infoFile, _ := os.Create(file + ".out")
+	info.Write(infoFile)
 
 }
 func TestStr(t *testing.T) {

@@ -2,11 +2,13 @@ package font
 
 import (
 	"bytes"
+	"errors"
 	"github.com/golang/glog"
 	"golang.org/x/image/math/fixed"
 	"image"
 	"image/draw"
 	"image/png"
+	"io"
 	"lucksystem/czimage"
 	"lucksystem/pak"
 	"math"
@@ -193,37 +195,68 @@ func (f *LucaFont) ReplaceChars(fontFile, allChar string, startIndex int, reDraw
 	f.Image = pic
 }
 
-func (f *LucaFont) Import(filename string, exportInfo ...interface{}) {
+func (f *LucaFont) Import(r io.Reader, opt ...interface{}) error {
 
+	return nil
 }
 
-func (f *LucaFont) Export(filename string, exportInfo ...interface{}) {
-	file, _ := os.Create(filename)
-	defer file.Close()
-	png.Encode(file, f.Image)
-	if len(exportInfo) == 1 && exportInfo[0].(bool) {
-		f.Info.Export(filename + ".txt")
+// Export
+//  Description
+//  Receiver f *LucaFont
+//  Param w io.Writer
+//  Param opt ...interface{}
+//    opt[0] txtFilename io.Writer 导出的全字符文件
+//  Return error
+//
+func (f *LucaFont) Export(w io.Writer, opt ...interface{}) error {
+	err := png.Encode(w, f.Image)
+	if err != nil {
+		return err
 	}
+	if len(opt) > 0 {
+		err = f.Info.Export(opt[0].(io.Writer))
+	}
+	return err
 }
 
-func (f *LucaFont) Write(filename string, writeInfo ...interface{}) {
+// Write
+//  Description
+//  Receiver f *LucaFont
+//  Param w io.Writer
+//  Param opt ...interface{}
+//    opt[0] infoFilename io.Writer 导出新的info文件
+//  Return error
+//
+func (f *LucaFont) Write(w io.Writer, opt ...interface{}) error {
+	var err error
 	// TODO 图像打包
 	if f.CzImage != nil {
 		// load
 
 		img := bytes.NewBuffer(nil)
-		png.Encode(img, f.Image)
+		err = png.Encode(img, f.Image)
+		if err != nil {
+			return err
+		}
 		czImg := bytes.NewBuffer(nil)
-		f.CzImage.Import(img, czImg, true)
-		file, _ := os.Create(filename)
-		file.Write(czImg.Bytes())
-		file.Close()
+		err = f.CzImage.Import(img, true)
+		if err != nil {
+			return err
+		}
+		err = f.CzImage.Write(czImg)
+		if err != nil {
+			return err
+		}
+		_, err = w.Write(czImg.Bytes())
+		if err != nil {
+			return err
+		}
 	} else {
 		// create
-		glog.Fatalln("LucaFont.Write 目前不支持创建的字体")
-		return
+		return errors.New("LucaFont.Write 目前不支持创建的字体")
 	}
-	if len(writeInfo) == 1 && writeInfo[0].(bool) {
-		f.Info.Write(filename + ".info")
+	if len(opt) > 0 {
+		err = f.Info.Write(opt[0].(io.Writer))
 	}
+	return err
 }

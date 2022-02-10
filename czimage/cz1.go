@@ -18,6 +18,7 @@ type Cz1Image struct {
 
 func (cz *Cz1Image) Load(header CzHeader, data []byte) {
 	cz.CzHeader = header
+	cz.Raw = data
 	pic := image.NewRGBA(image.Rect(0, 0, int(header.Width), int(header.Heigth)))
 	offset := int(cz.HeaderLength)
 	switch cz.Colorbits {
@@ -103,8 +104,8 @@ func (cz *Cz1Image) Load(header CzHeader, data []byte) {
 
 	cz.Image = pic
 }
-func (cz *Cz1Image) Export(w io.Writer, opt ...interface{}) {
-	png.Encode(w, cz.Image)
+func (cz *Cz1Image) Export(w io.Writer, opt ...interface{}) error {
+	return png.Encode(w, cz.Image)
 }
 
 func (cz *Cz1Image) GetImage() image.Image {
@@ -118,7 +119,7 @@ func (cz *Cz1Image) GetImage() image.Image {
 //  Param opt ...interface{}
 //    opt[0] bool 是否填充大小
 //
-func (cz *Cz1Image) Import(r io.Reader, w io.Writer, opt ...interface{}) {
+func (cz *Cz1Image) Import(r io.Reader, opt ...interface{}) error {
 	var err error
 	cz.PngImage, err = png.Decode(r)
 	if err != nil {
@@ -134,7 +135,7 @@ func (cz *Cz1Image) Import(r io.Reader, w io.Writer, opt ...interface{}) {
 
 	if width != pic.Rect.Size().X || height != pic.Rect.Size().Y {
 		glog.V(2).Infof("图片大小不匹配，应该为 w%d h%d\n", width, height)
-		return
+		return err
 	}
 	data := make([]byte, width*height)
 	i := 0
@@ -148,22 +149,30 @@ func (cz *Cz1Image) Import(r io.Reader, w io.Writer, opt ...interface{}) {
 	if len(cz.OutputInfo.BlockInfo) != 0 {
 		blockSize = int(cz.OutputInfo.BlockInfo[0].CompressedSize)
 	}
-	compressed, info := Compress(data, blockSize)
-
-	glog.V(6).Infoln(cz.CzHeader)
-	err = WriteStruct(w, &cz.CzHeader, cz.ColorPanel, info)
-
-	if err != nil {
-		panic(err)
-	}
-	w.Write(compressed)
 	glog.V(6).Infoln(cz.OutputInfo)
-	glog.V(6).Infoln(info)
+	cz.Raw, cz.OutputInfo = Compress(data, blockSize)
+	glog.V(6).Infoln(cz.OutputInfo)
+
 	cz.OutputInfo.TotalRawSize = 0
 	cz.OutputInfo.TotalCompressedSize = 0
-	for _, block := range info.BlockInfo {
+	for _, block := range cz.OutputInfo.BlockInfo {
 		cz.OutputInfo.TotalRawSize += int(block.RawSize)
 		cz.OutputInfo.TotalCompressedSize += int(block.CompressedSize)
 	}
 	cz.OutputInfo.Offset = 4 + int(cz.OutputInfo.FileCount)*8
+
+	return nil
+}
+func (cz *Cz1Image) Write(w io.Writer, opt ...interface{}) error {
+	var err error
+	glog.V(6).Infoln(cz.CzHeader)
+	err = WriteStruct(w, &cz.CzHeader, cz.ColorPanel, cz.OutputInfo)
+
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(cz.Raw)
+
+	return err
+
 }
