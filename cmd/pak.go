@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"lucksystem/charset"
 	"lucksystem/pak"
+	"lucksystem/utils"
 	"os"
 	"path"
-	"path/filepath"
 	"strconv"
 )
 
@@ -83,19 +83,6 @@ func (c *CmdPak) Export(argv []interface{}) {
 		panic(err)
 	}
 }
-func GetDirFileList(dir string) ([]string, error) {
-	var files []string
-	//方法一
-	var walkFunc = func(path string, info os.FileInfo, err error) error {
-		if !info.IsDir() {
-			files = append(files, path)
-		}
-		//fmt.Printf("%s\n", path)
-		return nil
-	}
-	err := filepath.Walk(dir, walkFunc)
-	return files, err
-}
 
 // Import
 //  Description
@@ -111,22 +98,24 @@ func (c *CmdPak) Import(argv []interface{}) {
 	}
 	if s.IsDir() {
 		// folder
-		files, err := GetDirFileList(filename)
+		files, err := utils.GetDirFileList(filename)
 		if err != nil {
 			panic(err)
 		}
 		for _, file := range files {
 			name := path.Base(file)
 			_, has := c.pak.NameMap[name]
+			fs, _ := os.Open(file)
 			if has {
-				err = c.pak.Set(name, file)
+				err = c.pak.Set(name, fs)
 			} else {
 				i, err := strconv.Atoi(name)
 				if err != nil {
 					continue
 				}
-				err = c.pak.SetById(i, file)
+				err = c.pak.SetById(i, fs)
 			}
+			fs.Close()
 			if err != nil {
 				panic(err)
 			}
@@ -136,20 +125,24 @@ func (c *CmdPak) Import(argv []interface{}) {
 		// file
 		name := path.Base(filename)
 		_, has := c.pak.NameMap[name]
+		fs, _ := os.Open(filename)
 		if has {
-			err = c.pak.Set(name, filename)
+			err = c.pak.Set(name, fs)
 		} else {
 			i, err := strconv.Atoi(name)
 			if err != nil {
 				panic(err)
 			}
-			err = c.pak.SetById(i, filename)
+			err = c.pak.SetById(i, fs)
 		}
+		fs.Close()
 		if err != nil {
 			panic(err)
 		}
 	}
-	err = c.pak.Write(outfile)
+	ofs, _ := os.Create(outfile)
+	err = c.pak.Write(ofs)
+	ofs.Close()
 	if err != nil {
 		panic(err)
 	}

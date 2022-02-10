@@ -105,7 +105,8 @@ func TestCz3Image_Import(t *testing.T) {
 	defer r.Close()
 	w, _ = os.Create("../data/LB_EN/IMAGE/4.png.cz3")
 	defer w.Close()
-	cz.Import(r, w)
+	cz.Import(r)
+	cz.Write(w)
 	fmt.Println()
 
 }
@@ -125,7 +126,8 @@ func TestCz1Image_Import(t *testing.T) {
 	defer r.Close()
 	w, _ = os.Create("../data/LB_EN/IMAGE/明朝20.png.cz1")
 	defer w.Close()
-	cz.Import(r, w)
+	cz.Import(r)
+	cz.Write(w)
 	fmt.Println()
 	//data, _ = os.ReadFile("../data/LB_EN/IMAGE/明朝20.png.cz1")
 	//cz, err = LoadCzImage(data)

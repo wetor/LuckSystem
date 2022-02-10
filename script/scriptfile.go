@@ -365,7 +365,6 @@ func (s *ScriptFile) Import(file string) error {
 			return err
 		}
 		line = strings.Replace(line, "\\n", "\n", -1)
-		fmt.Println(line)
 		ParseCodeParams(code, line)
 
 		fmt.Print(i)

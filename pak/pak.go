@@ -1,12 +1,16 @@
 package pak
 
 import (
+	"bufio"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"github.com/golang/glog"
 	"io"
 	"lucksystem/charset"
+	"lucksystem/utils"
 	"os"
+	"path"
 	"strconv"
 
 	"github.com/go-restruct/restruct"
@@ -194,25 +198,25 @@ func (p *PakFile) GetByIndex(index int) (*FileEntry, error) {
 //  Description
 //  Receiver p *PakFile
 //  Param name string
-//  Param setFileName string
+//  Param r io.Reader
 //  Return error
 //
-func (p *PakFile) Set(name, setFileName string) error {
+func (p *PakFile) Set(name string, r io.Reader) error {
 	id, has := p.NameMap[name]
 	if !has {
 		return errors.New("文件不存在")
 	}
-	return p.SetById(id, setFileName)
+	return p.SetById(id, r)
 }
-func (p *PakFile) SetById(id int, setFileName string) error {
-	return p.SetByIndex(id-int(p.IDStart), setFileName)
+func (p *PakFile) SetById(id int, r io.Reader) error {
+	return p.SetByIndex(id-int(p.IDStart), r)
 }
-func (p *PakFile) SetByIndex(index int, setFileName string) error {
+func (p *PakFile) SetByIndex(index int, r io.Reader) error {
 	if index < 0 || index >= int(p.FileCount) {
 		return errors.New("文件id错误")
 	}
 	entry := p.Files[index]
-	newData, err := os.ReadFile(setFileName)
+	newData, err := io.ReadAll(r)
 	if err != nil {
 		glog.V(8).Infoln("os.ReadFile", err)
 		return err
@@ -230,7 +234,14 @@ func (p *PakFile) SetByIndex(index int, setFileName string) error {
 	return nil
 }
 
-func (p *PakFile) Write(filename string) error {
+// Write
+//  Description
+//  Receiver p *PakFile
+//  Param w io.Writer 必须是*File类型
+//  Param opt ...interface{}
+//  Return error
+//
+func (p *PakFile) Write(w io.Writer, opt ...interface{}) error {
 
 	oldOffset := make(map[int]uint32, p.FileCount)
 	if p.Rebuild {
@@ -254,17 +265,16 @@ func (p *PakFile) Write(filename string) error {
 	}
 	oldFile, err := os.Open(p.FileName)
 	if err != nil {
-		glog.V(8).Infoln("os.Open", err)
+		glog.V(8).Infoln("os.Open.oldFile", err)
 		return err
 	}
 	defer oldFile.Close()
 
-	file, err := os.Create(filename)
-	if err != nil {
-		glog.V(8).Infoln("os.Create", err)
+	file, ok := w.(*os.File)
+	if !ok {
+		glog.V(8).Infoln("w.(*os.File)", err)
 		return err
 	}
-	defer file.Close()
 
 	// 1. 复制文件全部内容
 	_, err = io.Copy(file, oldFile)
@@ -304,5 +314,172 @@ func (p *PakFile) Write(filename string) error {
 		}
 	}
 
+	return nil
+}
+
+// Export Pak文件解包接口
+//  Description
+//  Receiver p *PakFile
+//  Param w io.Writer 保存到的文件名
+//  Param opt ...interface{}
+//    opt[0] 		mode 	string	可选 all,index,id,name
+//      mode=="all": w为每行一个文件路径的txt文件
+//        opt[1] 	dir 	string 	保存文件夹路径
+//      mode=="index":
+//        opt[1] 	index 	int 	从0开始的文件序号
+//      mode=="id":
+//        opt[1]	id		int		文件唯一ID
+//      mode=="name":
+//        opt[1]	name	string	文件名
+//  Return error
+//
+// TODO 未测试
+func (p *PakFile) Export(w io.Writer, opt ...interface{}) error {
+	var err error
+	switch opt[0].(string) {
+	case "all":
+		dir := opt[1].(string)
+		fes := p.ReadAll()
+		for _, e := range fes {
+			file := ""
+			line := ""
+			if len(e.Name) != 0 {
+				file = path.Join(dir, e.Name)
+				line = fmt.Sprintf("name:%s,%s", e.Name, file)
+			} else {
+				file = path.Join(dir, strconv.Itoa(e.ID))
+				line = fmt.Sprintf("id:%d,%s", e.ID, file)
+			}
+			_, err = w.Write([]byte(line))
+			if err != nil {
+				return err
+			}
+			err = os.WriteFile(file, e.Data, 0666)
+			if err != nil {
+				return err
+			}
+		}
+	case "index":
+		fallthrough
+	case "id":
+		fallthrough
+	case "name":
+		var e *FileEntry
+		switch opt[0].(string) {
+		case "index":
+			e, err = p.GetByIndex(opt[1].(int))
+		case "id":
+			e, err = p.GetById(opt[1].(int))
+		case "name":
+			e, err = p.Get(opt[1].(string))
+		}
+		if err != nil {
+			return err
+		}
+		_, err = w.Write(e.Data)
+		if err != nil {
+			return err
+		}
+	default:
+		return errors.New("pak.mode error")
+	}
+	return nil
+}
+
+// Import
+//  Description
+//  Receiver p *PakFile
+//  Param r io.Reader 导入文件
+//  Param opt ...interface{}
+//    opt[0]		mode	string	可选file,list,dir
+//      mode=="file": r为导入文件，opt[1]和opt[2]输入其一即可，若都有值，优先opt[1]
+//        opt[1]	name	string	替换指定文件名文件
+//        opt[2]	id		int		替换指定id文件
+//      mode=="list": r为包含多个文件路径的txt文件，按照Export mode=="all"输出的txt格式
+//      mode=="dir":  r为空
+//        opt[1]	dir		string	导入文件目录，按照Export导出的文件名进行匹配。若存在文件名则用文件名匹配，不存在则用ID匹配
+//  Return error
+//
+// TODO 未测试
+func (p *PakFile) Import(r io.Reader, opt ...interface{}) error {
+
+	var err error
+	switch opt[0].(string) {
+	case "file":
+		if opt[1] != nil && len(opt[1].(string)) != 0 {
+			name := opt[1].(string)
+			err = p.Set(name, r)
+		} else if opt[2] != nil {
+			index := opt[2].(int)
+			err = p.SetById(index, r)
+		} else {
+			glog.Fatalln("输入参数有误")
+		}
+	case "list":
+		var t, name, file string
+		var id int
+		var fs *os.File
+
+		scan := bufio.NewScanner(r)
+		for scan.Scan() {
+			line := scan.Text()
+			_, err = fmt.Sscanf(line, "%s:%s,%s", &t, &name, &file)
+			if err != nil {
+				glog.V(2).Infoln(err)
+				continue
+			}
+			fs, err = os.Open(file)
+			if err != nil {
+				glog.V(2).Infof("%v %s\n", err, file)
+				continue
+			}
+			if t == "id" {
+				_, err = fmt.Sscanf(line, "id:%d,%s", &id, &file)
+				err = p.SetById(id, fs)
+			} else {
+				err = p.Set(name, fs)
+			}
+			if err != nil {
+				return err
+			}
+			err = fs.Close()
+			if err != nil {
+				return err
+			}
+		}
+		if err = scan.Err(); err != nil {
+			glog.Fatalln("pak.Import.list 输入文件格式有误")
+		}
+
+	case "dir":
+		var files []string
+		var id int
+		files, err = utils.GetDirFileList(opt[1].(string))
+		if err != nil {
+			return err
+		}
+		for _, file := range files {
+			name := path.Base(file)
+			_, has := p.NameMap[name]
+			fs, _ := os.Open(file)
+			if has {
+				err = p.Set(name, fs)
+			} else {
+				id, err = strconv.Atoi(name)
+				if err != nil {
+					continue
+				}
+				err = p.SetById(id, fs)
+			}
+			if err != nil {
+				glog.V(2).Infof("%v %s\n", err, file)
+				return err
+			}
+			err = fs.Close()
+			if err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
