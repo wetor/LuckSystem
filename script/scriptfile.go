@@ -318,7 +318,8 @@ func (s *ScriptFile) SetOperateParams(index int, mode enum.VMRunMode, params ...
 }
 
 // Export 导出可编辑脚本
-func (s *ScriptFile) Export(file string) error {
+func (s *ScriptFile) Export(w io.Writer, opt ...interface{}) error {
+	var err error
 	for i, code := range s.Codes {
 		labelIndex, has := s.ELabelMap[code.Pos]
 		if has {
@@ -329,34 +330,27 @@ func (s *ScriptFile) Export(file string) error {
 			code.GotoIndex = gotoIndex
 		}
 	}
-
-	f, err := os.Create(file)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	w := bufio.NewWriter(f)
+	bw := bufio.NewWriter(w)
 	for i, code := range s.Codes {
 		str := ToStringCodeParams(code)
 		str = strings.Replace(str, "\n", "\\n", -1)
-		fmt.Fprintln(w, str)
-
 		glog.V(6).Infoln(i, str)
+		_, err = fmt.Fprintln(bw, str)
+		if err != nil {
+			return err
+		}
+
 	}
-	return w.Flush()
+	return bw.Flush()
 
 }
 
 // Import 导入可编辑脚本
-func (s *ScriptFile) Import(file string) error {
-	f, err := os.Open(file)
-	if err != nil {
-		return err
-	}
-	r := bufio.NewReader(f)
+func (s *ScriptFile) Import(r io.Reader, opt ...interface{}) error {
+
+	br := bufio.NewReader(r)
 	for i, code := range s.Codes {
-		line, err := r.ReadString('\n')
+		line, err := br.ReadString('\n')
 		if len(line) <= 1 {
 			return errors.New("文本行不能为空 " + strconv.Itoa(i))
 		} else if err == io.EOF {
@@ -441,7 +435,7 @@ func (s *ScriptFile) CodeParamsToBytes(code *CodeLine, coding charset.Charset, p
 	s.CurPos += int(code.Len + code.Len&1)
 
 }
-func (s *ScriptFile) Write() error {
+func (s *ScriptFile) Write(w io.Writer, opt ...interface{}) error {
 
 	data, err := restruct.Pack(binary.LittleEndian, s)
 	if err != nil {
@@ -458,7 +452,7 @@ func (s *ScriptFile) Write() error {
 		copy(data[gotoPos:gotoPos+4], pos)
 		fmt.Println(data[gotoPos : gotoPos+4])
 	}
-	err = os.WriteFile(s.FileName+".out", data, 0666)
+	_, err = w.Write(data)
 	if err != nil {
 		return err
 	}

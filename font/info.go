@@ -7,7 +7,6 @@ import (
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 	"io"
-	"os"
 )
 
 type DrawSize struct {
@@ -103,23 +102,38 @@ func CreateFontInfo(fontSize, blockSize int) *Info {
 // SetChars
 //  Description 如果startIndex=0且allChar为空，则为仅重绘
 //  Receiver i *Info
-//  Param fontFile string 字体文件
+//  Param fontFile io.Reader 字体文件
 //  Param allChar string 全字符串，若第一个字符不是空格，会自动补充为空格
 //  Param startIndex int 开始位置，即字库上面跳过多少字符
 //  Param reDraw bool 是否用新字体重绘startIndex之前的字符
 //
-func (i *Info) SetChars(fontFile, allChar string, startIndex int, reDraw bool) {
+func (i *Info) SetChars(fontFile io.Reader, allChar string, startIndex int, reDraw bool) {
 
-	glog.V(6).Infof("SetChars font:%v addCharNum:%v starIndex:%v\n", fontFile, len(allChar), startIndex)
+	if len(allChar) == 0 && startIndex == 0 && !reDraw {
+		// 什么都不做
+		return
+	}
 	// 加载字体
-	data, err := os.ReadFile(fontFile)
-	if err != nil {
-		glog.Fatalln(err)
+	var err error
+	var font *opentype.Font
+	fontFileReaderAt, ok := fontFile.(io.ReaderAt)
+	if ok {
+		font, err = opentype.ParseReaderAt(fontFileReaderAt)
+		if err != nil {
+			glog.Fatalln(err)
+		}
+	} else {
+		var data []byte
+		data, err = io.ReadAll(fontFile)
+		if err != nil {
+			glog.Fatalln(err)
+		}
+		font, err = opentype.Parse(data)
+		if err != nil {
+			glog.Fatalln(err)
+		}
 	}
-	font, err := opentype.Parse(data)
-	if err != nil {
-		glog.Fatalln(err)
-	}
+
 	i.FontFace, err = opentype.NewFace(font, &opentype.FaceOptions{
 		Size: float64(i.FontSize),
 		DPI:  72,
@@ -201,8 +215,31 @@ func (i *Info) SetChars(fontFile, allChar string, startIndex int, reDraw bool) {
 	}
 
 }
-func (i *Info) Import(r io.Reader, opt ...interface{}) error {
 
+// Import
+//  Description 如果startIndex=0且allChar为空，则为仅重绘
+//  Receiver i *Info
+//  Param r io.Reader 字体文件。若opt[0].(type)==bool，忽略
+//  Param opt ...interface{}
+//    opt[0]	onlyRedraw	bool 	仅使用新字体重绘，不增加新字符
+//      or
+//    opt[0]	allChar 	string	增加的全字符，若startIndex==0，且第一个字符不是空格，会自动补充为空格
+//    opt[1]	startIndex	int	开始位置，即字库上面跳过多少字符
+//    opt[2]	redraw 		bool	是否用新字体重绘startIndex之前的字符
+//  Return error
+//
+func (i *Info) Import(r io.Reader, opt ...interface{}) error {
+	if onlyRedraw, ok := opt[0].(bool); ok {
+		if onlyRedraw {
+			// 仅重绘
+			i.SetChars(r, "", 0, true)
+			return nil
+		} else {
+			// 不做任何修改
+			return nil
+		}
+	}
+	i.SetChars(r, opt[0].(string), opt[1].(int), opt[2].(bool))
 	return nil
 }
 

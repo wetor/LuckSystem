@@ -52,6 +52,7 @@ func (cz *Cz1Image) Load(header CzHeader, data []byte) {
 			}
 		}
 	case 8:
+		// TODO: 目前图像提取有损，原因未知
 		cz.ColorPanel = make([][]byte, 256)
 		for i := 0; i < 256; i++ {
 			cz.ColorPanel[i] = data[offset : offset+4]
