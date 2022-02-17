@@ -2,7 +2,6 @@ package VM
 
 import (
 	"fmt"
-	"github.com/golang/glog"
 	"lucksystem/game/context"
 	"lucksystem/game/engine"
 	"lucksystem/game/enum"
@@ -12,6 +11,8 @@ import (
 	"os"
 	"reflect"
 	"strings"
+
+	"github.com/golang/glog"
 )
 
 type VM struct {
@@ -135,7 +136,9 @@ func (vm *VM) Run() {
 		}
 		glog.V(4).Infoln("\tnext:", next)
 
-		if next == 0 || opname == "END" {
+		// if next == 0 || opname == "END" { - Many game scripts have an END opcode, but that does not mean that there is nothing else to parse after that opcode.
+		if next == 0 {
+
 			break // 结束
 		}
 		vm.EIP = next
