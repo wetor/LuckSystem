@@ -55,3 +55,104 @@ func TestStr(t *testing.T) {
 
 	fmt.Println(bbb)
 }
+func TestInfo_Export(t *testing.T) {
+	restruct.EnableExprBeta()
+	var err error
+	savePath := "../data/LB_EN/FONT/"
+	infoFiles := []string{"info32", "info24"}
+
+	//============
+	for _, name := range infoFiles {
+		data, _ := os.ReadFile(savePath + name)
+		info := LoadFontInfo(data)
+		fmt.Println(name, info.CharNum, len(info.IndexUnicode))
+		fs, _ := os.Create(savePath + name + "_export.txt")
+		err = info.Export(fs)
+		if err != nil {
+			panic(err)
+		}
+		err = fs.Close()
+		if err != nil {
+			panic(err)
+		}
+	}
+
+}
+
+func TestInfo_Import(t *testing.T) {
+	restruct.EnableExprBeta()
+	var err error
+	loadPath := "../data/LB_EN/FONT/"
+	infoFiles := []string{"info32", "info24"}
+	addChars := "!@#$%.,abcdefgAB CDEFG12345测试中文汉字"
+	font, _ := os.Open("../data/Other/Font/ARHei-400.ttf")
+	defer font.Close()
+	//============
+	fmt.Println()
+	for _, name := range infoFiles {
+		data, _ := os.ReadFile(loadPath + name)
+		info := LoadFontInfo(data)
+		fmt.Println(name, info.CharNum, len(info.IndexUnicode))
+
+		err = info.Import(font, true)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(name, info.CharNum, len(info.IndexUnicode))
+		fs, _ := os.Create(loadPath + name + "_byOnlyRedraw")
+		err = info.Write(fs)
+		if err != nil {
+			panic(err)
+		}
+		err = fs.Close()
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	//============
+	fmt.Println()
+	for _, name := range infoFiles {
+		data, _ := os.ReadFile(loadPath + name)
+		info := LoadFontInfo(data)
+		fmt.Println(name, info.CharNum, len(info.IndexUnicode))
+
+		err = info.Import(font, addChars, int(info.CharNum), false)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(name, info.CharNum, len(info.IndexUnicode))
+		fs, _ := os.Create(loadPath + name + "_byAddChar")
+		err = info.Write(fs)
+		if err != nil {
+			panic(err)
+		}
+		err = fs.Close()
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	//============
+	fmt.Println()
+	for _, name := range infoFiles {
+		data, _ := os.ReadFile(loadPath + name)
+		info := LoadFontInfo(data)
+		fmt.Println(name, info.CharNum, len(info.IndexUnicode))
+
+		err = info.Import(font, addChars, int(info.CharNum), true)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(name, info.CharNum, len(info.IndexUnicode))
+		fs, _ := os.Create(loadPath + name + "_byAddCharRedraw")
+		err = info.Write(fs)
+		if err != nil {
+			panic(err)
+		}
+		err = fs.Close()
+		if err != nil {
+			panic(err)
+		}
+	}
+}

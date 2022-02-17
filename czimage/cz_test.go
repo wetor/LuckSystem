@@ -47,12 +47,12 @@ func TestCZ1(t *testing.T) {
 func TestCZ1_2(t *testing.T) {
 	restruct.EnableExprBeta()
 
-	data, _ := os.ReadFile("../data/Other/Font/モダン32e")
+	data, _ := os.ReadFile("../data/LB_EN/FONT/明朝32_onlyRedraw")
 	cz, err := LoadCzImage(data)
 	if err != nil {
 		panic(err)
 	}
-	w, _ := os.Create("../data/Other/Font/モダン32e.cz1.png")
+	w, _ := os.Create("../data/LB_EN/FONT/明朝32_onlyRedraw.png")
 	cz.Export(w)
 	w.Close()
 	fmt.Println()

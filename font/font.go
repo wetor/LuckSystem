@@ -133,11 +133,11 @@ func (f *LucaFont) GetStringImage(str string) image.Image {
 // CreateLucaFont 创建全新的字体
 //  Description
 //  Param fontSize int 字体大小
-//  Param fontFile string 字体文件路径
+//  Param fontFile io.Reader 字体文件
 //  Param allChar string 所有字符
 //  Return *LucaFont
 //
-func CreateLucaFont(fontSize int, fontFile, allChar string) *LucaFont {
+func CreateLucaFont(fontSize int, fontFile io.Reader, allChar string) *LucaFont {
 	font := &LucaFont{
 		Size: fontSize,
 	}
@@ -151,14 +151,19 @@ func CreateLucaFont(fontSize int, fontFile, allChar string) *LucaFont {
 // ReplaceChars 替换字体中的字符
 //  Description 替换字体中的字符信息以及图像, 如果startIndex=0且allChar为空，则为修改原字体
 //  Receiver f *LucaFont
-//  Param fontFile string 字体文件
+//  Param fontFile io.Reader 字体文件
 //  Param allChar string 所替换的字符
 //  Param startIndex int 开始序号（图像从上到下，从左到右计算）
 //  Param reDraw bool 是否用新字体重绘startIndex之前的字符
 //
-func (f *LucaFont) ReplaceChars(fontFile, allChar string, startIndex int, reDraw bool) {
+func (f *LucaFont) ReplaceChars(fontFile io.Reader, allChar string, startIndex int, reDraw bool) {
+
 	if f.Info == nil {
 		glog.Fatalln("需要先载入或创建LucaFont")
+		return
+	}
+	if len(allChar) == 0 && startIndex == 0 && !reDraw {
+		// 什么都不做
 		return
 	}
 	f.Info.SetChars(fontFile, allChar, startIndex, reDraw)
@@ -195,11 +200,6 @@ func (f *LucaFont) ReplaceChars(fontFile, allChar string, startIndex int, reDraw
 	f.Image = pic
 }
 
-func (f *LucaFont) Import(r io.Reader, opt ...interface{}) error {
-
-	return nil
-}
-
 // Export
 //  Description
 //  Receiver f *LucaFont
@@ -219,6 +219,36 @@ func (f *LucaFont) Export(w io.Writer, opt ...interface{}) error {
 	return err
 }
 
+// Import
+//  Description
+//  Receiver f *LucaFont
+//  Param r io.Reader 字体文件
+//  Param opt ...interface{}
+//    opt[0]	onlyRedraw	bool 仅使用新字体重绘，不增加新字符
+//      or
+//    opt[0]	allChar	string	增加的全字符，若startIndex==0，且第一个字符不是空格，会自动补充为空格
+//    opt[1]	startIndex	int	开始位置，即字库上面跳过多少字符，-1为添加到最后
+//    opt[2]	redraw	bool	是否用新字体重绘startIndex之前的字符
+//  Return error
+//
+func (f *LucaFont) Import(r io.Reader, opt ...interface{}) error {
+	if onlyRedraw, ok := opt[0].(bool); ok {
+		if onlyRedraw {
+			// 仅重绘
+			f.ReplaceChars(r, "", 0, true)
+			return nil
+		} else {
+			// 不做任何修改
+			return nil
+		}
+	}
+	if opt[1].(int) == -1 {
+		opt[1] = int(f.Info.CharNum)
+	}
+	f.ReplaceChars(r, opt[0].(string), opt[1].(int), opt[2].(bool))
+	return nil
+}
+
 // Write
 //  Description
 //  Receiver f *LucaFont
@@ -229,7 +259,6 @@ func (f *LucaFont) Export(w io.Writer, opt ...interface{}) error {
 //
 func (f *LucaFont) Write(w io.Writer, opt ...interface{}) error {
 	var err error
-	// TODO 图像打包
 	if f.CzImage != nil {
 		// load
 

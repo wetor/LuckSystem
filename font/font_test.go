@@ -2,6 +2,7 @@ package font
 
 import (
 	"fmt"
+	"github.com/golang/glog"
 	"golang.org/x/image/font/opentype"
 	"golang.org/x/image/math/fixed"
 	"image"
@@ -56,22 +57,24 @@ func TestFreeTypeFont(t *testing.T) {
 	}
 	fmt.Println(font.NumGlyphs())
 	pic := image.NewRGBA(image.Rect(0, 0, 800, 600))
-	c := NewContext(pic)
 
-	c.SetFontFace(font, &opentype.FaceOptions{
+	fontFace, err := opentype.NewFace(font, &opentype.FaceOptions{
 		Size: 24,
 		DPI:  72,
 	})
+	if err != nil {
+		glog.Fatalln(err)
+	}
 
 	//c.Text(100, 100, "测试汉字，#12ABjgkloa!.理樹@「…は？　こんな夜に？　どこで？」")
 
-	xx1, xx2, _ := c.fontDrawer.Face.GlyphBounds('б')
+	xx1, xx2, _ := fontFace.GlyphBounds('б')
 	fmt.Println(xx1.Max.X.Ceil(), xx1.Max.Y.Ceil(), xx2.Ceil())
-	_, img, _, width, ok := c.fontDrawer.Face.Glyph(fixed.Point26_6{X: 0, Y: 0}, 'б')
+	_, img, _, width, ok := fontFace.Glyph(fixed.Point26_6{X: 0, Y: 0}, 'б')
 	draw.Draw(pic, pic.Bounds().Add(image.Pt(10, 10)), img, img.Bounds().Min, draw.Src)
 	draw.Draw(pic, pic.Bounds().Add(image.Pt(34, 10)), img, img.Bounds().Min, draw.Src)
 	draw.Draw(pic, pic.Bounds().Add(image.Pt(58, 10)), img, img.Bounds().Min, draw.Src)
-	_, img, _, width, ok = c.fontDrawer.Face.Glyph(fixed.Point26_6{X: 0, Y: 0}, '测')
+	_, img, _, width, ok = fontFace.Glyph(fixed.Point26_6{X: 0, Y: 0}, '测')
 	draw.Draw(pic, pic.Bounds().Add(image.Pt(10, 10)), img, img.Bounds().Min, draw.Src)
 	fmt.Println(width.Ceil(), ok)
 	f, _ := os.Create("../data/Other/Font/ARHei-400.ttf.png")
@@ -82,7 +85,9 @@ func TestFreeTypeFont(t *testing.T) {
 
 func TestCreateLucaFont(t *testing.T) {
 	restruct.EnableExprBeta()
-	f := CreateLucaFont(24, "../data/Other/Font/ARHei-400.ttf", " !@#$%.,abcdefgABCDEFG12345测试中文汉字")
+	font, _ := os.Open("../data/Other/Font/ARHei-400.ttf")
+	defer font.Close()
+	f := CreateLucaFont(24, font, " !@#$%.,abcdefgABCDEFG12345测试中文汉字")
 	pngFile, _ := os.Create("../data/Other/Font/ARHei-400.ttf.png")
 	txtFile, _ := os.Create("../data/Other/Font/ARHei-400.allChar.txt")
 	f.Export(pngFile, txtFile)
@@ -105,7 +110,9 @@ func TestEidtLucaFont(t *testing.T) {
 	fmt.Println("pak header", pak.PakHeader)
 
 	f := LoadLucaFontPak(pak, "モダン", 32)
-	f.ReplaceChars("../data/Other/Font/ARHei-400.ttf", " !@#$%.,abcdefgABCDEFG12345测试中文汉字", 7113, false)
+	font, _ := os.Open("../data/Other/Font/ARHei-400.ttf")
+	defer font.Close()
+	f.ReplaceChars(font, " !@#$%.,abcdefgABCDEFG12345测试中文汉字", 7113, false)
 	//f := CreateLucaFont("测试字体", 24, "../data/Other/Font/ARHei-400.ttf", " !@#$%.,abcdefgABCDEFG12345测试中文汉字")
 
 	pngFile, _ := os.Create("../data/Other/Font/モダン32e.png")
@@ -142,4 +149,83 @@ func TestSPFont(t *testing.T) {
 	defer file.Close()
 	f.Export(file)
 
+}
+func TestLucaFont_Export(t *testing.T) {
+	restruct.EnableExprBeta()
+	var err error
+	savePath := "../data/LB_EN/FONT/"
+	infoFile := "info32"
+	czFile := "明朝32"
+	txtName := "info32.txt"
+	pngName := "明朝32.png"
+
+	infoData, err := os.ReadFile(savePath + infoFile)
+	if err != nil {
+		panic(err)
+	}
+	czData, err := os.ReadFile(savePath + czFile)
+	if err != nil {
+		panic(err)
+	}
+	font := LoadLucaFont(infoData, czData)
+
+	txtFile, _ := os.Create(savePath + txtName)
+	defer txtFile.Close()
+
+	pngFile, _ := os.Create(savePath + pngName)
+	defer pngFile.Close()
+
+	err = font.Export(pngFile, txtFile)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func TestLucaFont_Import(t *testing.T) {
+	restruct.EnableExprBeta()
+	var err error
+	savePath := "../data/LB_EN/FONT/"
+	infoFile := "info32"
+	czFile := "明朝32"
+	ttfFile := "../data/Other/Font/ARHei-400.ttf"
+	addChars := "!@#$%.,abcdefgAB CDEFG12345测试中文汉字"
+
+	infoData, err := os.ReadFile(savePath + infoFile)
+	if err != nil {
+		panic(err)
+	}
+	czData, err := os.ReadFile(savePath + czFile)
+	if err != nil {
+		panic(err)
+	}
+	font := LoadLucaFont(infoData, czData)
+	ttf, _ := os.Open(ttfFile)
+	defer ttf.Close()
+
+	//===============
+	err = font.Import(ttf, true)
+	if err != nil {
+		panic(err)
+	}
+	cz1, _ := os.Create(savePath + czFile + "_onlyRedraw")
+	defer cz1.Close()
+	info1, _ := os.Create(savePath + infoFile + "_onlyRedraw")
+	defer info1.Close()
+	err = font.Write(cz1, info1)
+	if err != nil {
+		panic(err)
+	}
+	//================
+	err = font.Import(ttf, addChars, -1, false)
+	if err != nil {
+		panic(err)
+	}
+	cz2, _ := os.Create(savePath + czFile + "_addChar")
+	defer cz2.Close()
+	info2, _ := os.Create(savePath + infoFile + "_addChar")
+	defer info2.Close()
+	err = font.Write(cz2, info2)
+	if err != nil {
+		panic(err)
+	}
 }

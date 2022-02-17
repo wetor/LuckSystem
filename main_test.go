@@ -61,7 +61,9 @@ func TestLB_EN(t *testing.T) {
 		fmt.Println(err)
 	}
 	vm.Run()
-	script.Export("data/LB_EN/TXT/SEEN2005.txt")
+	f, _ := os.Create("data/LB_EN/TXT/SEEN2005.txt")
+	defer f.Close()
+	script.Export(f)
 
 }
 
@@ -74,7 +76,9 @@ func TestLoadLB_EN(t *testing.T) {
 	})
 
 	script.Read()
-	err := script.Import("data/LB_EN/TXT/SEEN2005.txt")
+	f, _ := os.Open("data/LB_EN/TXT/SEEN2005.txt")
+	defer f.Close()
+	err := script.Import(f)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -87,7 +91,9 @@ func TestLoadLB_EN(t *testing.T) {
 		panic(err)
 	}
 	vm.Run()
-	err = script.Write()
+	sf, _ := os.Create(script.FileName + ".out")
+	defer sf.Close()
+	err = script.Write(sf)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -129,7 +135,9 @@ func TestSP(t *testing.T) {
 	}
 	vm.Run()
 	//fmt.Println(vm.Context.Variable.ValueMap)
-	script.Export("data/SP/TXT/10_日常0729.txt")
+	f, _ := os.Create("data/SP/TXT/10_日常0729.txt")
+	defer f.Close()
+	script.Export(f)
 }
 
 func TestLoadSP(t *testing.T) {
@@ -141,7 +149,9 @@ func TestLoadSP(t *testing.T) {
 	})
 
 	script.Read()
-	err := script.Import("data/SP/TXT/10_日常0729.txt")
+	f, _ := os.Open("data/SP/TXT/10_日常0729.txt")
+	defer f.Close()
+	err := script.Import(f)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -154,7 +164,9 @@ func TestLoadSP(t *testing.T) {
 		panic(err)
 	}
 	vm.Run()
-	err = script.Write()
+	sf, _ := os.Create(script.FileName + ".out")
+	defer sf.Close()
+	err = script.Write(sf)
 	if err != nil {
 		fmt.Println(err)
 	}

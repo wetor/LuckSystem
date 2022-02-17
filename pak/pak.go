@@ -5,15 +5,16 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/go-restruct/restruct"
 	"github.com/golang/glog"
 	"io"
 	"lucksystem/charset"
 	"lucksystem/utils"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
-
-	"github.com/go-restruct/restruct"
+	"strings"
 )
 
 type PakFileOptions struct {
@@ -183,15 +184,20 @@ func (p *PakFile) GetByIndex(index int) (*FileEntry, error) {
 	}
 	f, err := os.Open(p.FileName)
 	if err != nil {
-		glog.V(8).Infoln("os.Open", err)
 		return nil, err
 	}
 	defer f.Close()
 
 	entry.Data = make([]byte, entry.Length)
-	f.ReadAt(entry.Data, int64(entry.Offset))
-
+	_, err = f.ReadAt(entry.Data, int64(entry.Offset))
+	if err != nil {
+		return nil, err
+	}
 	return entry, nil
+}
+func (p *PakFile) CheckName(name string) bool {
+	_, has := p.NameMap[name]
+	return has
 }
 
 // Set 设置外部文件替换pak文件
@@ -208,8 +214,15 @@ func (p *PakFile) Set(name string, r io.Reader) error {
 	}
 	return p.SetById(id, r)
 }
+
+func (p *PakFile) CheckId(id int) bool {
+	return p.CheckIndex(id - int(p.IDStart))
+}
 func (p *PakFile) SetById(id int, r io.Reader) error {
 	return p.SetByIndex(id-int(p.IDStart), r)
+}
+func (p *PakFile) CheckIndex(index int) bool {
+	return !(index < 0 || index >= int(p.FileCount))
 }
 func (p *PakFile) SetByIndex(index int, r io.Reader) error {
 	if index < 0 || index >= int(p.FileCount) {
@@ -237,7 +250,7 @@ func (p *PakFile) SetByIndex(index int, r io.Reader) error {
 // Write
 //  Description
 //  Receiver p *PakFile
-//  Param w io.Writer 必须是*File类型
+//  Param w io.Writer 必须实现 io.WriterAt
 //  Param opt ...interface{}
 //  Return error
 //
@@ -270,14 +283,13 @@ func (p *PakFile) Write(w io.Writer, opt ...interface{}) error {
 	}
 	defer oldFile.Close()
 
-	file, ok := w.(*os.File)
+	file, ok := w.(io.WriterAt)
 	if !ok {
-		glog.V(8).Infoln("w.(*os.File)", err)
+		glog.V(8).Infoln("w.(io.WriterAt)", err)
 		return err
 	}
-
 	// 1. 复制文件全部内容
-	_, err = io.Copy(file, oldFile)
+	_, err = io.Copy(w, oldFile)
 	if err != nil {
 		glog.V(8).Infoln("io.Copy", err)
 		return err
@@ -322,33 +334,33 @@ func (p *PakFile) Write(w io.Writer, opt ...interface{}) error {
 //  Receiver p *PakFile
 //  Param w io.Writer 保存到的文件名
 //  Param opt ...interface{}
-//    opt[0] 		mode 	string	可选 all,index,id,name
+//    opt[0] 	mode 	string	可选 all,index,id,name
 //      mode=="all": w为每行一个文件路径的txt文件
-//        opt[1] 	dir 	string 	保存文件夹路径
+//        opt[1] 	dir string 	保存文件夹路径
 //      mode=="index":
 //        opt[1] 	index 	int 	从0开始的文件序号
 //      mode=="id":
-//        opt[1]	id		int		文件唯一ID
+//        opt[1]	id	int	文件唯一ID
 //      mode=="name":
 //        opt[1]	name	string	文件名
 //  Return error
 //
-// TODO 未测试
 func (p *PakFile) Export(w io.Writer, opt ...interface{}) error {
 	var err error
 	switch opt[0].(string) {
 	case "all":
-		dir := opt[1].(string)
+		dir, _ := filepath.Abs(opt[1].(string))
 		fes := p.ReadAll()
 		for _, e := range fes {
 			file := ""
 			line := ""
 			if len(e.Name) != 0 {
+
 				file = path.Join(dir, e.Name)
-				line = fmt.Sprintf("name:%s,%s", e.Name, file)
+				line = fmt.Sprintf("name:%s,%s\n", e.Name, file)
 			} else {
 				file = path.Join(dir, strconv.Itoa(e.ID))
-				line = fmt.Sprintf("id:%d,%s", e.ID, file)
+				line = fmt.Sprintf("id:%d,%s\n", e.ID, file)
 			}
 			_, err = w.Write([]byte(line))
 			if err != nil {
@@ -391,53 +403,58 @@ func (p *PakFile) Export(w io.Writer, opt ...interface{}) error {
 //  Receiver p *PakFile
 //  Param r io.Reader 导入文件
 //  Param opt ...interface{}
-//    opt[0]		mode	string	可选file,list,dir
-//      mode=="file": r为导入文件，opt[1]和opt[2]输入其一即可，若都有值，优先opt[1]
+//    opt[0]	mode	string	可选file,list,dir
+//      mode=="file": r为导入文件，根据类型自动判断是文件名还是id，不支持index
 //        opt[1]	name	string	替换指定文件名文件
-//        opt[2]	id		int		替换指定id文件
+//        or
+//        opt[1]	id	int	替换指定id文件
 //      mode=="list": r为包含多个文件路径的txt文件，按照Export mode=="all"输出的txt格式
 //      mode=="dir":  r为空
-//        opt[1]	dir		string	导入文件目录，按照Export导出的文件名进行匹配。若存在文件名则用文件名匹配，不存在则用ID匹配
+//        opt[1]	dir	string	导入文件目录，按照Export导出的文件名进行匹配。若存在文件名则用文件名匹配，不存在则用ID匹配
 //  Return error
 //
-// TODO 未测试
 func (p *PakFile) Import(r io.Reader, opt ...interface{}) error {
 
 	var err error
 	switch opt[0].(string) {
 	case "file":
-		if opt[1] != nil && len(opt[1].(string)) != 0 {
-			name := opt[1].(string)
+		if name, ok := opt[1].(string); ok {
 			err = p.Set(name, r)
-		} else if opt[2] != nil {
-			index := opt[2].(int)
-			err = p.SetById(index, r)
+		} else if id, ok := opt[1].(int); ok {
+			err = p.SetById(id, r)
 		} else {
 			glog.Fatalln("输入参数有误")
 		}
 	case "list":
-		var t, name, file string
-		var id int
 		var fs *os.File
+		var name, file string
+		var id int
 
 		scan := bufio.NewScanner(r)
 		for scan.Scan() {
 			line := scan.Text()
-			_, err = fmt.Sscanf(line, "%s:%s,%s", &t, &name, &file)
-			if err != nil {
-				glog.V(2).Infoln(err)
-				continue
+			param := strings.Split(line, ",")
+
+			if len(param) != 2 {
+				glog.Fatalln("pak.Import.list 输入文件格式有误")
 			}
+			file = param[1]
 			fs, err = os.Open(file)
 			if err != nil {
 				glog.V(2).Infof("%v %s\n", err, file)
 				continue
 			}
-			if t == "id" {
-				_, err = fmt.Sscanf(line, "id:%d,%s", &id, &file)
+			if strings.HasPrefix(param[0], "name") {
+				name = param[0][5:]
+				err = p.Set(name, fs)
+			} else if strings.HasPrefix(param[0], "id") {
+				id, err = strconv.Atoi(param[0][3:])
+				if err != nil {
+					return err
+				}
 				err = p.SetById(id, fs)
 			} else {
-				err = p.Set(name, fs)
+				glog.Fatalln("pak.Import.list 输入文件格式有误")
 			}
 			if err != nil {
 				return err
@@ -460,16 +477,21 @@ func (p *PakFile) Import(r io.Reader, opt ...interface{}) error {
 		}
 		for _, file := range files {
 			name := path.Base(file)
-			_, has := p.NameMap[name]
 			fs, _ := os.Open(file)
-			if has {
+			if p.CheckName(name) {
 				err = p.Set(name, fs)
 			} else {
 				id, err = strconv.Atoi(name)
 				if err != nil {
+					glog.V(2).Infof("Skip File: %s\n", name)
 					continue
 				}
-				err = p.SetById(id, fs)
+				if p.CheckId(id) {
+					err = p.SetById(id, fs)
+				} else {
+					glog.V(2).Infof("Skip File: %s\n", name)
+					continue
+				}
 			}
 			if err != nil {
 				glog.V(2).Infof("%v %s\n", err, file)
