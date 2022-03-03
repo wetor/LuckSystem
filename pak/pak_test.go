@@ -13,15 +13,9 @@ import (
 
 func TestPak(t *testing.T) {
 	restruct.EnableExprBeta()
-	pak := NewPak(&PakFileOptions{
-		FileName: "../data/LB_EN/SCRIPT.PAK.out",
-		Coding:   charset.ShiftJIS,
-	})
-	err := pak.Open()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Printf("%v %v\n", pak.PakHeader, pak.Files[0].Name)
+	pak := LoadPak("../data/LB_EN/SCRIPT.PAK", charset.ShiftJIS)
+
+	fmt.Printf("%v %v\n", pak.Header, pak.Files[0].Name)
 	for _, f := range pak.Files {
 		fmt.Println(f.ID, f.Name, f.Offset, f.Length)
 	}
@@ -29,15 +23,12 @@ func TestPak(t *testing.T) {
 
 func TestVoicePak(t *testing.T) {
 	restruct.EnableExprBeta()
-	pak := NewPak(&PakFileOptions{
-		FileName: "/Volumes/NTFS/Download/Little.Busters.English.Edition/Little Busters! English Edition/files/VOICE0.PAK",
-		Coding:   charset.ShiftJIS,
-	})
-	err := pak.Open()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Printf("%v\n", pak.PakHeader)
+	pak := LoadPak(
+		"/Volumes/NTFS/Download/Little.Busters.English.Edition/Little Busters! English Edition/files/VOICE0.PAK",
+		charset.ShiftJIS,
+	)
+
+	fmt.Printf("%v\n", pak.Header)
 	// for _, f := range pak.Files {
 	// 	fmt.Println(f.ID, f.Name, f.Offset, f.Length)
 	// }
@@ -57,15 +48,12 @@ func TestVoicePak(t *testing.T) {
 }
 func TestCGPak(t *testing.T) {
 	restruct.EnableExprBeta()
-	pak := NewPak(&PakFileOptions{
-		FileName: "../data/LB_EN/BGCG.PAK",
-		Coding:   charset.ShiftJIS,
-	})
-	err := pak.Open()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Printf("%v\n", pak.PakHeader)
+	pak := LoadPak(
+		"../data/LB_EN/BGCG.PAK",
+		charset.ShiftJIS,
+	)
+
+	fmt.Printf("%v\n", pak.Header)
 	// for _, f := range pak.Files {
 	// 	fmt.Println(f.ID, f.Name, f.Offset, f.Length)
 	// }
@@ -81,15 +69,12 @@ func TestCGPak(t *testing.T) {
 }
 func TestFontPak(t *testing.T) {
 	restruct.EnableExprBeta()
-	pak := NewPak(&PakFileOptions{
-		FileName: "../data/LB_EN/FONT.PAK",
-		Coding:   charset.UTF_8,
-	})
-	err := pak.Open()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Printf("%v\n", pak.PakHeader)
+	pak := LoadPak(
+		"../data/LB_EN/FONT.PAK",
+		charset.UTF_8,
+	)
+
+	fmt.Printf("%v\n", pak.Header)
 	for _, f := range pak.Files {
 		fmt.Println(f.ID, f.Name, f.Offset, f.Length)
 	}
@@ -106,15 +91,12 @@ func TestFontPak(t *testing.T) {
 }
 func TestPakReplace(t *testing.T) {
 	restruct.EnableExprBeta()
-	pak := NewPak(&PakFileOptions{
-		FileName: "../data/LB_EN/SCRIPT.PAK",
-		Coding:   charset.ShiftJIS,
-	})
-	err := pak.Open()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Printf("%v\n", pak.PakHeader)
+	pak := LoadPak(
+		"../data/LB_EN/SCRIPT.PAK",
+		charset.ShiftJIS,
+	)
+
+	fmt.Printf("%v\n", pak.Header)
 	for i, f := range pak.Files {
 		if i < 160 {
 			continue
@@ -144,15 +126,12 @@ func TestPakFindCZ2(t *testing.T) {
 	//SYSCG2 122
 	//CHARCG 1910
 	restruct.EnableExprBeta()
-	pak := NewPak(&PakFileOptions{
-		FileName: "/Volumes/NTFS/Download/Little.Busters.English.Edition/Little Busters! English Edition/files/CHARCG.PAK",
-		Coding:   charset.UTF_8,
-	})
-	err := pak.Open()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Printf("%v\n", pak.PakHeader)
+	pak := LoadPak(
+		"/Volumes/NTFS/Download/Little.Busters.English.Edition/Little Busters! English Edition/files/CHARCG.PAK",
+		charset.UTF_8,
+	)
+
+	fmt.Printf("%v\n", pak.Header)
 	for _, f := range pak.Files {
 
 		e, _ := pak.GetById(f.ID)
@@ -166,15 +145,12 @@ func TestPakFindCZ2(t *testing.T) {
 func TestPakFindImage(t *testing.T) {
 
 	restruct.EnableExprBeta()
-	pak := NewPak(&PakFileOptions{
-		FileName: "/Volumes/NTFS/Download/Little.Busters.English.Edition/Little Busters! English Edition/files/CHARCG.PAK",
-		Coding:   charset.UTF_8,
-	})
-	err := pak.Open()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Printf("%v\n", pak.PakHeader)
+	pak := LoadPak(
+		"/Volumes/NTFS/Download/Little.Busters.English.Edition/Little Busters! English Edition/files/CHARCG.PAK",
+		charset.UTF_8,
+	)
+
+	fmt.Printf("%v\n", pak.Header)
 	for _, f := range pak.Files {
 
 		fmt.Println(f.ID, f.Name, f.Offset, f.Length, f.Replace)
@@ -203,21 +179,18 @@ func TestMain(m *testing.M) {
 }
 func TestPakFile_Export(t *testing.T) {
 	restruct.EnableExprBeta()
-
+	var err error
 	savePath := "../data/LB_EN/FONT/"
 	nameFiles := []string{"明朝32", "info32"}
 	indexFiles := []int{0, 33}
 	idFiles := []int{1, 34}
 	listFile := "list_byAll.txt"
 
-	pak := NewPak(&PakFileOptions{
-		FileName: "../data/LB_EN/FONT.PAK",
-		Coding:   charset.UTF_8,
-	})
-	err := pak.Open()
-	if err != nil {
-		fmt.Println(err)
-	}
+	pak := LoadPak(
+		"../data/LB_EN/FONT.PAK",
+		charset.UTF_8,
+	)
+
 	//============
 	for _, name := range nameFiles {
 		fs, _ := os.Create(savePath + name + "_byName")
@@ -290,14 +263,11 @@ func TestPakFile_Import(t *testing.T) {
 	}
 	//===========
 
-	pak := NewPak(&PakFileOptions{
-		FileName: "../data/LB_EN/FONT.PAK",
-		Coding:   charset.UTF_8,
-	})
-	err = pak.Open()
-	if err != nil {
-		fmt.Println(err)
-	}
+	pak := LoadPak(
+		"../data/LB_EN/FONT.PAK",
+		charset.UTF_8,
+	)
+
 	//============
 	for _, name := range nameFiles {
 		fs, _ := os.Open(loadPath + name + "_byName")

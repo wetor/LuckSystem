@@ -2,11 +2,11 @@ package czimage
 
 import (
 	"encoding/binary"
-	"errors"
 	"github.com/go-restruct/restruct"
 	"github.com/golang/glog"
 	"image"
 	"io"
+	"os"
 )
 
 // CzHeader
@@ -55,12 +55,18 @@ type CzImage interface {
 	Write(w io.Writer, opt ...interface{}) error
 }
 
-func LoadCzImage(data []byte) (CzImage, error) {
+func LoadCzImageFile(file string) CzImage {
+	data, err := os.ReadFile(file)
+	if err != nil {
+		glog.Fatalln(err)
+	}
+	return LoadCzImage(data)
+}
+func LoadCzImage(data []byte) CzImage {
 	header := CzHeader{}
 	err := restruct.Unpack(data[:15], binary.LittleEndian, &header)
 	if err != nil {
-		glog.V(8).Infoln("restruct.Unpack", err)
-		return nil, err
+		glog.Fatalln(err)
 	}
 	glog.V(6).Infoln("cz header", header)
 	var cz CzImage
@@ -78,8 +84,8 @@ func LoadCzImage(data []byte) (CzImage, error) {
 		cz = new(Cz3Image)
 		cz.Load(header, data)
 	default:
-		return nil, errors.New("未知类型")
+		glog.Fatalln("Unknown Cz image type")
 	}
 
-	return cz, nil
+	return cz
 }

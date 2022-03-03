@@ -1,8 +1,6 @@
 package main
 
-import (
-	"lucksystem/cmd"
-)
+import "flag"
 
 // glog level:
 //   1
@@ -26,6 +24,10 @@ func main() {
 	// go run . -type pak -i data/LB_EN/SCRIPT.PAK -o data/LB_EN/SCRIPT.PAK.out  -charset=sjis  -mode import -config data/LB_EN/test
 	// File import Pak
 	// go run . -type pak -i data/LB_EN/SCRIPT.PAK -o data/LB_EN/SCRIPT.PAK.out  -charset=sjis  -mode import -config data/LB_EN/test/_CGMODE
-	cmd.Cmd()
+
+	flag.Set("alsologtostderr", "true")
+	flag.Set("log_dir", "log")
+	flag.Set("v", "10")
+	Cmd()
 
 }

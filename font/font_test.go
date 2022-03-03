@@ -20,15 +20,11 @@ import (
 func TestFont(t *testing.T) {
 
 	restruct.EnableExprBeta()
-	pak := pak.NewPak(&pak.PakFileOptions{
-		FileName: "../data/LB_EN/FONT.PAK",
-		Coding:   charset.UTF_8,
-	})
-	err := pak.Open()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println("pak header", pak.PakHeader)
+	pak := pak.LoadPak(
+		"../data/LB_EN/FONT.PAK",
+		charset.UTF_8,
+	)
+	fmt.Println("pak header", pak.Header)
 
 	font := LoadLucaFontPak(pak, "モダン", 32)
 	img := font.GetStringImage("ЁАБ #12ABjgkloa!.理樹@「…は？　こんな夜に？　どこで？」")
@@ -89,8 +85,7 @@ func TestCreateLucaFont(t *testing.T) {
 	defer font.Close()
 	f := CreateLucaFont(24, font, " !@#$%.,abcdefgABCDEFG12345测试中文汉字")
 	pngFile, _ := os.Create("../data/Other/Font/ARHei-400.ttf.png")
-	txtFile, _ := os.Create("../data/Other/Font/ARHei-400.allChar.txt")
-	f.Export(pngFile, txtFile)
+	f.Export(pngFile, "../data/Other/Font/ARHei-400.allChar.txt")
 
 	czFile, _ := os.Create("../data/Other/Font/ARHei-400.ttf.cz")
 	infoFile, _ := os.Create("../data/Other/Font/ARHei-400.ttf.info")
@@ -99,15 +94,12 @@ func TestCreateLucaFont(t *testing.T) {
 
 func TestEidtLucaFont(t *testing.T) {
 	restruct.EnableExprBeta()
-	pak := pak.NewPak(&pak.PakFileOptions{
-		FileName: "../data/LB_EN/FONT.PAK",
-		Coding:   charset.UTF_8,
-	})
-	err := pak.Open()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println("pak header", pak.PakHeader)
+	pak := pak.LoadPak(
+		"../data/LB_EN/FONT.PAK",
+		charset.UTF_8,
+	)
+
+	fmt.Println("pak header", pak.Header)
 
 	f := LoadLucaFontPak(pak, "モダン", 32)
 	font, _ := os.Open("../data/Other/Font/ARHei-400.ttf")
@@ -116,8 +108,7 @@ func TestEidtLucaFont(t *testing.T) {
 	//f := CreateLucaFont("测试字体", 24, "../data/Other/Font/ARHei-400.ttf", " !@#$%.,abcdefgABCDEFG12345测试中文汉字")
 
 	pngFile, _ := os.Create("../data/Other/Font/モダン32e.png")
-	txtFile, _ := os.Create("../data/Other/Font/モダン32e.allChar.txt")
-	f.Export(pngFile, txtFile)
+	f.Export(pngFile, "../data/Other/Font/モダン32e.allChar.txt")
 
 	czFile, _ := os.Create("../data/Other/Font/モダン32e.cz")
 	infoFile, _ := os.Create("../data/Other/Font/モダン32e.info")
@@ -127,15 +118,12 @@ func TestSPFont(t *testing.T) {
 
 	restruct.EnableExprBeta()
 
-	pak := pak.NewPak(&pak.PakFileOptions{
-		FileName: "/Volumes/NTFS/WorkSpace/Github/SummerPockets/font/FONT.PAK",
-		Coding:   charset.UTF_8,
-	})
-	err := pak.Open()
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println("pak header", pak.PakHeader)
+	pak := pak.LoadPak(
+		"/Volumes/NTFS/WorkSpace/Github/SummerPockets/font/FONT.PAK",
+		charset.UTF_8,
+	)
+
+	fmt.Println("pak header", pak.Header)
 
 	for i, f := range pak.Files {
 		if i < 160 {
@@ -188,7 +176,7 @@ func TestLucaFont_Import(t *testing.T) {
 	infoFile := "info32"
 	czFile := "明朝32"
 	ttfFile := "../data/Other/Font/ARHei-400.ttf"
-	addChars := "!@#$%.,abcdefgAB CDEFG12345测试中文汉字"
+	addChars := "../data/Other/Font/allchar.txt"
 
 	infoData, err := os.ReadFile(savePath + infoFile)
 	if err != nil {

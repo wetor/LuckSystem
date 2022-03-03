@@ -17,12 +17,7 @@ import (
 	"strings"
 )
 
-type PakFileOptions struct {
-	FileName string
-	Coding   charset.Charset
-}
-
-type PakHeader struct {
+type Header struct {
 	HeaderLength uint32
 	FileCount    uint32
 	IDStart      uint32 // 图像包中，id段开始
@@ -36,11 +31,19 @@ type PakHeader struct {
 	Flags uint32
 	// 4 * 9 = 36
 }
-type PakType string
 
-type PakFile struct {
-	PakHeader `struct:"-"`
-	Files     []*FileEntry    `struct:"size=FileCount"`
+type Entry struct {
+	Offset  uint32
+	Length  uint32
+	Data    []byte `struct:"-"`
+	Name    string `struct:"-"`
+	ID      int    `struct:"-"`
+	Replace bool   `struct:"-"`
+}
+
+type Pak struct {
+	Header    `struct:"-"`
+	Files     []*Entry        `struct:"size=FileCount"`
 	NameMap   map[string]int  `struct:"-"`
 	FileName  string          `struct:"-"`
 	Coding    charset.Charset `struct:"-"`
@@ -49,21 +52,24 @@ type PakFile struct {
 	Rebuild   bool            `struct:"-"` // 替换数据后，是否需要重构pak
 }
 
-func NewPak(opt *PakFileOptions) *PakFile {
+func LoadPak(filename string, coding charset.Charset) *Pak {
 
-	pakFile := &PakFile{
+	pakFile := &Pak{
 		Rebuild: false,
 	}
-	pakFile.FileName = opt.FileName
-	if opt.Coding != "" {
-		pakFile.Coding = opt.Coding
-	} else {
+	pakFile.FileName = filename
+	pakFile.Coding = coding
+	if len(coding) == 0 {
 		pakFile.Coding = charset.UTF_8
+	}
+	err := pakFile.Open()
+	if err != nil {
+		glog.Fatalln(err)
 	}
 	return pakFile
 }
 
-func (p *PakFile) Open() error {
+func (p *Pak) Open() error {
 	f, err := os.Open(p.FileName)
 
 	if err != nil {
@@ -73,13 +79,18 @@ func (p *PakFile) Open() error {
 	defer f.Close()
 
 	headerLenBytes := make([]byte, 4)
-	f.ReadAt(headerLenBytes, 0)
+	_, err = f.ReadAt(headerLenBytes, 0)
+	if err != nil {
+		return err
+	}
 	headerLen := binary.LittleEndian.Uint32(headerLenBytes)
 
 	data := make([]byte, headerLen)
-	f.ReadAt(data, 0)
-
-	err = restruct.Unpack(data, binary.LittleEndian, &p.PakHeader)
+	_, err = f.ReadAt(data, 0)
+	if err != nil {
+		return err
+	}
+	err = restruct.Unpack(data, binary.LittleEndian, &p.Header)
 	if err != nil {
 		glog.V(8).Infoln("restruct.Unpack1", err)
 		return err
@@ -87,10 +98,16 @@ func (p *PakFile) Open() error {
 
 	temp := make([]byte, 4)
 	tempPos := int64(32)
-	f.ReadAt(temp, tempPos)
+	_, err = f.ReadAt(temp, tempPos)
+	if err != nil {
+		return err
+	}
 	for binary.LittleEndian.Uint32(temp) != p.HeaderLength/p.BlockSize {
 		tempPos += 4
-		f.ReadAt(temp, tempPos)
+		_, err = f.ReadAt(temp, tempPos)
+		if err != nil {
+			return err
+		}
 	}
 
 	// 文件偏移 长度读取
@@ -105,7 +122,10 @@ func (p *PakFile) Open() error {
 	named := (p.Flags & 512) != 0
 	if named {
 
-		f.ReadAt(temp, tempPos-4)
+		_, err = f.ReadAt(temp, tempPos-4)
+		if err != nil {
+			return err
+		}
 		offset := int(binary.LittleEndian.Uint32(temp))
 		size := 0
 		for _, file := range p.Files {
@@ -145,7 +165,7 @@ func (p *PakFile) Open() error {
 
 	return nil
 }
-func (p *PakFile) ReadAll() []*FileEntry {
+func (p *Pak) ReadAll() []*Entry {
 	f, err := os.Open(p.FileName)
 	if err != nil {
 		glog.V(8).Infoln("os.Open", err)
@@ -159,7 +179,7 @@ func (p *PakFile) ReadAll() []*FileEntry {
 	return p.Files
 }
 
-func (p *PakFile) Get(name string) (*FileEntry, error) {
+func (p *Pak) Get(name string) (*Entry, error) {
 
 	id, has := p.NameMap[name]
 	if !has {
@@ -168,10 +188,10 @@ func (p *PakFile) Get(name string) (*FileEntry, error) {
 	return p.GetById(id)
 }
 
-func (p *PakFile) GetById(id int) (*FileEntry, error) {
+func (p *Pak) GetById(id int) (*Entry, error) {
 	return p.GetByIndex(id - int(p.IDStart))
 }
-func (p *PakFile) GetByIndex(index int) (*FileEntry, error) {
+func (p *Pak) GetByIndex(index int) (*Entry, error) {
 
 	if index < 0 || index >= int(p.FileCount) {
 		return nil, errors.New("文件id错误")
@@ -195,19 +215,19 @@ func (p *PakFile) GetByIndex(index int) (*FileEntry, error) {
 	}
 	return entry, nil
 }
-func (p *PakFile) CheckName(name string) bool {
+func (p *Pak) CheckName(name string) bool {
 	_, has := p.NameMap[name]
 	return has
 }
 
 // Set 设置外部文件替换pak文件
 //  Description
-//  Receiver p *PakFile
+//  Receiver p *Pak
 //  Param name string
 //  Param r io.Reader
 //  Return error
 //
-func (p *PakFile) Set(name string, r io.Reader) error {
+func (p *Pak) Set(name string, r io.Reader) error {
 	id, has := p.NameMap[name]
 	if !has {
 		return errors.New("文件不存在")
@@ -215,16 +235,16 @@ func (p *PakFile) Set(name string, r io.Reader) error {
 	return p.SetById(id, r)
 }
 
-func (p *PakFile) CheckId(id int) bool {
+func (p *Pak) CheckId(id int) bool {
 	return p.CheckIndex(id - int(p.IDStart))
 }
-func (p *PakFile) SetById(id int, r io.Reader) error {
+func (p *Pak) SetById(id int, r io.Reader) error {
 	return p.SetByIndex(id-int(p.IDStart), r)
 }
-func (p *PakFile) CheckIndex(index int) bool {
+func (p *Pak) CheckIndex(index int) bool {
 	return !(index < 0 || index >= int(p.FileCount))
 }
-func (p *PakFile) SetByIndex(index int, r io.Reader) error {
+func (p *Pak) SetByIndex(index int, r io.Reader) error {
 	if index < 0 || index >= int(p.FileCount) {
 		return errors.New("文件id错误")
 	}
@@ -249,12 +269,12 @@ func (p *PakFile) SetByIndex(index int, r io.Reader) error {
 
 // Write
 //  Description
-//  Receiver p *PakFile
+//  Receiver p *Pak
 //  Param w io.Writer 必须实现 io.WriterAt
 //  Param opt ...interface{}
 //  Return error
 //
-func (p *PakFile) Write(w io.Writer, opt ...interface{}) error {
+func (p *Pak) Write(w io.Writer, opt ...interface{}) error {
 
 	oldOffset := make(map[int]uint32, p.FileCount)
 	if p.Rebuild {
@@ -331,7 +351,7 @@ func (p *PakFile) Write(w io.Writer, opt ...interface{}) error {
 
 // Export Pak文件解包接口
 //  Description
-//  Receiver p *PakFile
+//  Receiver p *Pak
 //  Param w io.Writer 保存到的文件名
 //  Param opt ...interface{}
 //    opt[0] 	mode 	string	可选 all,index,id,name
@@ -345,7 +365,7 @@ func (p *PakFile) Write(w io.Writer, opt ...interface{}) error {
 //        opt[1]	name	string	文件名
 //  Return error
 //
-func (p *PakFile) Export(w io.Writer, opt ...interface{}) error {
+func (p *Pak) Export(w io.Writer, opt ...interface{}) error {
 	var err error
 	switch opt[0].(string) {
 	case "all":
@@ -376,7 +396,7 @@ func (p *PakFile) Export(w io.Writer, opt ...interface{}) error {
 	case "id":
 		fallthrough
 	case "name":
-		var e *FileEntry
+		var e *Entry
 		switch opt[0].(string) {
 		case "index":
 			e, err = p.GetByIndex(opt[1].(int))
@@ -400,7 +420,7 @@ func (p *PakFile) Export(w io.Writer, opt ...interface{}) error {
 
 // Import
 //  Description
-//  Receiver p *PakFile
+//  Receiver p *Pak
 //  Param r io.Reader 导入文件
 //  Param opt ...interface{}
 //    opt[0]	mode	string	可选file,list,dir
@@ -413,7 +433,7 @@ func (p *PakFile) Export(w io.Writer, opt ...interface{}) error {
 //        opt[1]	dir	string	导入文件目录，按照Export导出的文件名进行匹配。若存在文件名则用文件名匹配，不存在则用ID匹配
 //  Return error
 //
-func (p *PakFile) Import(r io.Reader, opt ...interface{}) error {
+func (p *Pak) Import(r io.Reader, opt ...interface{}) error {
 
 	var err error
 	switch opt[0].(string) {

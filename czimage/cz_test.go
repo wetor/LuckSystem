@@ -15,10 +15,8 @@ func TestCZ3(t *testing.T) {
 	restruct.EnableExprBeta()
 	for i := 0; i < 10; i++ {
 		data, _ := os.ReadFile("../data/LB_EN/IMAGE/" + strconv.Itoa(i) + ".cz3")
-		cz, err := LoadCzImage(data)
-		if err != nil {
-			panic(err)
-		}
+		cz := LoadCzImage(data)
+
 		w, _ := os.Create("../data/LB_EN/IMAGE/" + strconv.Itoa(i) + ".png")
 		cz.Export(w)
 		w.Close()
@@ -32,10 +30,8 @@ func TestCZ1(t *testing.T) {
 	for _, name := range list {
 
 		data, _ := os.ReadFile("../data/LB_EN/IMAGE/" + name + ".cz1")
-		cz, err := LoadCzImage(data)
-		if err != nil {
-			panic(err)
-		}
+		cz := LoadCzImage(data)
+
 		w, _ := os.Create("../data/LB_EN/IMAGE/" + name + ".png")
 		cz.Export(w)
 		w.Close()
@@ -48,10 +44,8 @@ func TestCZ1_2(t *testing.T) {
 	restruct.EnableExprBeta()
 
 	data, _ := os.ReadFile("../data/LB_EN/FONT/明朝32_onlyRedraw")
-	cz, err := LoadCzImage(data)
-	if err != nil {
-		panic(err)
-	}
+	cz := LoadCzImage(data)
+
 	w, _ := os.Create("../data/LB_EN/FONT/明朝32_onlyRedraw.png")
 	cz.Export(w)
 	w.Close()
@@ -62,11 +56,9 @@ func TestLineDiff(t *testing.T) {
 	restruct.EnableExprBeta()
 
 	data, _ := os.ReadFile("../data/LB_EN/IMAGE/2.cz3")
-	cz, err := LoadCzImage(data)
+	cz := LoadCzImage(data)
 	//cz.GetImage()
-	if err != nil {
-		panic(err)
-	}
+
 	cz3 := cz.(*Cz3Image)
 	//os.WriteFile("../data/LB_EN/IMAGE/2.ld", []byte(cz3.Image.(*image.RGBA).Pix), 0666)
 	f, _ := os.Open("../data/LB_EN/IMAGE/2.png")
@@ -81,7 +73,7 @@ func TestLineDiff(t *testing.T) {
 //func TestCZ2(t *testing.T) {
 //	restruct.EnableExprBeta()
 //	data, _ := os.ReadFile("../data/Other/CZ2/ゴシック14.cz2")
-//	cz, err := LoadCzImage(data)
+//	cz := LoadCzImage(data)
 //	if err != nil {
 //		panic(err)
 //	}
@@ -93,10 +85,8 @@ func TestLineDiff(t *testing.T) {
 func TestCz3Image_Import(t *testing.T) {
 	restruct.EnableExprBeta()
 	data, _ := os.ReadFile("../data/LB_EN/IMAGE/4.cz3")
-	cz, err := LoadCzImage(data)
-	if err != nil {
-		panic(err)
-	}
+	cz := LoadCzImage(data)
+
 	w, _ := os.Create("../data/LB_EN/IMAGE/4.png")
 	cz.Export(w)
 	w.Close()
@@ -114,10 +104,8 @@ func TestCz3Image_Import(t *testing.T) {
 func TestCz1Image_Import(t *testing.T) {
 	restruct.EnableExprBeta()
 	data, _ := os.ReadFile("../data/LB_EN/IMAGE/明朝20.cz1")
-	cz, err := LoadCzImage(data)
-	if err != nil {
-		panic(err)
-	}
+	cz := LoadCzImage(data)
+
 	w, _ := os.Create("../data/LB_EN/IMAGE/明朝20.png")
 	cz.Export(w)
 	w.Close()
@@ -140,10 +128,7 @@ func TestCz1Image_Import(t *testing.T) {
 func TestCz0Image_Export(t *testing.T) {
 	restruct.EnableExprBeta()
 	data, _ := os.ReadFile("../data/LB_EN/IMAGE/10.cz0")
-	cz, err := LoadCzImage(data)
-	if err != nil {
-		panic(err)
-	}
+	cz := LoadCzImage(data)
 
 	w, _ := os.Create("../data/LB_EN/IMAGE/10.cz0.png")
 	cz.Export(w)
@@ -161,10 +146,7 @@ func TestMain(m *testing.M) {
 func TestCz0Image_Import(t *testing.T) {
 	restruct.EnableExprBeta()
 	data, _ := os.ReadFile("../data/LB_EN/IMAGE/10.cz0")
-	cz, err := LoadCzImage(data)
-	if err != nil {
-		panic(err)
-	}
+	cz := LoadCzImage(data)
 
 	w, _ := os.Create("../data/LB_EN/IMAGE/10.cz0.png")
 	cz.Export(w)

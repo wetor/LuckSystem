@@ -20,7 +20,7 @@ var ScriptBlackList = []string{"_VARNUM", "_CGMODE", "_SCR_LABEL", "_VOICE_PARAM
 
 type GameOptions struct {
 	GameName     string
-	Version      uint8
+	Version      int
 	ResourcesDir string
 	Coding       charset.Charset
 	Mode         enum.VMRunMode
@@ -28,10 +28,10 @@ type GameOptions struct {
 
 type Game struct {
 	GameName     string
-	Version      uint8
+	Version      int
 	ResourcesDir string
 	Coding       charset.Charset
-	Resources    map[string]*pak.PakFile
+	Resources    map[string]*pak.Pak
 	Context      *context.Context
 }
 
@@ -52,11 +52,11 @@ func NewGame(opt *GameOptions) *Game {
 		ChanEIP:  make(chan int),
 		RunMode:  opt.Mode,
 	}
-	game.Resources = make(map[string]*pak.PakFile)
-	game.Resources[ResScript] = pak.NewPak(&pak.PakFileOptions{
-		FileName: filepath.Join(game.ResourcesDir, ResScript),
-		Coding:   game.Coding,
-	})
+	game.Resources = make(map[string]*pak.Pak)
+	game.Resources[ResScript] = pak.LoadPak(
+		filepath.Join(game.ResourcesDir, ResScript),
+		game.Coding,
+	)
 	return game
 }
 
@@ -67,7 +67,7 @@ func (g *Game) LoadResources() {
 		p.Open()
 		switch key {
 		case ResScript:
-			var entry *pak.FileEntry
+			var entry *pak.Entry
 			for i := 0; i < int(p.FileCount); i++ {
 				entry, err = p.GetById(i)
 				if err != nil {
@@ -78,7 +78,7 @@ func (g *Game) LoadResources() {
 					continue
 				}
 				glog.V(4).Infof("%v %v\n", entry.Name, len(entry.Data))
-				scr, err := script.OpenScriptFile(entry)
+				scr, err := script.LoadScriptEntry(entry)
 				if err != nil {
 					panic(err)
 				}

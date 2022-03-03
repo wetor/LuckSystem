@@ -30,7 +30,7 @@ type LucaFont struct {
 //  Param size int 12 14 16 18 20 24 28 30 32 36 72
 //  Return *LucaFont
 //
-func LoadLucaFontPak(pak *pak.PakFile, fontName string, size int) *LucaFont {
+func LoadLucaFontPak(pak *pak.Pak, fontName string, size int) *LucaFont {
 	infoFile, err := pak.Get("info" + strconv.Itoa(size))
 	if err != nil {
 		glog.Fatalln(err)
@@ -70,7 +70,7 @@ func LoadLucaFont(infoFile, imageFile []byte) *LucaFont {
 	font := &LucaFont{}
 	font.Info = LoadFontInfo(infoFile)
 	font.Size = int(font.Info.FontSize)
-	font.CzImage, _ = czimage.LoadCzImage(imageFile)
+	font.CzImage = czimage.LoadCzImage(imageFile)
 
 	font.Image = font.CzImage.GetImage().(*image.RGBA)
 	return font
@@ -205,7 +205,7 @@ func (f *LucaFont) ReplaceChars(fontFile io.Reader, allChar string, startIndex i
 //  Receiver f *LucaFont
 //  Param w io.Writer
 //  Param opt ...interface{}
-//    opt[0] txtFilename io.Writer 导出的全字符文件
+//    opt[0] txtFilename string 导出的全字符文件名
 //  Return error
 //
 func (f *LucaFont) Export(w io.Writer, opt ...interface{}) error {
@@ -214,7 +214,9 @@ func (f *LucaFont) Export(w io.Writer, opt ...interface{}) error {
 		return err
 	}
 	if len(opt) > 0 {
-		err = f.Info.Export(opt[0].(io.Writer))
+		fs, _ := os.Create(opt[0].(string))
+		err = f.Info.Export(fs)
+		fs.Close()
 	}
 	return err
 }
@@ -226,8 +228,8 @@ func (f *LucaFont) Export(w io.Writer, opt ...interface{}) error {
 //  Param opt ...interface{}
 //    opt[0]	onlyRedraw	bool 仅使用新字体重绘，不增加新字符
 //      or
-//    opt[0]	allChar	string	增加的全字符，若startIndex==0，且第一个字符不是空格，会自动补充为空格
-//    opt[1]	startIndex	int	开始位置，即字库上面跳过多少字符，-1为添加到最后
+//    opt[0]	allCharFile	string	增加的全字符文件，若startIndex==0，且第一个字符不是空格，会自动补充为空格
+//    opt[1]	startIndex	int	开始位置。前面跳过字符数量，-1为添加到最后
 //    opt[2]	redraw	bool	是否用新字体重绘startIndex之前的字符
 //  Return error
 //
@@ -245,7 +247,11 @@ func (f *LucaFont) Import(r io.Reader, opt ...interface{}) error {
 	if opt[1].(int) == -1 {
 		opt[1] = int(f.Info.CharNum)
 	}
-	f.ReplaceChars(r, opt[0].(string), opt[1].(int), opt[2].(bool))
+	data, err := os.ReadFile(opt[0].(string))
+	if err != nil {
+		return err
+	}
+	f.ReplaceChars(r, string(data), opt[1].(int), opt[2].(bool))
 	return nil
 }
 
