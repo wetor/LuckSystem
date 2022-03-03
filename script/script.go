@@ -19,11 +19,6 @@ import (
 	"github.com/go-restruct/restruct"
 )
 
-type ScriptFileOptions struct {
-	FileName string
-	GameName string
-	Version  uint8
-}
 type JumpParam struct {
 	ScriptName string
 	Position   int
@@ -47,15 +42,15 @@ type ScriptInfo struct {
 	FileName string
 	Name     string
 	GameName string
-	Version  uint8
+	Version  int
 	CodeNum  int
 }
 
+// CodeLine
 // 导出逻辑
 // 1.读入脚本文件，解析为[]CodeLine
 // 2.vm运行，解析ParamBytes得到完整参数列表
 // 3.将制定导出参数加入到Params，转为字符串导出
-
 // 导入逻辑
 // 1.读入脚本文件，解析为[]CodeLine
 // 2.解析文本，添加进对应的Params中
@@ -137,17 +132,17 @@ func (e *ScriptEntry) addImportLabel(labelIndex, pos int) {
 	e.ILabelMap[labelIndex] = pos
 }
 
-func NewScriptFile(opt ScriptFileOptions) *ScriptFile {
+func LoadScriptFile(filename, gameName string, version int) *ScriptFile {
 	script := new(ScriptFile)
-	script.FileName = opt.FileName
-	_, script.Name = path.Split(opt.FileName)
-	script.GameName = opt.GameName
-	script.Version = opt.Version
+	script.FileName = filename
+	_, script.Name = path.Split(filename)
+	script.GameName = gameName
+	script.Version = version
 	script.InitEntry()
 	return script
 }
 
-func OpenScriptFile(entry *pak.FileEntry) (*ScriptFile, error) {
+func LoadScriptEntry(entry *pak.Entry) (*ScriptFile, error) {
 
 	script := &ScriptFile{}
 	script.Name = entry.Name
@@ -158,7 +153,7 @@ func OpenScriptFile(entry *pak.FileEntry) (*ScriptFile, error) {
 	return script, nil
 }
 
-func (s *ScriptFile) ReadByEntry(entry *pak.FileEntry) error {
+func (s *ScriptFile) ReadByEntry(entry *pak.Entry) error {
 	s.Name = entry.Name
 	return s.ReadData(entry.Data)
 }

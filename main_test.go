@@ -7,6 +7,7 @@ import (
 	"lucksystem/game/enum"
 	"lucksystem/script"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/go-restruct/restruct"
@@ -22,12 +23,8 @@ func TestMain(m *testing.M) {
 	os.Exit(ret)
 }
 func Test11(t *testing.T) {
-	var offset uint32 = 33
-	var BlockSize uint32 = 32
-	if offset/BlockSize*BlockSize != offset {
-		offset = (offset/BlockSize + 1) * BlockSize
-	}
-	fmt.Println(offset)
+	n, err := strconv.Atoi("123a")
+	fmt.Println(n, err)
 }
 
 type lenString string
@@ -48,11 +45,11 @@ func Test22(t *testing.T) {
 func TestLB_EN(t *testing.T) {
 	restruct.EnableExprBeta()
 
-	script := script.NewScriptFile(script.ScriptFileOptions{
-		FileName: "data/LB_EN/SCRIPT/SEEN2005",
-		GameName: "LB_EN",
-		Version:  3,
-	})
+	script := script.LoadScriptFile(
+		"data/LB_EN/SCRIPT/SEEN2005",
+		"LB_EN",
+		3,
+	)
 
 	script.Read()
 	vm := VM.NewVM(script, enum.VMRunExport)
@@ -69,11 +66,11 @@ func TestLB_EN(t *testing.T) {
 
 func TestLoadLB_EN(t *testing.T) {
 	restruct.EnableExprBeta()
-	script := script.NewScriptFile(script.ScriptFileOptions{
-		FileName: "data/LB_EN/SCRIPT/SEEN2005",
-		GameName: "LB_EN",
-		Version:  3,
-	})
+	script := script.LoadScriptFile(
+		"data/LB_EN/SCRIPT/SEEN2005",
+		"LB_EN",
+		3,
+	)
 
 	script.Read()
 	f, _ := os.Open("data/LB_EN/TXT/SEEN2005.txt")
@@ -102,20 +99,12 @@ func TestSP(t *testing.T) {
 	restruct.EnableExprBeta()
 
 	var err error
-	// pak := pak.NewPak(&pak.PakFileOptions{
-	// 	FileName: "data/SP/SCRIPT.PAK",
-	// 	Coding:   charset.ShiftJIS,
-	// })
-	// err = pak.Open()
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
 
-	script := script.NewScriptFile(script.ScriptFileOptions{
-		FileName: "data/SP/SCRIPT/10_日常0729",
-		GameName: "SP",
-		Version:  3,
-	})
+	script := script.LoadScriptFile(
+		"data/SP/SCRIPT/10_日常0729",
+		"SP",
+		3,
+	)
 
 	// entry, err := pak.Get("10_日常0730")
 	// if err != nil {
@@ -142,11 +131,11 @@ func TestSP(t *testing.T) {
 
 func TestLoadSP(t *testing.T) {
 	restruct.EnableExprBeta()
-	script := script.NewScriptFile(script.ScriptFileOptions{
-		FileName: "data/SP/SCRIPT/10_日常0729",
-		GameName: "SP",
-		Version:  3,
-	})
+	script := script.LoadScriptFile(
+		"data/SP/SCRIPT/10_日常0729",
+		"SP",
+		3,
+	)
 
 	script.Read()
 	f, _ := os.Open("data/SP/TXT/10_日常0729.txt")

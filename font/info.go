@@ -7,6 +7,7 @@ import (
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 	"io"
+	"os"
 )
 
 type DrawSize struct {
@@ -32,6 +33,13 @@ type Info struct {
 	IndexUnicode []rune    `struct:"-"` // imgindex -> unicode
 }
 
+func LoadFontInfoFile(file string) *Info {
+	data, err := os.ReadFile(file)
+	if err != nil {
+		glog.Fatalln(err)
+	}
+	return LoadFontInfo(data)
+}
 func LoadFontInfo(data []byte) *Info {
 	info := new(Info)
 	err := restruct.Unpack(data, binary.LittleEndian, info)
@@ -224,7 +232,7 @@ func (i *Info) SetChars(fontFile io.Reader, allChar string, startIndex int, reDr
 //    opt[0]	onlyRedraw	bool 	仅使用新字体重绘，不增加新字符
 //      or
 //    opt[0]	allChar 	string	增加的全字符，若startIndex==0，且第一个字符不是空格，会自动补充为空格
-//    opt[1]	startIndex	int	开始位置，即字库上面跳过多少字符
+//    opt[1]	startIndex	int	开始位置。前面跳过字符数量
 //    opt[2]	redraw 		bool	是否用新字体重绘startIndex之前的字符
 //  Return error
 //
