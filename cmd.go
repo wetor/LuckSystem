@@ -7,6 +7,8 @@ import (
 	"lucksystem/charset"
 	"lucksystem/czimage"
 	"lucksystem/font"
+	"lucksystem/game/VM"
+	"lucksystem/game/enum"
 	"lucksystem/pak"
 	"lucksystem/script"
 	"os"
@@ -62,7 +64,7 @@ import.type:
   info:
     params[0]	onlyRedraw	bool 	仅使用新字体重绘，不增加新字符 (Redraw with new fonts only, without adding new characters)
       or
-    params[0]	allChar	string	增加的全字符。若startIndex==0，且第一个字符不是空格，会自动补充为空格 (Added full characters. If params[1]==0 and the first character is not a space, it will be automatically supplemented with a space)
+    params[0]	allChar	string	增加的全字符。不能包含空格和半角逗号 (Added full characters. Cannot contain spaces and half width commas)
     params[1]	startIndex	int	开始位置。前面跳过字符数量 (Start position. Number of characters skipped before)
     params[2]	redraw	bool	是否用新字体重绘startIndex之前的字符 (Redraw characters before startIndex with new font)
   font:
@@ -110,7 +112,49 @@ import.type:
 	case "font":
 		object = font.LoadLucaFontFile(pSrc, pFontInfo)
 	case "script":
-		object = script.LoadScriptFile(pSrc, pGame, pScriptVersion)
+		scr := script.LoadScriptFile(pSrc, pGame, pScriptVersion)
+		err = scr.Read()
+		if err != nil {
+			panic(err)
+		}
+		var vm *VM.VM
+		var output io.Writer
+		var input io.Reader
+		output, err = os.Create(pOutput)
+		if err != nil {
+			panic(err)
+		}
+
+		if pMode == "export" {
+			vm = VM.NewVM(scr, enum.VMRunExport)
+			err = vm.LoadOpcode("data/" + pGame + "/OPCODE.txt")
+			if err != nil {
+				panic(err)
+			}
+			vm.Run()
+			err = scr.Export(output)
+		} else if pMode == "import" {
+			vm = VM.NewVM(scr, enum.VMRunImport)
+			err = vm.LoadOpcode("data/" + pGame + "/OPCODE.txt")
+			if err != nil {
+				panic(err)
+			}
+			input, err = os.Open(pInput)
+			if err != nil {
+				panic(err)
+			}
+			err = scr.Import(input)
+			if err != nil {
+				panic(err)
+			}
+			vm.Run()
+			err = scr.Write(output)
+		}
+
+		if err != nil {
+			panic(err)
+		}
+		return // type=script直接结束
 	default:
 		panic("Unknown type")
 
@@ -120,6 +164,10 @@ import.type:
 	for _, p := range strings.Split(pParams, ",") {
 		if n, err := strconv.Atoi(p); err == nil {
 			param = append(param, n)
+		} else if p == "true" {
+			param = append(param, true)
+		} else if p == "false" {
+			param = append(param, false)
 		} else {
 			param = append(param, p)
 		}

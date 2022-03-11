@@ -63,10 +63,13 @@ LucaSystem 引擎解析工具
 
 - 解析完成
 - 能够简单使用，生成指定文本的图像
+- 导出完成
+- 导入、制作完成
 
 #### info文件
 
-- 解析完成
+- 导出完成
+- 导入完成
 
 ### Luca OggPak 音频封包
 
@@ -84,9 +87,9 @@ LucaSystem 引擎解析工具
 - IMAGELOAD (LB_EN、SP)
 
 - BATTLE (LB_EN)
-- UNKNOW0 (仅LB_EN出现)
 - EQU
 - EQUN
+- EQUV
 - ADD
 - RANDOM
 - IFN
@@ -98,12 +101,44 @@ LucaSystem 引擎解析工具
 
 其余指令的数据均为未处理或者解析
 
+## TODO
+### 3.11
+- 控制台交互接口未进行完整的测试
+- cz0、cz3图像导入导出接口未统一
+- cz1、cz3图像导出存在异常，图像有损，推测为lzw解压算法问题
+
 ## 更新日志
 
 ### 未来
 
-- 支持命令行使用或tui使用（现在需要使用test来调用各种功能模块）
 - 支持更多LucaSystem引擎的游戏资源解析
+- 通用化与易理解的控制台交互接口
+
+### 3.11
+- 修复script导入导出交互bug
+- 测试部分交互
+- 新增Usage文档
+
+### 3.03
+- 完整的控制台交互接口（未测试）
+- 帮助文档
+
+### 2.17
+- 统一cz、info、font、pak、script的接口
+- 完善测试用例
+
+### 2.10 
+- 统一接口规范
+
+### 2.9
+- 修复script导入导出中换行、空行的问题
+- Merge AEBus pr
+  - 1. Fixed situation when LuckSystem would stop parsing scripts after finding END opcode
+  - 2. Added handling of TASK, SAYAVOICETEXT, VARSTR_SET opcodes, and fixed handling of BATTLE opcode.
+  - 3. Added opcode names for LB_EN, changed first three opcodes to EQU, EQUN, EQUV as specified in LITBUS_WIN32.exe, added handling of these opcodes in LB_EN.go
+
+### 1.25
+- 完成pak导入导出交互
 
 ### 1.22
 - 完成CZ1导入
