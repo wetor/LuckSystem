@@ -356,15 +356,15 @@ func (s *ScriptFile) Import(r io.Reader, opt ...interface{}) error {
 		line = strings.Replace(line, "\\n", "\n", -1)
 		ParseCodeParams(code, line)
 
-		fmt.Print(i)
+		glog.V(6).Info(i)
 		if code.LabelIndex > 0 {
-			fmt.Printf(" label%d:", code.LabelIndex)
+			glog.V(6).Infof(" label%d:", code.LabelIndex)
 		}
-		fmt.Printf(" %s %v", code.OpStr, code.Params)
+		glog.V(6).Infof(" %s %v", code.OpStr, code.Params)
 		if code.GotoIndex > 0 {
-			fmt.Printf(" {goto label%d}", code.GotoIndex)
+			glog.V(6).Infof(" {goto label%d}", code.GotoIndex)
 		}
-		fmt.Print("\n")
+		glog.V(6).Info("\n")
 
 	}
 	return nil
@@ -417,7 +417,7 @@ func (s *ScriptFile) CodeParamsToBytes(code *CodeLine, coding charset.Charset, p
 	for _, param := range params {
 		size += SetParam(buf, param, coding)
 	}
-	fmt.Printf("%v %v\n\t%v %v\n\t%v %v\n", code.OpStr, params, buf.Len(), buf.Bytes(), len(code.RawBytes), code.RawBytes)
+	glog.V(6).Infof("%v %v\n\t%v %v\n\t%v %v\n", code.OpStr, params, buf.Len(), buf.Bytes(), len(code.RawBytes), code.RawBytes)
 	code.Len = uint16(size + 4)
 	code.Align = make([]byte, code.Len&1)
 	code.RawBytes = buf.Bytes()
@@ -445,7 +445,7 @@ func (s *ScriptFile) Write(w io.Writer, opt ...interface{}) error {
 		pos := make([]byte, 4)
 		binary.LittleEndian.PutUint32(pos, uint32(jumpPos))
 		copy(data[gotoPos:gotoPos+4], pos)
-		fmt.Println(data[gotoPos : gotoPos+4])
+		glog.V(6).Infoln(data[gotoPos : gotoPos+4])
 	}
 	_, err = w.Write(data)
 	if err != nil {
