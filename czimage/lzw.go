@@ -96,3 +96,31 @@ func decompressLZW(compressed []uint16, size int) []byte {
 	}
 	return decompressed
 }
+func decompressLZW2(compressed []uint16, size int) (result []byte) {
+
+	dictionary := make(map[int]string)
+	for i := 0; i < 256; i++ {
+		dictionary[i] = string(rune(i))
+	}
+	w := dictionary[int(compressed[0])]
+	decompressed := make([]rune, 0, size)
+
+	for _, k := range compressed {
+		var entry []rune
+		if x, ok := dictionary[int(k)]; ok {
+			entry = []rune(x)
+		} else if int(k) == len(dictionary) {
+			entry = []rune(w)
+			entry = append(entry, entry[0])
+		}
+		decompressed = append(decompressed, entry...)
+		dictionary[len(dictionary)] = w + string(entry[0])
+
+		w = string(entry)
+	}
+	result = make([]byte, len(decompressed))
+	for i, r := range decompressed {
+		result[i] = byte(r)
+	}
+	return result
+}

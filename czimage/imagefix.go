@@ -10,13 +10,13 @@ import (
 func PanelImage(header *CzHeader, colorPanel [][]byte, data []byte) image.Image {
 	width := int(header.Width)
 	height := int(header.Heigth)
-	pic := image.NewRGBA(image.Rect(0, 0, width, height))
+	pic := image.NewNRGBA(image.Rect(0, 0, width, height))
 	// B,G,R,A
 	// 0,1,2,3
 	i := 0
 	for y := 0; y < int(header.Heigth); y++ {
 		for x := 0; x < int(header.Width); x++ {
-			pic.SetRGBA(x, y, color.RGBA{
+			pic.SetNRGBA(x, y, color.NRGBA{
 				R: colorPanel[data[i]][2],
 				G: colorPanel[data[i]][1],
 				B: colorPanel[data[i]][0],
@@ -38,7 +38,7 @@ func DiffLine(header CzHeader, img image.Image) (data []byte) {
 	width := int(header.Width)
 	height := int(header.Heigth)
 
-	pic := img.(*image.RGBA)
+	pic := img.(*image.NRGBA)
 	if width != pic.Rect.Size().X || height != pic.Rect.Size().Y {
 		glog.V(2).Infof("图片大小不匹配，应该为 w%d h%d\n", width, height)
 		return nil
@@ -80,7 +80,7 @@ func LineDiff(header *CzHeader, data []byte) image.Image {
 	//os.WriteFile("../data/LB_EN/IMAGE/ld.data", data, 0666)
 	width := int(header.Width)
 	height := int(header.Heigth)
-	pic := image.NewRGBA(image.Rect(0, 0, width, height))
+	pic := image.NewNRGBA(image.Rect(0, 0, width, height))
 	blockHeight := int(uint16(math.Ceil(float64(height) / float64(header.Colorblock))))
 	pixelByteCount := int(header.Colorbits >> 3)
 	lineByteCount := width * pixelByteCount

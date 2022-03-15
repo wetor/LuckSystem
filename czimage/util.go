@@ -71,10 +71,10 @@ func Decompress(data []byte, outputInfo *CzOutputInfo) []byte {
 		}
 		//os.WriteFile("../data/LB_EN/IMAGE/2.ori.lzw", data[offsetTemp:offset], 0666)
 		rawBuf := decompressLZW(lzwBuf, int(block.RawSize))
-		//os.WriteFile("../data/LB_EN/IMAGE/2.ori", rawBuf, 0666)
 		//panic("11")
 		outputBuf.Write(rawBuf)
 	}
+	//os.WriteFile("../data/LB_EN/IMAGE/32.ori", outputBuf.Bytes(), 0666)
 	return outputBuf.Bytes()
 
 }

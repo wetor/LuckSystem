@@ -52,7 +52,7 @@ func TestFreeTypeFont(t *testing.T) {
 		return
 	}
 	fmt.Println(font.NumGlyphs())
-	pic := image.NewRGBA(image.Rect(0, 0, 800, 600))
+	pic := image.NewNRGBA(image.Rect(0, 0, 800, 600))
 
 	fontFace, err := opentype.NewFace(font, &opentype.FaceOptions{
 		Size: 24,
