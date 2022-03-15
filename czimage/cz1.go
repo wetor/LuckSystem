@@ -19,7 +19,7 @@ type Cz1Image struct {
 func (cz *Cz1Image) Load(header CzHeader, data []byte) {
 	cz.CzHeader = header
 	cz.Raw = data
-	pic := image.NewRGBA(image.Rect(0, 0, int(header.Width), int(header.Heigth)))
+	pic := image.NewNRGBA(image.Rect(0, 0, int(header.Width), int(header.Heigth)))
 	offset := int(cz.HeaderLength)
 	switch cz.Colorbits {
 	case 4:
@@ -42,7 +42,7 @@ func (cz *Cz1Image) Load(header CzHeader, data []byte) {
 				} else {
 					index = (buf[i/2] & 0xF0) >> 4 // high4bit
 				}
-				pic.SetRGBA(x, y, color.RGBA{
+				pic.SetNRGBA(x, y, color.NRGBA{
 					R: cz.ColorPanel[index][2],
 					G: cz.ColorPanel[index][1],
 					B: cz.ColorPanel[index][0],
@@ -52,7 +52,6 @@ func (cz *Cz1Image) Load(header CzHeader, data []byte) {
 			}
 		}
 	case 8:
-		// TODO: 目前图像提取有损，原因未知
 		cz.ColorPanel = make([][]byte, 256)
 		for i := 0; i < 256; i++ {
 			cz.ColorPanel[i] = data[offset : offset+4]
@@ -67,7 +66,7 @@ func (cz *Cz1Image) Load(header CzHeader, data []byte) {
 		i := 0
 		for y := 0; y < int(header.Heigth); y++ {
 			for x := 0; x < int(header.Width); x++ {
-				pic.SetRGBA(x, y, color.RGBA{
+				pic.SetNRGBA(x, y, color.NRGBA{
 					R: cz.ColorPanel[buf[i]][2],
 					G: cz.ColorPanel[buf[i]][1],
 					B: cz.ColorPanel[buf[i]][0],
@@ -85,7 +84,7 @@ func (cz *Cz1Image) Load(header CzHeader, data []byte) {
 		i := 0
 		for y := 0; y < int(header.Heigth); y++ {
 			for x := 0; x < int(header.Width); x++ {
-				pic.SetRGBA(x, y, color.RGBA{
+				pic.SetNRGBA(x, y, color.NRGBA{
 					R: buf[i+0],
 					G: buf[i+1],
 					B: buf[i+2],

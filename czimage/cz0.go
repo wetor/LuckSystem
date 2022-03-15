@@ -50,13 +50,13 @@ func (cz *Cz0Image) decompress() {
 }
 
 func (cz *Cz0Image) Export(w io.Writer, opt ...interface{}) error {
-	pic := image.NewRGBA(image.Rect(0, 0, int(cz.Width), int(cz.Heigth)))
+	pic := image.NewNRGBA(image.Rect(0, 0, int(cz.Width), int(cz.Heigth)))
 	offset := int(cz.HeaderLength)
 	switch cz.Colorbits {
 	case 32:
 		for y := 0; y < int(cz.Heigth); y++ {
 			for x := 0; x < int(cz.Width); x++ {
-				pic.SetRGBA(x, y, color.RGBA{
+				pic.SetNRGBA(x, y, color.NRGBA{
 					R: cz.Raw[offset],
 					G: cz.Raw[offset+1],
 					B: cz.Raw[offset+2],
@@ -92,7 +92,7 @@ func (cz *Cz0Image) Write(w io.Writer, opt ...interface{}) error {
 	if err != nil {
 		return err
 	}
-	pic := cz.PngImage.(*image.RGBA)
+	pic := cz.PngImage.(*image.NRGBA)
 	switch cz.Colorbits {
 	case 32:
 		_, err = w.Write(pic.Pix)

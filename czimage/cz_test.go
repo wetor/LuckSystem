@@ -60,7 +60,7 @@ func TestLineDiff(t *testing.T) {
 	//cz.GetImage()
 
 	cz3 := cz.(*Cz3Image)
-	//os.WriteFile("../data/LB_EN/IMAGE/2.ld", []byte(cz3.Image.(*image.RGBA).Pix), 0666)
+	//os.WriteFile("../data/LB_EN/IMAGE/2.ld", []byte(cz3.Image.(*image.NRGBA).Pix), 0666)
 	f, _ := os.Open("../data/LB_EN/IMAGE/2.png")
 	defer f.Close()
 	img, _ := png.Decode(f)
@@ -127,10 +127,10 @@ func TestCz1Image_Import(t *testing.T) {
 }
 func TestCz0Image_Export(t *testing.T) {
 	restruct.EnableExprBeta()
-	data, _ := os.ReadFile("../data/LB_EN/IMAGE/10.cz0")
+	data, _ := os.ReadFile("../data/LB_EN/FONT/明朝32")
 	cz := LoadCzImage(data)
 
-	w, _ := os.Create("../data/LB_EN/IMAGE/10.cz0.png")
+	w, _ := os.Create("../data/LB_EN/IMAGE/明朝32.png")
 	cz.Export(w)
 	w.Close()
 }

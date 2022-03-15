@@ -20,7 +20,7 @@ type LucaFont struct {
 	Size    int
 	CzImage czimage.CzImage
 	Info    *Info
-	Image   *image.RGBA
+	Image   *image.NRGBA
 }
 
 // LoadLucaFontPak 通过pak加载LucaFont
@@ -72,7 +72,7 @@ func LoadLucaFont(infoFile, imageFile []byte) *LucaFont {
 	font.Size = int(font.Info.FontSize)
 	font.CzImage = czimage.LoadCzImage(imageFile)
 
-	font.Image = font.CzImage.GetImage().(*image.RGBA)
+	font.Image = font.CzImage.GetImage().(*image.NRGBA)
 	return font
 }
 
@@ -119,7 +119,7 @@ func (f *LucaFont) GetStringImageList(str string) ([]image.Image, []DrawSize) {
 func (f *LucaFont) GetStringImage(str string) image.Image {
 	imgW := int(f.Info.BlockSize)
 	imgs, draws := f.GetStringImageList(str)
-	pic := image.NewRGBA(image.Rect(0, 0, len(imgs)*imgW, imgW*2))
+	pic := image.NewNRGBA(image.Rect(0, 0, len(imgs)*imgW, imgW*2))
 	X := 0
 	for i, img := range imgs {
 
@@ -172,7 +172,7 @@ func (f *LucaFont) ReplaceChars(fontFile io.Reader, allChar string, startIndex i
 	imageH := size * int(math.Ceil(float64(f.Info.CharNum)/100.0)) // 对应行数高度
 	oldImageH := size * int(math.Ceil(float64(startIndex)/100.0))
 
-	pic := image.NewRGBA(image.Rect(0, 0, imageW, imageH))
+	pic := image.NewNRGBA(image.Rect(0, 0, imageW, imageH))
 	if !reDraw && f.Image != nil {
 		img := f.Image.SubImage(image.Rect(0, 0, imageW, oldImageH))
 		draw.Draw(pic, pic.Bounds().Add(image.Pt(0, 0)), img, img.Bounds().Min, draw.Src)
