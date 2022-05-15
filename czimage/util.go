@@ -122,3 +122,10 @@ func Compress(data []byte, size int) (compressed []byte, outputInfo *CzOutputInf
 
 	return outputBuf.Bytes(), outputInfo
 }
+
+// ImageToNRGBA convert image.Image to image.NRGBA
+func ImageToNRGBA(im image.Image) *image.NRGBA {
+	dst := image.NewNRGBA(im.Bounds())
+	draw.Draw(dst, im.Bounds(), im, im.Bounds().Min, draw.Src)
+	return dst
+}

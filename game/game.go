@@ -47,7 +47,7 @@ func NewGame(opt *GameOptions) *Game {
 	}
 	game.Context = &context.Context{
 		Engine:   &engine.Engine{},
-		Scripts:  make(map[string]*script.ScriptFile),
+		Scripts:  make(map[string]*script.Script),
 		KeyPress: make(chan int),
 		ChanEIP:  make(chan int),
 		RunMode:  opt.Mode,
@@ -64,7 +64,6 @@ func (g *Game) LoadResources() {
 	var err error
 
 	for key, p := range g.Resources {
-		p.Open()
 		switch key {
 		case ResScript:
 			var entry *pak.Entry
@@ -78,7 +77,7 @@ func (g *Game) LoadResources() {
 					continue
 				}
 				glog.V(4).Infof("%v %v\n", entry.Name, len(entry.Data))
-				scr, err := script.LoadScriptEntry(entry)
+				scr, err := script.LoadEntry(entry)
 				if err != nil {
 					panic(err)
 				}

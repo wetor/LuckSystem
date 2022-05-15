@@ -30,15 +30,15 @@ type StringParam struct {
 	HasLen bool
 }
 
-// ScriptFile 从文件中直接读取到的代码结构
-// 可用作运行时，不可直接导出，需要先转化为ScriptEntry
-type ScriptFile struct {
-	ScriptInfo  `struct:"-"`
-	ScriptEntry `struct:"-"`
-	Codes       []*CodeLine `struct:"while=!_eof"`
+// Script 从文件中直接读取到的代码结构∂
+// 可用作运行时，不可直接导出，需要先转化为Entry
+type Script struct {
+	Info  `struct:"-"`
+	Entry `struct:"-"`
+	Codes []*CodeLine `struct:"while=!_eof"`
 }
 
-type ScriptInfo struct {
+type Info struct {
 	FileName string
 	Name     string
 	GameName string
@@ -75,9 +75,9 @@ type CodeInfo struct {
 	GotoIndex  int // 跳转标记，为0则不使用
 }
 
-// ScriptEntry 脚本导入导出实体
-// 不可用作运行时，需先转话为ScriptFile
-type ScriptEntry struct {
+// Entry 脚本导入导出实体
+// 不可用作运行时，需先转话为Script
+type Entry struct {
 	// 递增序列，从1开始
 	IndexNext int
 
@@ -98,7 +98,7 @@ type ScriptEntry struct {
 	IGotoMap  map[int]int // GotoParamPos(跳转参数地址) -> LabelIndex(标签序号)
 }
 
-func (e *ScriptEntry) InitEntry() {
+func (e *Entry) InitEntry() {
 	e.ELabelMap = make(map[int]int)
 	e.EGotoMap = make(map[int]int)
 
@@ -109,7 +109,7 @@ func (e *ScriptEntry) InitEntry() {
 	e.CurPos = 0
 }
 
-func (e *ScriptEntry) addExportGotoLabel(codeIndex, pos int) int {
+func (e *Entry) addExportGotoLabel(codeIndex, pos int) int {
 
 	val, has := e.ELabelMap[pos]
 	if has {
@@ -123,17 +123,17 @@ func (e *ScriptEntry) addExportGotoLabel(codeIndex, pos int) int {
 }
 
 // labelIndex, Goto参数位置
-func (e *ScriptEntry) addImportGoto(pos, labelIndex int) {
+func (e *Entry) addImportGoto(pos, labelIndex int) {
 	e.IGotoMap[pos] = labelIndex
 }
 
 // labelIndex, 当前代码位置
-func (e *ScriptEntry) addImportLabel(labelIndex, pos int) {
+func (e *Entry) addImportLabel(labelIndex, pos int) {
 	e.ILabelMap[labelIndex] = pos
 }
 
-func LoadScriptFile(filename, gameName string, version int) *ScriptFile {
-	script := new(ScriptFile)
+func LoadScript(filename, gameName string, version int) *Script {
+	script := new(Script)
 	script.FileName = filename
 	_, script.Name = path.Split(filename)
 	script.GameName = gameName
@@ -142,9 +142,9 @@ func LoadScriptFile(filename, gameName string, version int) *ScriptFile {
 	return script
 }
 
-func LoadScriptEntry(entry *pak.Entry) (*ScriptFile, error) {
+func LoadEntry(entry *pak.Entry) (*Script, error) {
 
-	script := &ScriptFile{}
+	script := &Script{}
 	script.Name = entry.Name
 	err := script.ReadData(entry.Data)
 	if err != nil {
@@ -153,12 +153,12 @@ func LoadScriptEntry(entry *pak.Entry) (*ScriptFile, error) {
 	return script, nil
 }
 
-func (s *ScriptFile) ReadByEntry(entry *pak.Entry) error {
+func (s *Script) ReadByEntry(entry *pak.Entry) error {
 	s.Name = entry.Name
 	return s.ReadData(entry.Data)
 }
 
-func (s *ScriptFile) Read() error {
+func (s *Script) Read() error {
 
 	data, err := os.ReadFile(s.FileName)
 	if err != nil {
@@ -186,7 +186,7 @@ func (s *ScriptFile) Read() error {
 //       1.params[len-1] opcode string 可选
 //       2.params[len-2] coding Charset 可选，所有字符串参数的默认编码
 //       3.params[len-3] export []bool 可选，导出列表，需要与参数列表(不含设置)数量相同，若少于有效参数数量，则默认补充false，不导出
-func (s *ScriptFile) SetOperateParams(index int, mode enum.VMRunMode, params ...interface{}) error {
+func (s *Script) SetOperateParams(index int, mode enum.VMRunMode, params ...interface{}) error {
 	if mode == enum.VMRun {
 		return nil
 	}
@@ -313,7 +313,7 @@ func (s *ScriptFile) SetOperateParams(index int, mode enum.VMRunMode, params ...
 }
 
 // Export 导出可编辑脚本
-func (s *ScriptFile) Export(w io.Writer, opt ...interface{}) error {
+func (s *Script) Export(w io.Writer) error {
 	var err error
 	for i, code := range s.Codes {
 		labelIndex, has := s.ELabelMap[code.Pos]
@@ -341,7 +341,7 @@ func (s *ScriptFile) Export(w io.Writer, opt ...interface{}) error {
 }
 
 // Import 导入可编辑脚本
-func (s *ScriptFile) Import(r io.Reader, opt ...interface{}) error {
+func (s *Script) Import(r io.Reader) error {
 
 	br := bufio.NewReader(r)
 	for i, code := range s.Codes {
@@ -370,7 +370,7 @@ func (s *ScriptFile) Import(r io.Reader, opt ...interface{}) error {
 	return nil
 }
 
-func (s *ScriptFile) ReadData(data []byte) error {
+func (s *Script) ReadData(data []byte) error {
 
 	err := restruct.Unpack(data, binary.LittleEndian, s)
 	if err != nil {
@@ -408,7 +408,7 @@ func (s *ScriptFile) ReadData(data []byte) error {
 }
 
 // Write
-func (s *ScriptFile) CodeParamsToBytes(code *CodeLine, coding charset.Charset, params []interface{}) {
+func (s *Script) CodeParamsToBytes(code *CodeLine, coding charset.Charset, params []interface{}) {
 	buf := &bytes.Buffer{}
 	size := 0
 	for _, param := range code.FixedParam {
@@ -430,7 +430,7 @@ func (s *ScriptFile) CodeParamsToBytes(code *CodeLine, coding charset.Charset, p
 	s.CurPos += int(code.Len + code.Len&1)
 
 }
-func (s *ScriptFile) Write(w io.Writer, opt ...interface{}) error {
+func (s *Script) Write(w io.Writer) error {
 
 	data, err := restruct.Pack(binary.LittleEndian, s)
 	if err != nil {
