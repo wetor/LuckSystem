@@ -8,7 +8,7 @@ import (
 )
 
 type Context struct {
-	Scripts map[string]*script.ScriptFile
+	Scripts map[string]*script.Script
 	// 运行时变量存储
 	Variable *variable.VariableStore
 
@@ -31,7 +31,7 @@ type Context struct {
 }
 
 // Script 获取当前script
-func (ctx *Context) Script() *script.ScriptFile {
+func (ctx *Context) Script() *script.Script {
 	return ctx.Scripts[ctx.CScriptName]
 }
 

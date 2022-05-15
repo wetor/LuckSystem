@@ -28,7 +28,7 @@ type VM struct {
 	EIP int
 }
 
-func NewVM(_script *script.ScriptFile, mode enum.VMRunMode) *VM {
+func NewVM(_script *script.Script, mode enum.VMRunMode) *VM {
 	vm := &VM{}
 	switch _script.GameName {
 	case "LB_EN":
@@ -39,7 +39,7 @@ func NewVM(_script *script.ScriptFile, mode enum.VMRunMode) *VM {
 	}
 	vm.Context = &context.Context{
 		Engine:   &engine.Engine{},
-		Scripts:  make(map[string]*script.ScriptFile),
+		Scripts:  make(map[string]*script.Script),
 		KeyPress: make(chan int),
 		ChanEIP:  make(chan int),
 		RunMode:  mode,
