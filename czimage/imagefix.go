@@ -44,6 +44,10 @@ func DiffLine(header CzHeader, img image.Image) (data []byte) {
 		return nil
 	}
 	data = make([]byte, len(pic.Pix))
+	if header.Colorblock == 0 {
+		header.Colorblock = 3
+		glog.V(2).Infof("Colorblock(0x0E:0x10)值为零，默认为3\n")
+	}
 	blockHeight := int(uint16(math.Ceil(float64(height) / float64(header.Colorblock))))
 	pixelByteCount := int(header.Colorbits >> 3)
 	lineByteCount := width * pixelByteCount
@@ -61,10 +65,8 @@ func DiffLine(header CzHeader, img image.Image) (data []byte) {
 		} else {
 			preLine = currLine
 		}
-		if pixelByteCount == 4 {
-			// y*pic.Stride : (y+1)*pic.Stride
-			copy(data[i:i+lineByteCount], currLine)
-		}
+
+		copy(data[i:i+lineByteCount], currLine)
 		i += lineByteCount
 	}
 	return data
@@ -81,6 +83,10 @@ func LineDiff(header *CzHeader, data []byte) image.Image {
 	width := int(header.Width)
 	height := int(header.Heigth)
 	pic := image.NewNRGBA(image.Rect(0, 0, width, height))
+	if header.Colorblock == 0 {
+		header.Colorblock = 3
+		glog.V(2).Infof("Colorblock(0x0E:0x10)值为零，默认为3\n")
+	}
 	blockHeight := int(uint16(math.Ceil(float64(height) / float64(header.Colorblock))))
 	pixelByteCount := int(header.Colorbits >> 3)
 	lineByteCount := width * pixelByteCount
@@ -98,6 +104,10 @@ func LineDiff(header *CzHeader, data []byte) image.Image {
 		if pixelByteCount == 4 {
 			// y*pic.Stride : (y+1)*pic.Stride
 			copy(pic.Pix[i:i+lineByteCount], currLine)
+		} else if pixelByteCount == 3 {
+			for x := 0; x < lineByteCount; x += 3 {
+				pic.SetNRGBA(x/3, y, color.NRGBA{R: currLine[x], G: currLine[x+1], B: currLine[x+2], A: 0xFF})
+			}
 		}
 		i += lineByteCount
 	}
