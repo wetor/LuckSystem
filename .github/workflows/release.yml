@@ -1,0 +1,28 @@
+name: Go
+
+on: 
+  push:
+    tags:
+    - '*'
+  
+jobs:
+  build_release:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16
+
+    - name: Build
+      run: |
+        CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o LuckSystem_linux .
+        CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o LuckSystem_mac .
+        CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o LuckSystem.exe .
+    - uses: ncipollo/release-action@v1
+      with:
+        artifacts: "LuckSystem_linux,LuckSystem_mac,LuckSystem.exe"
+        bodyFile: ""
+        token: ${{ secrets.RELEASE_GITHUB_TOKEN }}
