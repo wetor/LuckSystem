@@ -34,11 +34,10 @@ func PanelImage(header *CzHeader, colorPanel [][]byte, data []byte) image.Image 
 //  Param img image.Image
 //  Return data
 //
-func DiffLine(header CzHeader, img image.Image) (data []byte) {
+func DiffLine(header CzHeader, pic *image.NRGBA) (data []byte) {
 	width := int(header.Width)
 	height := int(header.Heigth)
 
-	pic := img.(*image.NRGBA)
 	if width != pic.Rect.Size().X || height != pic.Rect.Size().Y {
 		glog.V(2).Infof("图片大小不匹配，应该为 w%d h%d\n", width, height)
 		return nil

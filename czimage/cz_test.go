@@ -3,6 +3,7 @@ package czimage
 import (
 	"flag"
 	"fmt"
+	"image"
 	"image/png"
 	"os"
 	"strconv"
@@ -11,6 +12,15 @@ import (
 	"github.com/go-restruct/restruct"
 )
 
+func TestMain(m *testing.M) {
+	flag.Set("alsologtostderr", "true")
+	flag.Set("log_dir", "log")
+	flag.Set("v", "10")
+	flag.Parse()
+
+	ret := m.Run()
+	os.Exit(ret)
+}
 func TestCZ3(t *testing.T) {
 	restruct.EnableExprBeta()
 	for i := 0; i < 10; i++ {
@@ -64,7 +74,11 @@ func TestLineDiff(t *testing.T) {
 	f, _ := os.Open("../data/LB_EN/IMAGE/2.png")
 	defer f.Close()
 	img, _ := png.Decode(f)
-	data1 := DiffLine(cz3.CzHeader, img)
+	pic, ok := img.(*image.NRGBA)
+	if !ok {
+		pic = ImageToNRGBA(img)
+	}
+	data1 := DiffLine(cz3.CzHeader, pic)
 	fmt.Println(len(data1))
 	os.WriteFile("../data/LB_EN/IMAGE/2.dl", data1, 0666)
 
@@ -84,18 +98,20 @@ func TestLineDiff(t *testing.T) {
 
 func TestCz3Image_Import(t *testing.T) {
 	restruct.EnableExprBeta()
-	data, _ := os.ReadFile("../data/LB_EN/IMAGE/4.cz3")
+	filename := "../data/Other/CZ3/TITLE03"
+	data, _ := os.ReadFile(filename)
 	cz := LoadCzImage(data)
 
-	w, _ := os.Create("../data/LB_EN/IMAGE/4.png")
+	w, _ := os.Create(filename + ".png")
+	cz.GetImage()
 	cz.Export(w)
 	w.Close()
 
-	r, _ := os.Open("../data/LB_EN/IMAGE/4.png")
+	r, _ := os.Open(filename + ".png")
 	defer r.Close()
-	w, _ = os.Create("../data/LB_EN/IMAGE/4.png.cz3")
+	w, _ = os.Create(filename + ".cz3")
 	defer w.Close()
-	cz.Import(r)
+	cz.Import(r, false)
 	cz.Write(w)
 	fmt.Println()
 
@@ -107,6 +123,7 @@ func TestCz1Image_Import(t *testing.T) {
 	cz := LoadCzImage(data)
 
 	w, _ := os.Create("../data/LB_EN/IMAGE/明朝20.png")
+	cz.GetImage()
 	cz.Export(w)
 	w.Close()
 
@@ -114,7 +131,7 @@ func TestCz1Image_Import(t *testing.T) {
 	defer r.Close()
 	w, _ = os.Create("../data/LB_EN/IMAGE/明朝20.png.cz1")
 	defer w.Close()
-	cz.Import(r)
+	cz.Import(r, false)
 	cz.Write(w)
 	fmt.Println()
 	//data, _ = os.ReadFile("../data/LB_EN/IMAGE/明朝20.png.cz1")
@@ -131,24 +148,18 @@ func TestCz0Image_Export(t *testing.T) {
 	cz := LoadCzImage(data)
 
 	w, _ := os.Create("../data/LB_EN/IMAGE/明朝32.png")
+	cz.GetImage()
 	cz.Export(w)
 	w.Close()
 }
-func TestMain(m *testing.M) {
-	flag.Set("alsologtostderr", "true")
-	flag.Set("log_dir", "log")
-	flag.Set("v", "10")
-	flag.Parse()
 
-	ret := m.Run()
-	os.Exit(ret)
-}
 func TestCz0Image_Import(t *testing.T) {
 	restruct.EnableExprBeta()
 	data, _ := os.ReadFile("../data/LB_EN/IMAGE/10.cz0")
 	cz := LoadCzImage(data)
 
 	w, _ := os.Create("../data/LB_EN/IMAGE/10.cz0.png")
+	cz.GetImage()
 	cz.Export(w)
 	w.Close()
 
@@ -156,6 +167,7 @@ func TestCz0Image_Import(t *testing.T) {
 	defer r.Close()
 	w, _ = os.Create("../data/LB_EN/IMAGE/10.cz0.png.cz0")
 	defer w.Close()
-	cz.Import(r, w)
+	cz.Import(r, false)
+	cz.Write(w)
 	fmt.Println()
 }

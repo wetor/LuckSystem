@@ -135,7 +135,7 @@ func TestSPFont(t *testing.T) {
 	f := LoadLucaFontPak(pak, "モダン", 32)
 	file, _ := os.Create("../data/Other/Font/モダン32.png")
 	defer file.Close()
-	f.Export(file)
+	f.Export(file, "")
 
 }
 func TestLucaFont_Export(t *testing.T) {
@@ -157,8 +157,7 @@ func TestLucaFont_Export(t *testing.T) {
 	}
 	font := LoadLucaFont(infoData, czData)
 
-	txtFile, _ := os.Create(savePath + txtName)
-	defer txtFile.Close()
+	txtFile := savePath + txtName
 
 	pngFile, _ := os.Create(savePath + pngName)
 	defer pngFile.Close()
@@ -191,7 +190,7 @@ func TestLucaFont_Import(t *testing.T) {
 	defer ttf.Close()
 
 	//===============
-	err = font.Import(ttf, true)
+	err = font.Import(ttf, 0, true, "")
 	if err != nil {
 		panic(err)
 	}
@@ -204,7 +203,7 @@ func TestLucaFont_Import(t *testing.T) {
 		panic(err)
 	}
 	//================
-	err = font.Import(ttf, addChars, -1, false)
+	err = font.Import(ttf, -1, false, addChars)
 	if err != nil {
 		panic(err)
 	}

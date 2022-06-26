@@ -50,9 +50,9 @@ type CzOutputInfo struct {
 type CzImage interface {
 	Load(header CzHeader, data []byte)
 	GetImage() image.Image
-	Export(w io.Writer, opt ...interface{}) error
-	Import(r io.Reader, opt ...interface{}) error
-	Write(w io.Writer, opt ...interface{}) error
+	Export(w io.Writer) error
+	Import(r io.Reader, fillSize bool) error
+	Write(w io.Writer) error
 }
 
 func LoadCzImageFile(file string) CzImage {

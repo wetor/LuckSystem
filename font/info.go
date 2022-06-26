@@ -172,24 +172,24 @@ func (i *Info) SetChars(fontFile io.Reader, allChar string, startIndex int, reDr
 			noReDraw = true
 		}
 	} else {
-		for startIndex > int(i.CharNum) {
+		for startIndex > int(i.CharNum) || startIndex+len(chars) > int(i.CharNum) {
 			i.DrawSize = append(i.DrawSize, DrawSize{})
 			i.IndexUnicode = append(i.IndexUnicode, rune(0))
 			i.CharNum++
 		}
 
-		tempDrawSize := make([]DrawSize, len(chars))
-		i.DrawSize = append(i.DrawSize[:startIndex], append(tempDrawSize)...)
-
-		tempIndexUnicode := make([]rune, len(chars))
-		i.IndexUnicode = append(i.IndexUnicode[:startIndex], append(tempIndexUnicode)...)
-
-		i.CharNum = uint16(len(i.DrawSize))
+		//tempDrawSize := make([]DrawSize, len(chars))
+		//i.DrawSize = append(i.DrawSize[:startIndex], append(tempDrawSize)...)
+		//
+		//tempIndexUnicode := make([]rune, len(chars))
+		//i.IndexUnicode = append(i.IndexUnicode[:startIndex], append(tempIndexUnicode)...)
+		//
+		//i.CharNum = uint16(len(i.DrawSize))
 	}
 	if !noReDraw {
 		for index := 0; index < int(i.CharNum); index++ {
 			var char rune
-			if index < startIndex {
+			if index < startIndex || index >= startIndex+len(chars) {
 				if reDraw {
 					char = i.IndexUnicode[index]
 				} else {
@@ -199,9 +199,9 @@ func (i *Info) SetChars(fontFile io.Reader, allChar string, startIndex int, reDr
 				char = chars[index-startIndex]
 			}
 			// i.FontMap[char] = uint16(index)
+			i.UnicodeIndex[i.IndexUnicode[index]] = 0 // 清除原字符
 			i.UnicodeIndex[char] = uint16(index)
 			i.IndexUnicode[index] = char
-
 			bounds, advance, ok := i.FontFace.GlyphBounds(char)
 
 			if !ok {
@@ -225,29 +225,16 @@ func (i *Info) SetChars(fontFile io.Reader, allChar string, startIndex int, reDr
 }
 
 // Import
-//  Description 如果startIndex=0且allChar为空，则为仅重绘
+//  Description 若startIndex=0, redraw=true, allChar="", 则仅使用字体重绘原字符集
 //  Receiver i *Info
-//  Param r io.Reader 字体文件。若opt[0].(type)==bool，忽略
-//  Param opt ...interface{}
-//    opt[0]	onlyRedraw	bool 	仅使用新字体重绘，不增加新字符
-//      or
-//    opt[0]	allChar 	string	增加的全字符，若startIndex==0，且第一个字符不是空格，会自动补充为空格
-//    opt[1]	startIndex	int	开始位置。前面跳过字符数量
-//    opt[2]	redraw 		bool	是否用新字体重绘startIndex之前的字符
+//  Param r io.Reader 字体文件
+//  Param startIndex int 开始位置。前面跳过字符数量
+//  Param redraw bool 是否用新字体重绘startIndex之前的字符
+//  Param allChar string 增加的全字符，若startIndex==0，且第一个字符不是空格，会自动补充为空格
 //  Return error
 //
-func (i *Info) Import(r io.Reader, opt ...interface{}) error {
-	if onlyRedraw, ok := opt[0].(bool); ok {
-		if onlyRedraw {
-			// 仅重绘
-			i.SetChars(r, "", 0, true)
-			return nil
-		} else {
-			// 不做任何修改
-			return nil
-		}
-	}
-	i.SetChars(r, opt[0].(string), opt[1].(int), opt[2].(bool))
+func (i *Info) Import(r io.Reader, startIndex int, redraw bool, allChar string) error {
+	i.SetChars(r, allChar, startIndex, redraw)
 	return nil
 }
 
@@ -255,10 +242,9 @@ func (i *Info) Import(r io.Reader, opt ...interface{}) error {
 //  Description
 //  Receiver i *Info
 //  Param w io.Writer
-//  Param opt ...interface{}
 //  Return error
 //
-func (i *Info) Export(w io.Writer, opt ...interface{}) error {
+func (i *Info) Export(w io.Writer) error {
 
 	var err error
 	for _, char := range i.IndexUnicode {
@@ -279,10 +265,9 @@ func (i *Info) Export(w io.Writer, opt ...interface{}) error {
 //  Description
 //  Receiver i *Info
 //  Param w io.Writer
-//  Param opt ...interface{}
 //  Return error
 //
-func (i *Info) Write(w io.Writer, opt ...interface{}) error {
+func (i *Info) Write(w io.Writer) error {
 
 	data, err := restruct.Pack(binary.LittleEndian, i)
 	if err != nil {
