@@ -54,22 +54,24 @@ type Pak struct {
 
 func LoadPak(filename string, coding charset.Charset) *Pak {
 
-	pakFile := &Pak{
-		Rebuild: false,
-	}
-	pakFile.FileName = filename
-	pakFile.Coding = coding
+	pakFile := &Pak{}
+	pakFile.Load(filename, coding)
+	return pakFile
+}
+func (p *Pak) Load(filename string, coding charset.Charset) {
+
+	p.Rebuild = false
+	p.FileName = filename
+	p.Coding = coding
 	if len(coding) == 0 {
-		pakFile.Coding = charset.UTF_8
+		p.Coding = charset.UTF_8
 	}
-	err := pakFile.Open()
+	err := p.open()
 	if err != nil {
 		glog.Fatalln(err)
 	}
-	return pakFile
 }
-
-func (p *Pak) Open() error {
+func (p *Pak) open() error {
 	f, err := os.Open(p.FileName)
 
 	if err != nil {
@@ -271,10 +273,9 @@ func (p *Pak) SetByIndex(index int, r io.Reader) error {
 //  Description
 //  Receiver p *Pak
 //  Param w io.Writer 必须实现 io.WriterAt
-//  Param opt ...interface{}
 //  Return error
 //
-func (p *Pak) Write(w io.Writer, opt ...interface{}) error {
+func (p *Pak) Write(w io.Writer) error {
 
 	oldOffset := make(map[int]uint32, p.FileCount)
 	if p.Rebuild {
@@ -349,27 +350,30 @@ func (p *Pak) Write(w io.Writer, opt ...interface{}) error {
 	return nil
 }
 
-// Export Pak文件解包接口
+// Export
 //  Description
 //  Receiver p *Pak
-//  Param w io.Writer 保存到的文件名
-//  Param opt ...interface{}
-//    opt[0] 	mode 	string	可选 all,index,id,name
+//  Param w io.Writer
+//  Param mode string 可选 all,index,id,name
+//  Param value interface{}
 //      mode=="all": w为每行一个文件路径的txt文件
-//        opt[1] 	dir string 	保存文件夹路径
+//        value 	dir string 	保存文件夹路径
 //      mode=="index":
-//        opt[1] 	index 	int 	从0开始的文件序号
+//        value 	index 	int 	从0开始的文件序号
 //      mode=="id":
-//        opt[1]	id	int	文件唯一ID
+//        value	id	int	文件唯一ID
 //      mode=="name":
-//        opt[1]	name	string	文件名
+//        value	name	string	文件名
 //  Return error
 //
-func (p *Pak) Export(w io.Writer, opt ...interface{}) error {
+func (p *Pak) Export(w io.Writer, mode string, value interface{}) error {
 	var err error
-	switch opt[0].(string) {
+	switch mode {
 	case "all":
-		dir, _ := filepath.Abs(opt[1].(string))
+		dir, _ := filepath.Abs(value.(string))
+		if _, err = os.Stat(dir); os.IsNotExist(err) {
+			os.Mkdir(dir, os.ModePerm)
+		}
 		fes := p.ReadAll()
 		for _, e := range fes {
 			file := ""
@@ -397,13 +401,13 @@ func (p *Pak) Export(w io.Writer, opt ...interface{}) error {
 		fallthrough
 	case "name":
 		var e *Entry
-		switch opt[0].(string) {
+		switch mode {
 		case "index":
-			e, err = p.GetByIndex(opt[1].(int))
+			e, err = p.GetByIndex(value.(int))
 		case "id":
-			e, err = p.GetById(opt[1].(int))
+			e, err = p.GetById(value.(int))
 		case "name":
-			e, err = p.Get(opt[1].(string))
+			e, err = p.Get(value.(string))
 		}
 		if err != nil {
 			return err
@@ -422,8 +426,8 @@ func (p *Pak) Export(w io.Writer, opt ...interface{}) error {
 //  Description
 //  Receiver p *Pak
 //  Param r io.Reader 导入文件
-//  Param opt ...interface{}
-//    opt[0]	mode	string	可选file,list,dir
+//  Param mode string 可选file,list,dir
+//  Param value interface{}
 //      mode=="file": r为导入文件，根据类型自动判断是文件名还是id，不支持index
 //        opt[1]	name	string	替换指定文件名文件
 //        or
@@ -433,14 +437,14 @@ func (p *Pak) Export(w io.Writer, opt ...interface{}) error {
 //        opt[1]	dir	string	导入文件目录，按照Export导出的文件名进行匹配。若存在文件名则用文件名匹配，不存在则用ID匹配
 //  Return error
 //
-func (p *Pak) Import(r io.Reader, opt ...interface{}) error {
+func (p *Pak) Import(r io.Reader, mode string, value interface{}) error {
 
 	var err error
-	switch opt[0].(string) {
+	switch mode {
 	case "file":
-		if name, ok := opt[1].(string); ok {
+		if name, ok := value.(string); ok {
 			err = p.Set(name, r)
-		} else if id, ok := opt[1].(int); ok {
+		} else if id, ok := value.(int); ok {
 			err = p.SetById(id, r)
 		} else {
 			glog.Fatalln("输入参数有误")
@@ -491,7 +495,7 @@ func (p *Pak) Import(r io.Reader, opt ...interface{}) error {
 	case "dir":
 		var files []string
 		var id int
-		files, err = utils.GetDirFileList(opt[1].(string))
+		files, err = utils.GetDirFileList(value.(string))
 		if err != nil {
 			return err
 		}
@@ -523,5 +527,5 @@ func (p *Pak) Import(r io.Reader, opt ...interface{}) error {
 			}
 		}
 	}
-	return nil
+	return err
 }

@@ -31,6 +31,12 @@ type Cz0Image struct {
 	CzData
 }
 
+// Load
+//  Description 载入cz图像
+//  Receiver cz *Cz0Image
+//  Param header CzHeader
+//  Param data []byte
+//
 func (cz *Cz0Image) Load(header CzHeader, data []byte) {
 	cz.CzHeader = header
 	cz.Raw = data
@@ -42,14 +48,13 @@ func (cz *Cz0Image) Load(header CzHeader, data []byte) {
 	cz.OutputInfo = nil
 }
 
+// decompress
+//  Description 解压数据
+//  Receiver cz *Cz0Image
+//
 func (cz *Cz0Image) decompress() {
 	//os.WriteFile("../data/LB_EN/IMAGE/2.lzw", cz.Raw[int(cz.HeaderLength)+cz.OutputInfo.Offset:], 0666)
-	buf := Decompress(cz.Raw[int(cz.HeaderLength)+cz.OutputInfo.Offset:], cz.OutputInfo)
-	glog.V(6).Infoln("uncompress size ", len(buf))
-	cz.Image = LineDiff(&cz.CzHeader, buf)
-}
-
-func (cz *Cz0Image) Export(w io.Writer, opt ...interface{}) error {
+	glog.V(6).Infoln("size ", len(cz.Raw))
 	pic := image.NewNRGBA(image.Rect(0, 0, int(cz.Width), int(cz.Heigth)))
 	offset := int(cz.HeaderLength)
 	switch cz.Colorbits {
@@ -57,7 +62,7 @@ func (cz *Cz0Image) Export(w io.Writer, opt ...interface{}) error {
 		for y := 0; y < int(cz.Heigth); y++ {
 			for x := 0; x < int(cz.Width); x++ {
 				pic.SetNRGBA(x, y, color.NRGBA{
-					R: cz.Raw[offset],
+					R: cz.Raw[offset+0],
 					G: cz.Raw[offset+1],
 					B: cz.Raw[offset+2],
 					A: cz.Raw[offset+3]},
@@ -67,10 +72,13 @@ func (cz *Cz0Image) Export(w io.Writer, opt ...interface{}) error {
 		}
 	}
 	cz.Image = pic
-	err := png.Encode(w, cz.Image)
-	return err
 }
 
+// GetImage
+//  Description 取得解压后的图像数据
+//  Receiver cz *Cz0Image
+//  Return image.Image
+//
 func (cz *Cz0Image) GetImage() image.Image {
 	if cz.Image == nil {
 		cz.decompress()
@@ -78,21 +86,50 @@ func (cz *Cz0Image) GetImage() image.Image {
 	return cz.Image
 }
 
-func (cz *Cz0Image) Import(r io.Reader, opt ...interface{}) error {
+// Export
+//  Description 导出图像到文件
+//  Receiver cz *Cz0Image
+//  Param w io.Writer
+//  Return error
+//
+func (cz *Cz0Image) Export(w io.Writer) error {
+	if cz.Image == nil {
+		cz.decompress()
+	}
+	return png.Encode(w, cz.Image)
+}
+
+// Import
+//  Description 导入图像
+//  Receiver cz *Cz0Image
+//  Param r io.Reader
+//  Param fillSize bool
+//  Return error
+//
+func (cz *Cz0Image) Import(r io.Reader, fillSize bool) error {
 	var err error
 	cz.PngImage, err = png.Decode(r)
-
 	return err
 
 }
-func (cz *Cz0Image) Write(w io.Writer, opt ...interface{}) error {
+
+// Write
+//  Description 将图像保存为cz
+//  Receiver cz *Cz0Image
+//  Param w io.Writer
+//  Return error
+//
+func (cz *Cz0Image) Write(w io.Writer) error {
 	var err error
 	glog.V(6).Infoln(cz.CzHeader)
 	err = WriteStruct(w, &cz.CzHeader, &cz.Cz0Header)
 	if err != nil {
 		return err
 	}
-	pic := cz.PngImage.(*image.NRGBA)
+	pic, ok := cz.PngImage.(*image.NRGBA)
+	if !ok {
+		pic = ImageToNRGBA(cz.PngImage)
+	}
 	switch cz.Colorbits {
 	case 32:
 		_, err = w.Write(pic.Pix)

@@ -45,7 +45,7 @@ func Test22(t *testing.T) {
 func TestLB_EN(t *testing.T) {
 	restruct.EnableExprBeta()
 
-	script := script.LoadScriptFile(
+	script := script.LoadScript(
 		"data/LB_EN/SCRIPT/SEEN2005",
 		"LB_EN",
 		3,
@@ -66,7 +66,7 @@ func TestLB_EN(t *testing.T) {
 
 func TestLoadLB_EN(t *testing.T) {
 	restruct.EnableExprBeta()
-	script := script.LoadScriptFile(
+	script := script.LoadScript(
 		"data/LB_EN/SCRIPT/SEEN2005",
 		"LB_EN",
 		3,
@@ -100,7 +100,7 @@ func TestSP(t *testing.T) {
 
 	var err error
 
-	script := script.LoadScriptFile(
+	script := script.LoadScript(
 		"data/SP/SCRIPT/10_日常0729",
 		"SP",
 		3,
@@ -131,7 +131,7 @@ func TestSP(t *testing.T) {
 
 func TestLoadSP(t *testing.T) {
 	restruct.EnableExprBeta()
-	script := script.LoadScriptFile(
+	script := script.LoadScript(
 		"data/SP/SCRIPT/10_日常0729",
 		"SP",
 		3,

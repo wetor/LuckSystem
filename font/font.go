@@ -204,17 +204,16 @@ func (f *LucaFont) ReplaceChars(fontFile io.Reader, allChar string, startIndex i
 //  Description
 //  Receiver f *LucaFont
 //  Param w io.Writer
-//  Param opt ...interface{}
-//    opt[0] txtFilename string 导出的全字符文件名
+//  Param allCharFile string 导出的全字符文件名
 //  Return error
 //
-func (f *LucaFont) Export(w io.Writer, opt ...interface{}) error {
+func (f *LucaFont) Export(w io.Writer, allCharFile string) error {
 	err := png.Encode(w, f.Image)
 	if err != nil {
 		return err
 	}
-	if len(opt) > 0 {
-		fs, _ := os.Create(opt[0].(string))
+	if len(allCharFile) > 0 {
+		fs, _ := os.Create(allCharFile)
 		err = f.Info.Export(fs)
 		fs.Close()
 	}
@@ -222,36 +221,31 @@ func (f *LucaFont) Export(w io.Writer, opt ...interface{}) error {
 }
 
 // Import
-//  Description
+//  Description 若startIndex=0, redraw=true, allChar="", 则仅使用字体重绘原字符集
 //  Receiver f *LucaFont
 //  Param r io.Reader 字体文件
-//  Param opt ...interface{}
-//    opt[0]	onlyRedraw	bool 仅使用新字体重绘，不增加新字符
-//      or
-//    opt[0]	allCharFile	string	增加的全字符文件，若startIndex==0，且第一个字符不是空格，会自动补充为空格
-//    opt[1]	startIndex	int	开始位置。前面跳过字符数量，-1为添加到最后
-//    opt[2]	redraw	bool	是否用新字体重绘startIndex之前的字符
+//  Param startIndex int 开始位置。前面跳过字符数量，-1为添加到最后
+//  Param redraw bool 是否用新字体重绘startIndex之前的字符
+//  Param allChar string 增加的全字符，若startIndex==0，且第一个字符不是空格，会自动补充为空格
 //  Return error
 //
-func (f *LucaFont) Import(r io.Reader, opt ...interface{}) error {
-	if onlyRedraw, ok := opt[0].(bool); ok {
-		if onlyRedraw {
+func (f *LucaFont) Import(r io.Reader, startIndex int, redraw bool, allCharFile string) error {
+
+	if len(allCharFile) == 0 {
+		if redraw {
 			// 仅重绘
 			f.ReplaceChars(r, "", 0, true)
-			return nil
-		} else {
-			// 不做任何修改
-			return nil
 		}
+		return nil
 	}
-	if opt[1].(int) == -1 {
-		opt[1] = int(f.Info.CharNum)
+	if startIndex == -1 {
+		startIndex = int(f.Info.CharNum)
 	}
-	data, err := os.ReadFile(opt[0].(string))
+	data, err := os.ReadFile(allCharFile)
 	if err != nil {
 		return err
 	}
-	f.ReplaceChars(r, string(data), opt[1].(int), opt[2].(bool))
+	f.ReplaceChars(r, string(data), startIndex, redraw)
 	return nil
 }
 
@@ -259,11 +253,10 @@ func (f *LucaFont) Import(r io.Reader, opt ...interface{}) error {
 //  Description
 //  Receiver f *LucaFont
 //  Param w io.Writer
-//  Param opt ...interface{}
-//    opt[0] infoFilename io.Writer 导出新的info文件
+//  Param infoW io.Writer 导出新的info文件
 //  Return error
 //
-func (f *LucaFont) Write(w io.Writer, opt ...interface{}) error {
+func (f *LucaFont) Write(w io.Writer, infoW io.Writer) error {
 	var err error
 	if f.CzImage != nil {
 		// load
@@ -290,8 +283,8 @@ func (f *LucaFont) Write(w io.Writer, opt ...interface{}) error {
 		// create
 		return errors.New("LucaFont.Write 目前不支持创建的字体")
 	}
-	if len(opt) > 0 {
-		err = f.Info.Write(opt[0].(io.Writer))
+	if infoW != nil {
+		err = f.Info.Write(infoW)
 	}
 	return err
 }

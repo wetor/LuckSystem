@@ -94,7 +94,7 @@ func TestInfo_Import(t *testing.T) {
 		info := LoadFontInfo(data)
 		fmt.Println(name, info.CharNum, len(info.IndexUnicode))
 
-		err = info.Import(font, true)
+		err = info.Import(font, 0, true, "")
 		if err != nil {
 			panic(err)
 		}
@@ -117,7 +117,7 @@ func TestInfo_Import(t *testing.T) {
 		info := LoadFontInfo(data)
 		fmt.Println(name, info.CharNum, len(info.IndexUnicode))
 
-		err = info.Import(font, addChars, int(info.CharNum), false)
+		err = info.Import(font, int(info.CharNum), false, addChars)
 		if err != nil {
 			panic(err)
 		}
@@ -140,7 +140,7 @@ func TestInfo_Import(t *testing.T) {
 		info := LoadFontInfo(data)
 		fmt.Println(name, info.CharNum, len(info.IndexUnicode))
 
-		err = info.Import(font, addChars, int(info.CharNum), true)
+		err = info.Import(font, int(info.CharNum), true, addChars)
 		if err != nil {
 			panic(err)
 		}

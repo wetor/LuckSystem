@@ -30,6 +30,12 @@ type Cz3Image struct {
 	CzData
 }
 
+// Load
+//  Description 载入cz图像
+//  Receiver cz *Cz3Image
+//  Param header CzHeader
+//  Param data []byte
+//
 func (cz *Cz3Image) Load(header CzHeader, data []byte) {
 	cz.CzHeader = header
 	cz.Raw = data
@@ -41,6 +47,10 @@ func (cz *Cz3Image) Load(header CzHeader, data []byte) {
 	cz.OutputInfo = GetOutputInfo(cz.Raw[int(cz.HeaderLength):])
 }
 
+// decompress
+//  Description 解压数据
+//  Receiver cz *Cz3Image
+//
 func (cz *Cz3Image) decompress() {
 	//os.WriteFile("../data/LB_EN/IMAGE/2.lzw", cz.Raw[int(cz.HeaderLength)+cz.OutputInfo.Offset:], 0666)
 	buf := Decompress(cz.Raw[int(cz.HeaderLength)+cz.OutputInfo.Offset:], cz.OutputInfo)
@@ -48,13 +58,11 @@ func (cz *Cz3Image) decompress() {
 	cz.Image = LineDiff(&cz.CzHeader, buf)
 }
 
-func (cz *Cz3Image) Export(w io.Writer, opt ...interface{}) error {
-	if cz.Image == nil {
-		cz.decompress()
-	}
-	return png.Encode(w, cz.Image)
-}
-
+// GetImage
+//  Description 取得解压后的图像数据
+//  Receiver cz *Cz3Image
+//  Return image.Image
+//
 func (cz *Cz3Image) GetImage() image.Image {
 	if cz.Image == nil {
 		cz.decompress()
@@ -62,13 +70,37 @@ func (cz *Cz3Image) GetImage() image.Image {
 	return cz.Image
 }
 
-func (cz *Cz3Image) Import(r io.Reader, opt ...interface{}) error {
+// Export
+//  Description 导出图像到文件
+//  Receiver cz *Cz3Image
+//  Param w io.Writer
+//  Return error
+//
+func (cz *Cz3Image) Export(w io.Writer) error {
+	if cz.Image == nil {
+		cz.decompress()
+	}
+	return png.Encode(w, cz.Image)
+}
+
+// Import
+//  Description 导入图像
+//  Receiver cz *Cz3Image
+//  Param r io.Reader
+//  Param fillSize bool
+//  Return error
+//
+func (cz *Cz3Image) Import(r io.Reader, fillSize bool) error {
 	var err error
 	cz.PngImage, err = png.Decode(r)
 	if err != nil {
 		return err
 	}
-	data := DiffLine(cz.CzHeader, cz.PngImage)
+	pic, ok := cz.PngImage.(*image.NRGBA)
+	if !ok {
+		pic = ImageToNRGBA(cz.PngImage)
+	}
+	data := DiffLine(cz.CzHeader, pic)
 	blockSize := 0
 	if len(cz.OutputInfo.BlockInfo) != 0 {
 		blockSize = int(cz.OutputInfo.BlockInfo[0].CompressedSize)
@@ -86,7 +118,14 @@ func (cz *Cz3Image) Import(r io.Reader, opt ...interface{}) error {
 
 	return nil
 }
-func (cz *Cz3Image) Write(w io.Writer, opt ...interface{}) error {
+
+// Write
+//  Description 将图像保存为cz
+//  Receiver cz *Cz3Image
+//  Param w io.Writer
+//  Return error
+//
+func (cz *Cz3Image) Write(w io.Writer) error {
 	var err error
 	glog.V(6).Infoln(cz.CzHeader)
 	err = WriteStruct(w, &cz.CzHeader, &cz.Cz3Header, cz.OutputInfo)

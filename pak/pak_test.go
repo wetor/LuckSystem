@@ -314,7 +314,7 @@ func TestPakFile_Import(t *testing.T) {
 
 	//============
 	fs, _ := os.Open(loadPath + listFile)
-	err = pak.Import(fs, "list")
+	err = pak.Import(fs, "list", "")
 	if err != nil {
 		panic(err)
 	}
