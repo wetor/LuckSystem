@@ -19,7 +19,6 @@
 data/*/*
 !data/*/OPCODE.txt
 log/
-lucascript
-luckscript
+lucksystem
 main
 czimage/cz2.go
