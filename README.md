@@ -1,3 +1,7 @@
+# Important
+This project only accepts **bug issues** and **pull requests**, and does not provide assistance in use  
+此项目仅接受现有功能的BUG反馈和Pull requests，不提供使用上的帮助  
+
 # Luck System
 
 LucaSystem ~~engine galgame **Emulator**~~  
