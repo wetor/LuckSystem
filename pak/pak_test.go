@@ -3,21 +3,44 @@ package pak
 import (
 	"flag"
 	"fmt"
-	"github.com/go-restruct/restruct"
-	"lucksystem/charset"
-	"lucksystem/voice"
 	"os"
 	"strconv"
 	"testing"
+
+	"github.com/go-restruct/restruct"
+	"lucksystem/charset"
+	"lucksystem/voice"
 )
 
 func TestPak(t *testing.T) {
 	restruct.EnableExprBeta()
-	pak := LoadPak("../data/LB_EN/SCRIPT.PAK", charset.ShiftJIS)
+	pak := LoadPak("D:\\Game\\LOOPERS\\LOOPERS\\files\\src\\SCRIPT.PAK", charset.UTF_8)
 
 	fmt.Printf("%v %v\n", pak.Header, pak.Files[0].Name)
 	for _, f := range pak.Files {
 		fmt.Println(f.ID, f.Name, f.Offset, f.Length)
+		fs, _ := os.Create("D:\\Game\\LOOPERS\\LOOPERS\\files\\src\\Unpak\\" + f.Name)
+		err := pak.Export(fs, "name", f.Name)
+		if err != nil {
+			panic(err)
+		}
+		err = fs.Close()
+	}
+}
+
+func TestImportPak(t *testing.T) {
+	restruct.EnableExprBeta()
+	pak := LoadPak("D:\\Game\\LOOPERS\\LOOPERS\\files\\SCRIPT.PAK", charset.UTF_8)
+
+	fmt.Printf("%v %v\n", pak.Header, pak.Files[0].Name)
+	for _, f := range pak.Files {
+		fmt.Println(f.ID, f.Name, f.Offset, f.Length)
+		fs, _ := os.Create("D:\\Game\\LOOPERS\\LOOPERS\\files\\Unpak\\" + f.Name)
+		err := pak.Export(fs, "name", f.Name)
+		if err != nil {
+			panic(err)
+		}
+		err = fs.Close()
 	}
 }
 

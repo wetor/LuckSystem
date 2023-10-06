@@ -5,16 +5,17 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/go-restruct/restruct"
-	"github.com/golang/glog"
 	"io"
-	"lucksystem/charset"
-	"lucksystem/utils"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/go-restruct/restruct"
+	"github.com/golang/glog"
+	"lucksystem/charset"
+	"lucksystem/utils"
 )
 
 type Header struct {
@@ -193,6 +194,7 @@ func (p *Pak) Get(name string) (*Entry, error) {
 func (p *Pak) GetById(id int) (*Entry, error) {
 	return p.GetByIndex(id - int(p.IDStart))
 }
+
 func (p *Pak) GetByIndex(index int) (*Entry, error) {
 
 	if index < 0 || index >= int(p.FileCount) {
@@ -223,12 +225,12 @@ func (p *Pak) CheckName(name string) bool {
 }
 
 // Set 设置外部文件替换pak文件
-//  Description
-//  Receiver p *Pak
-//  Param name string
-//  Param r io.Reader
-//  Return error
 //
+//	Description
+//	Receiver p *Pak
+//	Param name string
+//	Param r io.Reader
+//	Return error
 func (p *Pak) Set(name string, r io.Reader) error {
 	id, has := p.NameMap[name]
 	if !has {
@@ -253,7 +255,7 @@ func (p *Pak) SetByIndex(index int, r io.Reader) error {
 	entry := p.Files[index]
 	newData, err := io.ReadAll(r)
 	if err != nil {
-		glog.V(8).Infoln("os.ReadFile", err)
+		glog.Warning("os.ReadFile", err)
 		return err
 	}
 	alignLength := entry.Length
@@ -261,8 +263,12 @@ func (p *Pak) SetByIndex(index int, r io.Reader) error {
 		alignLength = (alignLength/p.BlockSize + 1) * p.BlockSize
 	}
 
-	p.Rebuild = alignLength < uint32(len(newData)) // 无法装下新数据内容，需要重构
+	p.Rebuild = p.Rebuild || alignLength < uint32(len(newData)) // 无法装下新数据内容，需要重构
 
+	if uint32(len(newData)) != entry.Length {
+		glog.V(4).Infof("%s\nlength: %d -> length: %d\n",
+			entry.Name, entry.Length, uint32(len(newData)))
+	}
 	entry.Replace = true
 	entry.Data = newData
 	entry.Length = uint32(len(newData))
@@ -270,11 +276,11 @@ func (p *Pak) SetByIndex(index int, r io.Reader) error {
 }
 
 // Write
-//  Description
-//  Receiver p *Pak
-//  Param w io.Writer 必须实现 io.WriterAt
-//  Return error
 //
+//	Description
+//	Receiver p *Pak
+//	Param w io.Writer 必须实现 io.WriterAt
+//	Return error
 func (p *Pak) Write(w io.Writer) error {
 
 	oldOffset := make(map[int]uint32, p.FileCount)
@@ -351,21 +357,21 @@ func (p *Pak) Write(w io.Writer) error {
 }
 
 // Export
-//  Description
-//  Receiver p *Pak
-//  Param w io.Writer
-//  Param mode string 可选 all,index,id,name
-//  Param value interface{}
-//      mode=="all": w为每行一个文件路径的txt文件
-//        value 	dir string 	保存文件夹路径
-//      mode=="index":
-//        value 	index 	int 	从0开始的文件序号
-//      mode=="id":
-//        value	id	int	文件唯一ID
-//      mode=="name":
-//        value	name	string	文件名
-//  Return error
 //
+//	Description
+//	Receiver p *Pak
+//	Param w io.Writer
+//	Param mode string 可选 all,index,id,name
+//	Param value interface{}
+//	    mode=="all": w为每行一个文件路径的txt文件
+//	      value 	dir string 	保存文件夹路径
+//	    mode=="index":
+//	      value 	index 	int 	从0开始的文件序号
+//	    mode=="id":
+//	      value	id	int	文件唯一ID
+//	    mode=="name":
+//	      value	name	string	文件名
+//	Return error
 func (p *Pak) Export(w io.Writer, mode string, value interface{}) error {
 	var err error
 	switch mode {
@@ -423,20 +429,20 @@ func (p *Pak) Export(w io.Writer, mode string, value interface{}) error {
 }
 
 // Import
-//  Description
-//  Receiver p *Pak
-//  Param r io.Reader 导入文件
-//  Param mode string 可选file,list,dir
-//  Param value interface{}
-//      mode=="file": r为导入文件，根据类型自动判断是文件名还是id，不支持index
-//        opt[1]	name	string	替换指定文件名文件
-//        or
-//        opt[1]	id	int	替换指定id文件
-//      mode=="list": r为包含多个文件路径的txt文件，按照Export mode=="all"输出的txt格式
-//      mode=="dir":  r为空
-//        opt[1]	dir	string	导入文件目录，按照Export导出的文件名进行匹配。若存在文件名则用文件名匹配，不存在则用ID匹配
-//  Return error
 //
+//	Description
+//	Receiver p *Pak
+//	Param r io.Reader 导入文件
+//	Param mode string 可选file,list,dir
+//	Param value interface{}
+//	    mode=="file": r为导入文件，根据类型自动判断是文件名还是id，不支持index
+//	      opt[1]	name	string	替换指定文件名文件
+//	      or
+//	      opt[1]	id	int	替换指定id文件
+//	    mode=="list": r为包含多个文件路径的txt文件，按照Export mode=="all"输出的txt格式
+//	    mode=="dir":  r为空
+//	      opt[1]	dir	string	导入文件目录，按照Export导出的文件名进行匹配。若存在文件名则用文件名匹配，不存在则用ID匹配
+//	Return error
 func (p *Pak) Import(r io.Reader, mode string, value interface{}) error {
 
 	var err error

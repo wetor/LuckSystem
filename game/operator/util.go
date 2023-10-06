@@ -1,8 +1,9 @@
-package operater
+package operator
 
 import (
 	"encoding/binary"
 	"fmt"
+
 	"lucksystem/charset"
 )
 
@@ -82,7 +83,7 @@ func ToString(format string, a ...interface{}) string {
 func AllToUint16(data []byte) (list []uint16, end int) {
 	dataLen := len(data)
 	if dataLen%2 == 0 {
-		end = 0
+		end = -1
 	} else {
 		end = dataLen - 1
 	}
@@ -94,12 +95,13 @@ func AllToUint16(data []byte) (list []uint16, end int) {
 }
 
 // SetParam 参数转为字节
-//   1.codeBytes 完整的参数字节数据
-//   2.data[0] Paramter类型指针
-//   3.data[1] start 可空，默认0。当前参数开始位置
-//   4.data[2] size 可空，默认对于Paramter类型长度。当前参数字节长度
-//   5.data[3] coding 可空，默认Unicode。LString类型编码
-//   return start+size，即下个参数的start
+//
+//	1.codeBytes 完整的参数字节数据
+//	2.data[0] Paramter类型指针
+//	3.data[1] start 可空，默认0。当前参数开始位置
+//	4.data[2] size 可空，默认对于Paramter类型长度。当前参数字节长度
+//	5.data[3] coding 可空，默认Unicode。LString类型编码
+//	return start+size，即下个参数的start
 func GetParam(codeBytes []byte, data ...interface{}) int {
 	var start, size int
 	var coding charset.Charset
@@ -142,7 +144,16 @@ func GetParam(codeBytes []byte, data ...interface{}) int {
 		*value = tmp
 		return next
 	case *lstring:
-		size = int(ToUint16(codeBytes[start:start+2])) * 2
+		l := int(ToUint16(codeBytes[start : start+2]))
+		switch coding {
+		case charset.Unicode, charset.ShiftJIS:
+			size = l * 2
+		case charset.UTF_8:
+			size = 0x10000 - l
+		}
+		if l == 0 {
+			size = 0
+		}
 		tmp, next := DecodeString(codeBytes, start+2, size, coding)
 		*value = lstring(tmp)
 		return next

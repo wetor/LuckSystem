@@ -2,7 +2,6 @@ package script
 
 import (
 	"fmt"
-	"runtime"
 	"strconv"
 	"strings"
 )
@@ -21,17 +20,11 @@ func ToStringCodeParams(code *CodeLine) string {
 			paramStr = append(paramStr, `"`+param+`"`)
 		case *JumpParam:
 			if code.GotoIndex > 0 {
-				if len(param.ScriptName) > 0 {
-					// paramStr = append(paramStr, fmt.Sprintf(`{goto "%s" label%d}`, param.ScriptName, code.GotoIndex))
-				} else {
-					paramStr = append(paramStr, fmt.Sprintf("{goto label%d}", code.GotoIndex))
-				}
+				paramStr = append(paramStr, fmt.Sprintf("{goto label%d}", code.GotoIndex))
+			} else if param.GlobalIndex > 0 {
+				paramStr = append(paramStr, fmt.Sprintf(`{goto "%s" global%d}`, param.ScriptName, param.GlobalIndex))
 			} else {
-				if len(param.ScriptName) > 0 {
-					// paramStr = append(paramStr, fmt.Sprintf(`{goto "%s" %d}`, param.ScriptName, param.Position))
-				} else {
-					paramStr = append(paramStr, fmt.Sprintf("{goto %d}", param.Position))
-				}
+				paramStr = append(paramStr, fmt.Sprintf("{goto %d}", param.Position))
 			}
 		default:
 			paramStr = append(paramStr, fmt.Sprintf("%v", param))
@@ -39,12 +32,14 @@ func ToStringCodeParams(code *CodeLine) string {
 		}
 	}
 	str := strings.Join(paramStr, ", ")
-
+	str = fmt.Sprintf(`%s (%s)`, code.OpStr, str)
 	if code.LabelIndex > 0 {
-		return fmt.Sprintf(`label%d: %s (%s)`, code.LabelIndex, code.OpStr, str)
-	} else {
-		return fmt.Sprintf(`%s (%s)`, code.OpStr, str)
+		str = fmt.Sprintf(`label%d: %s`, code.LabelIndex, str)
 	}
+	if code.GlobalLabelIndex > 0 {
+		str = fmt.Sprintf(`global%d: %s`, code.GlobalLabelIndex, str)
+	}
+	return str
 }
 
 func ParseCodeParams(code *CodeLine, codeStr string) {
@@ -53,6 +48,8 @@ func ParseCodeParams(code *CodeLine, codeStr string) {
 	opStr := ""
 	labelIndex := 0
 	gotoIndex := 0
+	globalLabelIndex := 0
+	globalGotoIndex := 0
 	gotoFile := ""
 	isString := false
 	isSpecial := false
@@ -82,6 +79,8 @@ func ParseCodeParams(code *CodeLine, codeStr string) {
 				} else if isSpecial {
 					if len(word) > 5 && wordStr[0:5] == "label" {
 						gotoIndex, _ = strconv.Atoi(wordStr[5:])
+					} else if len(word) > 6 && wordStr[0:6] == "global" {
+						globalGotoIndex, _ = strconv.Atoi(wordStr[6:])
 					} else if wordStr != "goto" {
 						gotoFile = wordStr
 					}
@@ -94,7 +93,11 @@ func ParseCodeParams(code *CodeLine, codeStr string) {
 				isSpecial = false
 			}
 		case ':':
-			labelIndex, _ = strconv.Atoi(string(word[5:]))
+			if len(word) > 5 && string(word[0:5]) == "label" {
+				labelIndex, _ = strconv.Atoi(string(word[5:]))
+			} else if len(word) > 6 && string(word[0:6]) == "global" {
+				globalLabelIndex, _ = strconv.Atoi(string(word[6:]))
+			}
 			word = word[0:0]
 		case '"':
 			isString = true
@@ -108,14 +111,18 @@ func ParseCodeParams(code *CodeLine, codeStr string) {
 	code.LabelIndex = labelIndex
 	code.GotoIndex = gotoIndex
 
-	if gotoFile != "" || gotoIndex > 0 {
+	code.GlobalGotoIndex = globalGotoIndex
+	code.GlobalLabelIndex = globalLabelIndex
+
+	if gotoFile != "" || gotoIndex > 0 || globalGotoIndex > 0 {
 		params = append(params, &JumpParam{
-			ScriptName: gotoFile,
-			Position:   gotoIndex,
+			GlobalIndex: globalGotoIndex,
+			ScriptName:  gotoFile,
+			Position:    gotoIndex + globalGotoIndex, // 填充使用
 		})
 	}
-
 	code.Params = params
+
 	// if labelIndex > 0 {
 	// 	fmt.Printf("label%d: ", labelIndex)
 	// }
@@ -125,11 +132,4 @@ func ParseCodeParams(code *CodeLine, codeStr string) {
 	// }
 	// fmt.Print("\n")
 	// _, _, _ = labelIndex, gotoIndex, params
-}
-func GetOperateName() string {
-	pc := make([]uintptr, 1)
-	runtime.Callers(3, pc)
-	f := runtime.FuncForPC(pc[0])
-	name := f.Name()
-	return name[strings.LastIndex(name, ".")+1:]
 }

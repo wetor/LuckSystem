@@ -25,4 +25,4 @@ jobs:
       with:
         artifacts: "LuckSystem_linux,LuckSystem_mac,LuckSystem.exe"
         bodyFile: ""
-        token: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+        token: ${{ secrets.GITHUB_TOKEN }}

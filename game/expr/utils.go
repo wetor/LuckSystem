@@ -3,7 +3,7 @@ package expr
 /*
 判断单字符是否为操作符
 */
-func IsOperater(ch byte) bool {
+func IsOperator(ch byte) bool {
 	op := "+-*/%()[]{}><=|&^!"
 	for i := 0; i < len(op); i++ {
 		if ch == op[i] {
@@ -16,7 +16,7 @@ func IsOperater(ch byte) bool {
 /*
 判断两个字符是否为组合操作符
 */
-func IsOperater2(ch, ch2 byte) bool {
+func IsOperator2(ch, ch2 byte) bool {
 	if ch == '<' && ch2 == '<' {
 		return true
 	} else if ch == '>' && ch2 == '>' {
@@ -37,7 +37,7 @@ func IsOperater2(ch, ch2 byte) bool {
 	return false
 }
 
-func GetOperaterLevel(word string) int {
+func GetOperatorLevel(word string) int {
 
 	level := [][]string{
 		{"*", "/", "%", ""},

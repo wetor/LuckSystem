@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	TOperater = 0
+	TOperator = 0
 	TNumber   = 1
 	TVariable = 2
 )
@@ -49,7 +49,7 @@ func Exec(tokens []Token, variable map[string]int) (int, error) {
 				return 0, err
 			}
 			stack.PushBack(val)
-		} else if token.Type == TOperater {
+		} else if token.Type == TOperator {
 			if stack.Len() < 2 {
 				return 0, errors.New("表达式错误")
 			}
@@ -79,7 +79,7 @@ func Parser(exprStr string) (tokens []Token, err error) {
 	isNum := false
 	for i := 0; i < len(exprStr); i++ {
 		ch := exprStr[i]
-		if ch == ' ' || IsOperater(ch) { // 单词读取结束（换行或读到操作符）
+		if ch == ' ' || IsOperator(ch) { // 单词读取结束（换行或读到操作符）
 			sword := string(word)
 			if len(word) > 0 {
 				if isNum {
@@ -100,7 +100,7 @@ func Parser(exprStr string) (tokens []Token, err error) {
 				continue
 			}
 			word = append(word, ch)
-			if i+1 < len(exprStr) && IsOperater2(ch, exprStr[i+1]) {
+			if i+1 < len(exprStr) && IsOperator2(ch, exprStr[i+1]) {
 				word = append(word, exprStr[i+1])
 				i++
 			}
@@ -112,7 +112,7 @@ func Parser(exprStr string) (tokens []Token, err error) {
 					stack.Remove(top)
 					tokens = append(tokens, Token{
 						Data: top.Value.(string),
-						Type: TOperater,
+						Type: TOperator,
 					})
 					top = stack.Back()
 				}
@@ -121,11 +121,11 @@ func Parser(exprStr string) (tokens []Token, err error) {
 				stack.PushBack(sword)
 			} else {
 				top := stack.Back()
-				for top != nil && stack.Len() > 0 && (GetOperaterLevel(sword) <= GetOperaterLevel(top.Value.(string))) {
+				for top != nil && stack.Len() > 0 && (GetOperatorLevel(sword) <= GetOperatorLevel(top.Value.(string))) {
 					stack.Remove(top)
 					tokens = append(tokens, Token{
 						Data: top.Value.(string),
-						Type: TOperater,
+						Type: TOperator,
 					})
 					top = stack.Back()
 				}
@@ -155,7 +155,7 @@ func Parser(exprStr string) (tokens []Token, err error) {
 
 		tokens = append(tokens, Token{
 			Data: top.Value.(string),
-			Type: TOperater,
+			Type: TOperator,
 		})
 		top = stack.Back()
 	}

@@ -6,29 +6,18 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/golang/glog"
 	"io"
-	"lucksystem/charset"
-	"lucksystem/game/enum"
-	"lucksystem/pak"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
+	"lucksystem/charset"
+	"lucksystem/game/enum"
+	"lucksystem/pak"
+
 	"github.com/go-restruct/restruct"
 )
-
-type JumpParam struct {
-	ScriptName string
-	Position   int
-}
-
-type StringParam struct {
-	Data   string
-	Coding charset.Charset
-	HasLen bool
-}
 
 // Script 从文件中直接读取到的代码结构∂
 // 可用作运行时，不可直接导出，需要先转化为Entry
@@ -36,14 +25,6 @@ type Script struct {
 	Info  `struct:"-"`
 	Entry `struct:"-"`
 	Codes []*CodeLine `struct:"while=!_eof"`
-}
-
-type Info struct {
-	FileName string
-	Name     string
-	GameName string
-	Version  int
-	CodeNum  int
 }
 
 // CodeLine
@@ -68,89 +49,27 @@ type CodeLine struct {
 	Align      []byte        `struct:"size=Len & 1"` // 对齐，只读
 }
 
-type CodeInfo struct {
-	Index      int // 序号
-	Pos        int // 文件偏移，和Index绑定
-	LabelIndex int // 跳转目标标记，从1开始
-	GotoIndex  int // 跳转标记，为0则不使用
-}
-
-// Entry 脚本导入导出实体
-// 不可用作运行时，需先转话为Script
-type Entry struct {
-	// 递增序列，从1开始
-	IndexNext int
-
-	// 导出：
-	// 1.执行脚本，遇到GOTO等跳转指令，将jumpPos作为key，递增序列Index作为value，存入ELabelMap，即一个地址只能存在一个LabelIndex
-	// 2.同时，将当前指令的CodeIndex作为key，1中和jumpPos对应的LabelIndex作为value，存入EGotoMap，即标记次条语句包含跳转到LabelIndex的指令
-	ELabelMap map[int]int // Pos(跳转地址) -> LabelIndex(标签序号) ，Pos 通过GOTO (pos) 生成，Index 为序列
-	EGotoMap  map[int]int // CodeIndex(代码序号) -> LabelIndex(标签序号) ，CodeIndex为当前语句序列，此语句含有跳转指令，跳转到LabelIndex
-
-	// 导入当前位置
-	CurPos int
-	// 导入：
-	// 1.解析文本，同时开始序列化脚本，转为二进制数据并写入。
-	// 2.遇到Label标签，将LabelIndex作为key，当前语句开始位置的文件偏移Pos作为value，存入ILabelMap，即标签对应的跳转地址
-	// 3.遇到GOTO等跳转指令时，将要跳转到的LabelIndex作为key，[jumpPos参数所在的文件偏移]作为value存入IGotoMap，即暂时留空，后续再补充数据
-	// 4.数据写入完成，遍历IGotoMap，根据ILabelMap的key，即LabelIndex，在ILabelMap中取得语句偏移Pos，写入[jumpPos参数所在的文件偏移]位置，填充数据。
-	ILabelMap map[int]int // LabelIndex(标签序号) -> CodeStartPos(代码开头地址，跳转目标地址)
-	IGotoMap  map[int]int // GotoParamPos(跳转参数地址) -> LabelIndex(标签序号)
-}
-
-func (e *Entry) InitEntry() {
-	e.ELabelMap = make(map[int]int)
-	e.EGotoMap = make(map[int]int)
-
-	e.ILabelMap = make(map[int]int)
-	e.IGotoMap = make(map[int]int)
-
-	e.IndexNext = 1
-	e.CurPos = 0
-}
-
-func (e *Entry) addExportGotoLabel(codeIndex, pos int) int {
-
-	val, has := e.ELabelMap[pos]
-	if has {
-		e.EGotoMap[codeIndex] = val
-		return val
+func LoadScript(opts *LoadOptions) *Script {
+	script := &Script{
+		Info: Info{
+			Name: opts.Name,
+		},
 	}
-	e.ELabelMap[pos] = e.IndexNext
-	e.EGotoMap[codeIndex] = e.IndexNext
-	e.IndexNext++
-	return e.ELabelMap[pos]
-}
-
-// labelIndex, Goto参数位置
-func (e *Entry) addImportGoto(pos, labelIndex int) {
-	e.IGotoMap[pos] = labelIndex
-}
-
-// labelIndex, 当前代码位置
-func (e *Entry) addImportLabel(labelIndex, pos int) {
-	e.ILabelMap[labelIndex] = pos
-}
-
-func LoadScript(filename, gameName string, version int) *Script {
-	script := new(Script)
-	script.FileName = filename
-	_, script.Name = path.Split(filename)
-	script.GameName = gameName
-	script.Version = version
 	script.InitEntry()
-	return script
-}
-
-func LoadEntry(entry *pak.Entry) (*Script, error) {
-
-	script := &Script{}
-	script.Name = entry.Name
-	err := script.ReadData(entry.Data)
-	if err != nil {
-		return nil, err
+	if opts.Entry != nil {
+		script.Name = opts.Entry.Name
+		err := script.ReadData(opts.Entry.Data)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		err := script.Read(opts.Filename)
+		if err != nil {
+			panic(err)
+		}
 	}
-	return script, nil
+
+	return script
 }
 
 func (s *Script) ReadByEntry(entry *pak.Entry) error {
@@ -158,9 +77,8 @@ func (s *Script) ReadByEntry(entry *pak.Entry) error {
 	return s.ReadData(entry.Data)
 }
 
-func (s *Script) Read() error {
-
-	data, err := os.ReadFile(s.FileName)
+func (s *Script) Read(filename string) error {
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		glog.V(8).Infoln("os.ReadFile", err)
 		return err
@@ -169,23 +87,24 @@ func (s *Script) Read() error {
 }
 
 // SetOperateParams 设置需要导入导出的变量数据
-//   1.index 当前代码行号，即Codes的下标
-//   2.mode VMRun/VMRunExport/VMRunImport 模拟器/导出/导入 模式
-//     模拟器模式：
-//       直接返回，不作操作
-//     导出模式：
-//       将脚本中解析需要导出的参数列表paramList对Params赋值，对OpStr赋值
-//     导入模式：
-//       1.将从文件直接解析来的Params（[]string）根据从脚本中解析需要导出的paramList数据类型，转换Param类型
-//       2.将正确类型的Param(导出参数列表)与不导出参数列表合并成allParamList
-//       3.调用CodeParamsToBytes，将完整参数列表转为RawBytes
-//   3.params 参数/设置列表，如长度为len
-//     参数列表：
-//       支持的特殊类型为：[]uint16（会解析为数个uint16参数）、*JumpParam（暂不支持ScriptName参数）、*StringParam
-//     设置列表：从后向前解析，如果为个别设置项空，其他设置项顺位后移，如opcode为空，则coding为params[len-1]
-//       1.params[len-1] opcode string 可选
-//       2.params[len-2] coding Charset 可选，所有字符串参数的默认编码
-//       3.params[len-3] export []bool 可选，导出列表，需要与参数列表(不含设置)数量相同，若少于有效参数数量，则默认补充false，不导出
+//
+//	1.index 当前代码行号，即Codes的下标
+//	2.mode VMRun/VMRunExport/VMRunImport 模拟器/导出/导入 模式
+//	  模拟器模式：
+//	    直接返回，不作操作
+//	  导出模式：
+//	    将脚本中解析需要导出的参数列表paramList对Params赋值，对OpStr赋值
+//	  导入模式：
+//	    1.将从文件直接解析来的Params（[]string）根据从脚本中解析需要导出的paramList数据类型，转换Param类型
+//	    2.将正确类型的Param(导出参数列表)与不导出参数列表合并成allParamList
+//	    3.调用CodeParamsToBytes，将完整参数列表转为RawBytes
+//	3.params 参数/设置列表，如长度为len
+//	  参数列表：
+//	    支持的特殊类型为：[]uint16（会解析为数个uint16参数）、*JumpParam（暂不支持ScriptName参数）、*StringParam
+//	  设置列表：从后向前解析，如果为个别设置项空，其他设置项顺位后移，如opcode为空，则coding为params[len-1]
+//	    1.params[len-1] opcode string 可选
+//	    2.params[len-2] coding Charset 可选，所有字符串参数的默认编码
+//	    3.params[len-3] export []bool 可选，导出列表，需要与参数列表(不含设置)数量相同，若少于有效参数数量，则默认补充false，不导出
 func (s *Script) SetOperateParams(index int, mode enum.VMRunMode, params ...interface{}) error {
 	if mode == enum.VMRun {
 		return nil
@@ -194,9 +113,11 @@ func (s *Script) SetOperateParams(index int, mode enum.VMRunMode, params ...inte
 	paramNum := len(params)
 	var paramsExport []bool // 导出参数列表
 	strCharset := charset.UTF_8
-	op := GetOperateName() // runtime 向上两层的函数名
 
-	if paramNum > 0 && op == "UNDEFINE" {
+	code := s.Codes[index]
+	op := code.OpStr
+
+	if paramNum > 0 && op == "UNDEFINED" {
 		if val, ok := params[paramNum-1].(string); ok { // 最后一个参数为编码类型
 			op = val // opcode
 			paramNum--
@@ -224,8 +145,6 @@ func (s *Script) SetOperateParams(index int, mode enum.VMRunMode, params ...inte
 		paramsExport = append(paramsExport, false)
 	}
 
-	code := s.Codes[index]
-
 	paramList := make([]interface{}, 0, paramNum)
 
 	for i := 0; i < paramNum; i++ {
@@ -237,7 +156,9 @@ func (s *Script) SetOperateParams(index int, mode enum.VMRunMode, params ...inte
 				}
 			case *JumpParam:
 				paramList = append(paramList, param)
-				s.addExportGotoLabel(index, param.Position)
+				if param.GlobalIndex == 0 {
+					s.AddExportGotoLabel(index, param.Position)
+				}
 			case *StringParam:
 				paramList = append(paramList, param.Data)
 			default:
@@ -249,7 +170,6 @@ func (s *Script) SetOperateParams(index int, mode enum.VMRunMode, params ...inte
 
 	if mode == enum.VMRunExport {
 		code.Params = paramList
-		code.OpStr = op
 	} else if mode == enum.VMRunImport {
 		// 导入模式
 		if len(paramList) != len(code.Params) {
@@ -265,7 +185,7 @@ func (s *Script) SetOperateParams(index int, mode enum.VMRunMode, params ...inte
 				val, _ := strconv.ParseUint(code.Params[i].(string), 10, 16)
 				code.Params[i] = uint16(val)
 			case uint32:
-				val, _ := strconv.ParseUint(code.Params[i].(string), 10, 16)
+				val, _ := strconv.ParseUint(code.Params[i].(string), 10, 32)
 				code.Params[i] = uint32(val)
 			}
 			//fmt.Println(code.OpStr, code.Params[i], paramList[i])
@@ -314,8 +234,10 @@ func (s *Script) SetOperateParams(index int, mode enum.VMRunMode, params ...inte
 
 // Export 导出可编辑脚本
 func (s *Script) Export(w io.Writer) error {
+	glog.V(2).Infoln("Export: ", s.Name)
 	var err error
 	for i, code := range s.Codes {
+		// 内部跳转
 		labelIndex, has := s.ELabelMap[code.Pos]
 		if has {
 			code.LabelIndex = labelIndex
@@ -324,17 +246,24 @@ func (s *Script) Export(w io.Writer) error {
 		if has {
 			code.GotoIndex = gotoIndex
 		}
+		// 跨文件跳转
+		labelIndex, has = s.EGlobalLabelMap[code.Pos]
+		if has {
+			code.GlobalLabelIndex = labelIndex
+		}
+		gotoIndex, has = s.EGlobalGotoMap[i]
+		if has {
+			code.GlobalGotoIndex = gotoIndex
+		}
 	}
 	bw := bufio.NewWriter(w)
-	for i, code := range s.Codes {
+	for _, code := range s.Codes {
 		str := ToStringCodeParams(code)
 		str = strings.Replace(str, "\n", "\\n", -1)
-		glog.V(6).Infoln(i, str)
 		_, err = fmt.Fprintln(bw, str)
 		if err != nil {
 			return err
 		}
-
 	}
 	return bw.Flush()
 
@@ -342,7 +271,7 @@ func (s *Script) Export(w io.Writer) error {
 
 // Import 导入可编辑脚本
 func (s *Script) Import(r io.Reader) error {
-
+	glog.V(2).Infoln("Import: ", s.Name)
 	br := bufio.NewReader(r)
 	for i, code := range s.Codes {
 		line, err := br.ReadString('\n')
@@ -357,14 +286,14 @@ func (s *Script) Import(r io.Reader) error {
 		ParseCodeParams(code, line)
 
 		glog.V(6).Info(i)
+		glog.V(6).Infof("%v", line)
 		if code.LabelIndex > 0 {
 			glog.V(6).Infof(" label%d:", code.LabelIndex)
 		}
-		glog.V(6).Infof(" %s %v", code.OpStr, code.Params)
+		glog.V(6).Infof("%s %v", code.OpStr, code.Params)
 		if code.GotoIndex > 0 {
 			glog.V(6).Infof(" {goto label%d}", code.GotoIndex)
 		}
-		glog.V(6).Info("\n")
 
 	}
 	return nil
@@ -411,27 +340,44 @@ func (s *Script) ReadData(data []byte) error {
 func (s *Script) CodeParamsToBytes(code *CodeLine, coding charset.Charset, params []interface{}) {
 	buf := &bytes.Buffer{}
 	size := 0
+	position := 0
 	for _, param := range code.FixedParam {
-		size += SetParam(buf, param, coding)
+		l, _ := SetParam(buf, param, coding, false)
+		size += l
 	}
 	for _, param := range params {
-		size += SetParam(buf, param, coding)
+		l, j := SetParam(buf, param, coding, false)
+		size += l
+		if j {
+			position = size - 4
+		}
+
 	}
-	glog.V(6).Infof("%v %v\n\t%v %v\n\t%v %v\n", code.OpStr, params, buf.Len(), buf.Bytes(), len(code.RawBytes), code.RawBytes)
+	if buf.Len() != len(code.RawBytes) {
+		glog.V(4).Infof("%v %v\n\t%v %v\n\t%v %v\n", code.OpStr, params, buf.Len(), buf.Bytes(), len(code.RawBytes), code.RawBytes)
+	}
 	code.Len = uint16(size + 4)
+	position += 4
 	code.Align = make([]byte, code.Len&1)
 	code.RawBytes = buf.Bytes()
 	if code.LabelIndex > 0 {
-		s.addImportLabel(code.LabelIndex, s.CurPos)
+		s.AddImportLabel(code.LabelIndex, s.CurPos)
 	}
 	if code.GotoIndex > 0 {
-		s.addImportGoto(s.CurPos+int(code.Len)-4, code.GotoIndex) // -4 最后一个参数
+		s.AddImportGoto(s.CurPos+position, code.GotoIndex)
 	}
+	if code.GlobalLabelIndex > 0 {
+		s.AddImportGlobalLabel(code.GlobalLabelIndex, s.CurPos)
+	}
+	if code.GlobalGotoIndex > 0 {
+		s.AddImportGlobalGoto(s.CurPos+position, code.GlobalGotoIndex)
+	}
+
 	s.CurPos += int(code.Len + code.Len&1)
 
 }
-func (s *Script) Write(w io.Writer) error {
 
+func (s *Script) Write(w io.Writer) error {
 	data, err := restruct.Pack(binary.LittleEndian, s)
 	if err != nil {
 		return err
@@ -447,6 +393,18 @@ func (s *Script) Write(w io.Writer) error {
 		copy(data[gotoPos:gotoPos+4], pos)
 		glog.V(6).Infoln(data[gotoPos : gotoPos+4])
 	}
+
+	for gotoPos, labelIndex := range s.IGlobalGotoMap {
+		jumpPos, has := s.IGlobalLabelMap[labelIndex]
+		if !has {
+			return errors.New("Global Goto-Label不匹配 " + strconv.Itoa(labelIndex))
+		}
+		pos := make([]byte, 4)
+		binary.LittleEndian.PutUint32(pos, uint32(jumpPos))
+		copy(data[gotoPos:gotoPos+4], pos)
+		glog.V(6).Infoln(data[gotoPos : gotoPos+4])
+	}
+
 	_, err = w.Write(data)
 	if err != nil {
 		return err
@@ -463,7 +421,18 @@ func CodeString(w io.Writer, data string, hasLen bool, coding charset.Charset) i
 	buf := []byte(dst)
 	size := len(buf)
 	if hasLen {
-		binary.Write(w, binary.LittleEndian, uint16(size/2))
+		writeSize := uint16(0)
+		switch coding {
+		case charset.UTF_8:
+			writeSize = uint16(0x10000 - size)
+		case charset.ShiftJIS:
+			fallthrough
+		case charset.Unicode:
+			fallthrough
+		default:
+			writeSize = uint16(size / 2)
+		}
+		binary.Write(w, binary.LittleEndian, writeSize)
 		size += 2
 	}
 	w.Write(buf)
@@ -485,41 +454,35 @@ func CodeString(w io.Writer, data string, hasLen bool, coding charset.Charset) i
 }
 
 // SetParam 参数转为字节
-//   1.data[0] param 数据
-//   2.data[1] coding 可空，默认Unicode
-//   3.data[2] len 可空，是否为lstring类型
-//   return size 字节长度
-func SetParam(buf *bytes.Buffer, data ...interface{}) int {
-
-	size := 0
-	lenStr := false
-	var coding charset.Charset
-	if len(data) >= 2 {
-		coding = data[1].(charset.Charset)
-	} else {
+//
+//	1.data[0] param 数据
+//	2.data[1] coding 可空，默认Unicode
+//	3.data[2] len 可空，是否为lstring类型
+//	return size 字节长度
+//	return position 跳转标记位置
+func SetParam(buf *bytes.Buffer, param interface{}, coding charset.Charset, hasLen bool) (size int, jump bool) {
+	if len(coding) == 0 {
 		coding = charset.Unicode
 	}
-	if len(data) >= 3 {
-		lenStr = data[2].(bool)
-	}
-	switch value := data[0].(type) {
+	switch value := param.(type) {
 	case string:
-		size = CodeString(buf, value, lenStr, coding)
+		size = CodeString(buf, value, hasLen, coding)
 	case *StringParam:
 		size = CodeString(buf, value.Data, value.HasLen, value.Coding)
 	case *JumpParam:
 		// 填充跳转 pos
-		if value.ScriptName != "" {
-			size += CodeString(buf, value.ScriptName, false, coding)
-		}
-		if value.Position > 0 { // 现在为labelIndex
+		//if value.ScriptName != "" {
+		//	size += CodeString(buf, value.ScriptName, false, coding)
+		//}
+		if value.Position > 0 || value.GlobalIndex > 0 { // 现在为labelIndex
+			jump = true
 			binary.Write(buf, binary.LittleEndian, uint32(value.Position))
 			size += 4
 		}
 	default:
 		tmp := buf.Len()
-		binary.Write(buf, binary.LittleEndian, data[0])
+		binary.Write(buf, binary.LittleEndian, param)
 		size = buf.Len() - tmp
 	}
-	return size
+	return size, jump
 }
