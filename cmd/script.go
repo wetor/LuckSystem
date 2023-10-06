@@ -1,6 +1,5 @@
 /*
 Copyright © 2022 NAME HERE <EMAIL ADDRESS>
-
 */
 package cmd
 
@@ -8,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"lucksystem/charset"
 )
 
 // scriptCmd represents the script command
@@ -22,16 +22,22 @@ var scriptCmd = &cobra.Command{
 	},
 }
 
+var (
+	ScriptOpcode       string
+	ScriptPlugin       string
+	ScriptSource       string
+	ScriptExportDir    string
+	ScriptImportDir    string
+	ScriptImportOutput string
+)
+
 func init() {
 	rootCmd.AddCommand(scriptCmd)
 
-	// Here you will define your flags and configuration settings.
+	scriptCmd.PersistentFlags().StringVarP(&ScriptSource, "source", "s", "SCRIPT.PAK", "SCRIPT.PAK文件")
+	scriptCmd.PersistentFlags().StringVarP(&Charset, "charset", "c", string(charset.UTF_8), "PAK文件字符串编码")
+	scriptCmd.PersistentFlags().StringVarP(&ScriptOpcode, "opcode", "O", "", "游戏的OPCODE文件")
+	scriptCmd.PersistentFlags().StringVarP(&ScriptPlugin, "plugin", "p", "", "游戏OPCODE解析插件")
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// scriptCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// scriptCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	scriptCmd.MarkFlagsRequiredTogether("opcode", "plugin")
 }

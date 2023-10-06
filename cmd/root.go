@@ -1,14 +1,14 @@
 /*
 Copyright © 2022 WeTor wetorx@qq.com
-
 */
 package cmd
 
 import (
 	"flag"
-	"github.com/go-restruct/restruct"
 	"os"
 	"strconv"
+
+	"github.com/go-restruct/restruct"
 
 	"github.com/spf13/cobra"
 )
@@ -58,6 +58,6 @@ func init() {
 	restruct.EnableExprBeta()
 
 	rootCmd.Flags().BoolVar(&Log, "log", true, "启用日志")
-	rootCmd.Flags().IntVar(&LogLevel, "log_level", 10, "输出日志等级")
+	rootCmd.Flags().IntVar(&LogLevel, "log_level", 5, "输出日志等级")
 	rootCmd.Flags().StringVar(&LogDir, "log_dir", "log", "保存日志路径")
 }

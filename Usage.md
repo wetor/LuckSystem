@@ -2,6 +2,28 @@
 
 ## Example
 ```shell
+# 反编译SCRIPT.PAK
+lucksystem script decompile \
+  -s D:/Game/LOOPERS/files/SCRIPT.PAK \
+  -c UTF-8 \
+  -O data/LOOPERS.txt \
+  -p data/LOOPERS.py \
+  -o D:/Game/LOOPERS/files/Export
+
+# lucksystem script decompile -s D:/Game/LOOPERS/LOOPERS/files/src/SCRIPT.PAK -c UTF-8 -O data/LOOPERS.txt -p data/LOOPERS.py -o D:/Game/LOOPERS/LOOPERS/files/Export
+
+# 导入修改后的反编译脚本到SCRIPT.PAK
+lucksystem script import \
+  -s D:/Game/LOOPERS/files/SCRIPT.PAK \
+  -c UTF-8 \
+  -O data/LOOPERS.txt \
+  -p data/LOOPERS.py \
+  -i D:/Game/LOOPERS/files/Export \
+  -o D:/Game/LOOPERS/files/Import/SCRIPT.PAK
+
+# lucksystem script import -s D:/Game/LOOPERS/LOOPERS/files/src/SCRIPT.PAK -c UTF-8 -O data/LOOPERS.txt -p data/LOOPERS.py -i D:/Game/LOOPERS/LOOPERS/files/Export -o D:/Game/LOOPERS/LOOPERS/files/Import/SCRIPT.PAK
+
+
 # 查看FONT.PAK文件列表
 lucksystem pak \
   -s data/LB_EN/FONT.PAK \
