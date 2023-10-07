@@ -56,7 +56,9 @@ func NewGame(opt *GameOptions) *Game {
 			PluginFile: opt.PluginFile,
 		}),
 	}
-	game.VM.LoadOpcode(opt.OpcodeFile)
+	if len(opt.OpcodeFile) > 0 {
+		game.VM.LoadOpcode(opt.OpcodeFile)
+	}
 	return game
 }
 
