@@ -39,5 +39,5 @@ func init() {
 	scriptCmd.PersistentFlags().StringVarP(&ScriptOpcode, "opcode", "O", "", "游戏的OPCODE文件")
 	scriptCmd.PersistentFlags().StringVarP(&ScriptPlugin, "plugin", "p", "", "游戏OPCODE解析插件")
 
-	scriptCmd.MarkFlagsRequiredTogether("opcode", "plugin")
+	scriptCmd.MarkPersistentFlagRequired("source")
 }

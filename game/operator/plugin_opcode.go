@@ -145,11 +145,11 @@ func init() {
 		py.MustNewMethod("read_uint8", pluginContext.ReadUInt8, 0, `read_uint8(export=False) -> int`),
 		py.MustNewMethod("read_uint16", pluginContext.ReadUInt16, 0, `read_uint16(export=False) -> int`),
 		py.MustNewMethod("read_uint32", pluginContext.ReadUInt32, 0, `read_uint32(export=False) -> int`),
-		py.MustNewMethod("read_jump", pluginContext.ReadJump, 0, `read_jump(file, export=True) -> int`),
+		py.MustNewMethod("read_jump", pluginContext.ReadJump, 0, `read_jump(file='', export=True) -> int`),
 		py.MustNewMethod("read_str", pluginContext.ReadString, 0, `read_str(charset=textCharset, export=True) -> str`),
 		py.MustNewMethod("read_len_str", pluginContext.ReadLenString, 0, `read_len_str(charset=textCharset, export=True) -> str`),
 		py.MustNewMethod("end", pluginContext.End, 0, `end()`),
-		py.MustNewMethod("can_read", pluginContext.CanRead, 0, `can_read()`),
+		py.MustNewMethod("can_read", pluginContext.CanRead, 0, `can_read() -> bool`),
 		py.MustNewMethod("set_config", pluginContext.SetConfig, 0, `set_config(expr_charset, text_charset, default_export=True)`),
 	}
 

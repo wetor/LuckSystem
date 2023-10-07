@@ -1,13 +1,13 @@
 # Important
 This project only accepts **bug issues** and **pull requests**, and does not provide assistance in use  
-此项目仅接受现有功能的BUG反馈和Pull requests，不提供使用上的帮助  
-
-使用方法：[Usage](Usage.md)
+此项目仅接受现有功能的BUG反馈和Pull requests，不提供使用上的帮助
 
 # Luck System
 
-LucaSystem ~~engine galgame **Emulator**~~  
 LucaSystem 引擎解析工具
+
+## 使用方法：[Usage](Usage.md)
+## 插件手册：[Plugin](Plugin.md)
 
 ## LucaSystem解析完成进度
 
@@ -50,7 +50,10 @@ LucaSystem 引擎解析工具
 
 - 导出完成
 - 导入完成
-- 简单的模拟执行
+- ~~简单的模拟执行~~
+- 支持插件扩展（gpython）
+  - 非标准的Python，语法类似Python3.4，缺少大量的内置库和一些特性，基本使用没有问题
+  - 插件手册 [Plugin](Plugin.md)
 
 #### 笔记
 
@@ -82,13 +85,13 @@ LucaSystem 引擎解析工具
 - 导出完成
 
 ## 目前支持的游戏
-
-1. LB_EN:《Little Busters! English Edition》 Steam *优先
-2. SP:《Summer Pockets》 Nintendo Switch
+1. 《LOOPERS》 Steam
+2. LB_EN:《Little Busters! English Edition》 Steam
+3. SP:《Summer Pockets》 Nintendo Switch
 
 ## 目前支持的指令
 
-- MESSAGE (LB_EN、SP)
+- MESSAGE (LB_EN、SP、LOOPERS)
 - SELECT (LB_EN、SP)
 - IMAGELOAD (LB_EN、SP)
 
@@ -103,17 +106,17 @@ LucaSystem 引擎解析工具
 - GOTO
 - JUMP
 - FARCALL
-- MOVE
+- GOSUB
 
-其余指令的数据均为未处理或者解析
 
 ## 更新日志
 
-### 未来
+### 2023.10.7
+- 支持LOOPERS导入和导出(已测试)
+- 支持Plugin扩展以支持任意游戏
+- 内置SummerPockets(未测试)和LOOPERS默认Plugin插件和OPCODE
+- 移除模拟器相关代码
 
-- 完善的log输出
-- 支持更多LucaSystem引擎的游戏资源解析
-- 通用化与易理解的控制台交互接口
 
 ### 6.26
 - 完全重构cmd使用方式
