@@ -21,8 +21,13 @@ jobs:
         CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o LuckSystem_linux .
         CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o LuckSystem_mac .
         CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o LuckSystem.exe .
+    - name: Create zip files
+      run: |
+        zip -r LuckSystem_linux_x86_64.zip LuckSystem_linux Plugin.md Usage.md README.md data
+        zip -r LuckSystem_mac_x86_64.zip LuckSystem_mac Plugin.md Usage.md README.md data
+        zip -r LuckSystem_windows_x86_64.zip LuckSystem.exe Plugin.md Usage.md README.md data
     - uses: ncipollo/release-action@v1
       with:
-        artifacts: "LuckSystem_linux,LuckSystem_mac,LuckSystem.exe"
+        artifacts: "LuckSystem_linux_x86_64.zip,LuckSystem_mac_x86_64.zip,LuckSystem_windows_x86_64.zip"
         bodyFile: ""
         token: ${{ secrets.GITHUB_TOKEN }}
