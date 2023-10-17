@@ -16,7 +16,7 @@ import (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:     "LuckSystem",
-	Version: "1.0.0",
+	Version: "2.0.2",
 	Short:   "LucaSystem引擎工具集",
 	Long: `LucaSystem引擎工具集
 https://github.com/wetor/LuckSystem

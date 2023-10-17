@@ -16,8 +16,6 @@
 .DS_Store
 .vscode/
 .idea/
-data/*/*
-!data/*/OPCODE.txt
 log/
 lucksystem
 main
