@@ -23,7 +23,7 @@ var scriptImportCmd = &cobra.Command{
 			PluginFile: ScriptPlugin,
 			OpcodeFile: ScriptOpcode,
 			Coding:     charset.Charset(Charset),
-			Mode:       enum.VMRunExport,
+			Mode:       enum.VMRunImport,
 		})
 		g.LoadScriptResources(ScriptSource)
 		g.ImportScript(ScriptImportDir)
