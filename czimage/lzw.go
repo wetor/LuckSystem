@@ -1,7 +1,6 @@
 package czimage
 
 import (
-	"encoding/binary"
 	"fmt"
 )
 
@@ -98,111 +97,23 @@ func decompressLZW(compressed []uint16, size int) []byte {
 	return decompressed
 }
 
-func decompressLZW22(compressed []uint16, size int) []byte {
-	dictionary := make(map[uint16][]byte)
-	for i := 0; i < 256; i++ {
-		dictionary[uint16(i)] = []byte{byte(i)}
-	}
-	dictionaryCount := uint16(len(dictionary))
-	w := dictionary[compressed[0]>>1]
-
-	decompressed := make([]byte, 0, size)
-	for i, element := range compressed {
-		_ = i
-		element = element >> 1
-		var entry []byte
-		if x, ok := dictionary[element]; ok {
-			entry = make([]byte, len(x))
-			copy(entry, x)
-			// entry = dictionary[element]
-		} else if element == dictionaryCount {
-			entry = make([]byte, len(w), len(w)+1)
-			copy(entry, w)
-			entry = append(entry, w[0])
-			// entry = dictionary[element-1] + dictionary[element-1][0]
-		} else {
-			panic(fmt.Sprintf("Bad compressed element: %d", element))
-		}
-		if len(decompressed) >= size {
-			return decompressed
-		}
-		decompressed = append(decompressed, entry...)
-		w = append(w, entry[0])
-		dictionary[dictionaryCount] = w
-		dictionaryCount++
-		// dictionary[element] = dictionary[element-1] + dictionary[element-1][0]
-
-		fmt.Printf("i: %d, e: %d, dict_count: %d, w: %v, entry: %v\n", i, element, dictionaryCount, w, entry)
-		if i > 500 {
-			panic("1")
-		}
-		w = entry
-	}
-	return decompressed
-}
-
-func decompressLZW222(compressed []uint16, size int) []byte {
-	dictionary := make(map[uint16][]byte)
-	for i := 0; i < 256; i++ {
-		dictionary[uint16(i)] = []byte{byte(i)}
-	}
-	dictionaryCount := uint16(len(dictionary))
-	w := dictionary[compressed[0]>>1]
-	decompressed := make([]byte, 0, size)
-	for i, element := range compressed {
-		_ = i
-		dictionaryCount &= 32767
-		//dictionaryCount |= uint16(i)
-		element = element >> 1
-		var entry []byte
-		if x, ok := dictionary[element]; ok {
-			entry = make([]byte, len(x))
-			copy(entry, x)
-		} else if element == dictionaryCount {
-			entry = make([]byte, len(w), len(w)+1)
-			copy(entry, w)
-			entry = append(entry, w[0])
-		} else {
-			panic(fmt.Sprintf("Bad compressed element: %d", element))
-		}
-
-		//if len(decompressed) >= size {
-		//	return decompressed
-		//}
-		decompressed = append(decompressed, entry...)
-		w = append(w, entry[0])
-		if _, ok := dictionary[dictionaryCount]; !ok {
-			dictionary[dictionaryCount] = w
-			dictionaryCount++
-		}
-
-		w = entry
-	}
-	return decompressed
-}
-
+// DecompressLZWByAsm
+//
+//	CZ2的LZW解压算法，暂时汇编实现
 func DecompressLZWByAsm(ptr []byte, size int) []byte {
-	dict := map[int][]byte{}
-	for i := 0; i < 256; i++ {
-		dict[i] = []byte{byte(i)}
-	}
-	dictCount := 256
-	var r8d_data, w []byte
-
 	var rax, rbx, rcx, rdx, rsi, rdi, rbp int
-	var r8d, r9d, r10d, r11d, r12d, r14d int
+	var r8d, r9d, r10d, r11d, r12d, r14d, r15d int
 	rbp = size // 解压长度
-	result := make([]byte, rbp)
 	r12d = len(ptr)
 	rsi = 0
-	ptr = append(ptr, []byte{0, 0, 0, 0}...)
+	ptr = append(ptr, []byte{0, 0}...)
+	result := make([]byte, rbp)
+	pos_map := map[int]int{}
 
 F0150:
 	rcx = rdi
-
-	//r8_map[r15d] = rbx - 1
-	//rdx_map[r15d] = rbx - r14d
-	//r15d++
+	pos_map[r15d] = rbx
+	r15d++
 	rdx = int(ptr[rsi])
 	rax = 1
 	rdi++
@@ -300,8 +211,7 @@ F0237:
 F023C:
 	rax = rdi                         // mov eax,edi
 	rax = int(int32(rax) &^ int32(7)) // and eax,-08
-	//rax &= 248
-	rdi -= rax // sub edi,eax
+	rdi -= rax                        // sub edi,eax
 F0243:
 	if rsi > r12d {
 		goto END
@@ -312,48 +222,17 @@ F0243:
 
 	result[rbx] = byte(r8d) // mov [rbx],r8l
 	rbx++                   // inc rbx
-	r8d_data = []byte{byte(r8d)}
-
-	w = append(w, byte(r8d))
-	dict[dictCount] = w
-	dictCount++
-	w = []byte{byte(r8d)}
-	//fmt.Printf("i: %v, e: %d, dict_count: %d, w: %v, entry: %v\n", ok, rax, dictCount, dict[dictCount-1], r8d_data)
 
 	goto F0150
 F0260:
 	rax = r8d // movsxd rax,r8d
 
-	if x, ok := dict[rax]; ok {
-		r8d_data = make([]byte, len(x))
-		copy(r8d_data, x)
-		// entry = dictionary[element]
-	} else if rax == dictCount {
-		r8d_data = make([]byte, len(w)+1)
-		copy(r8d_data, append(w, w[0]))
-		// entry = dictionary[element-1] + dictionary[element-1][0]
-	} else {
-		panic(fmt.Sprintf("Bad compressed element: %d", rax))
-	}
-	//fmt.Printf("i: %v, e: %d, dict_count: %d, w: %v, entry: %v\n", ok, rax, dictCount, dict[dictCount-1], r8d_data)
-	w = append(w, r8d_data[0])
-	dict[dictCount] = w
-	dictCount++
-	w = make([]byte, len(r8d_data))
-	copy(w, r8d_data)
-
-	//if rsi >= 543220 {
-	//	fmt.Println(1)
-	//}
-
-	r8d = len(r8d_data) - 1
-	rdx = 0
-
-	//r8d = r8_map[rax]  // mov r8,[r13+rax*8-00000800]
-	//rdx = rdx_map[rax] // mov rdx,[r13+rax*8-00000808]
+	r8d = pos_map[rax-256] // mov r8,[r13+rax*8-00000800]
+	rdx = pos_map[rax-257] // mov rdx,[r13+rax*8-00000808]
 	rcx = r8d
 	rcx -= rdx
 	rcx++
+
 	rax = rcx
 	rax += rbx // add rax,rbx
 	if rax < rbp {
@@ -367,7 +246,7 @@ F028F:
 	if rcx&1 == 0 {
 		goto F029F
 	}
-	result[rbx] = r8d_data[rdx]
+	result[rbx] = result[rdx]
 	rdx++
 	rbx++
 F029F:
@@ -375,7 +254,7 @@ F029F:
 		goto F02B8
 	}
 	for i := 0; i < 2; i++ {
-		result[rbx+i] = r8d_data[rdx+i]
+		result[rbx+i] = result[rdx+i]
 	}
 	rbx += 2
 	rdx += 2
@@ -384,7 +263,7 @@ F02B8:
 		goto F02DF
 	}
 	for i := 0; i < 4; i++ {
-		result[rbx+i] = r8d_data[rdx+i]
+		result[rbx+i] = result[rdx+i]
 	}
 	rbx += 4
 	rdx += 4
@@ -393,7 +272,7 @@ F02DF:
 		goto F0322
 	}
 	for i := 0; i < 8; i++ {
-		result[rbx+i] = r8d_data[rdx+i]
+		result[rbx+i] = result[rdx+i]
 	}
 	rbx += 8
 	rdx += 8
@@ -403,10 +282,6 @@ F0322:
 	}
 	r14d = rcx
 	r14d = int(int64(r14d) &^ int64(0xF)) // and r14,-10
-	//if r14d > 255 {
-	//	r14d = 255
-	//}
-	//r14d &= 240
 	rax = r14d + rdx
 	if rbx > rax {
 		goto F03D0
@@ -418,7 +293,7 @@ F0322:
 	//nop dword ptr [rax+00]
 F0350:
 	for i := 0; i < 0x10; i++ {
-		result[rbx+i] = r8d_data[rdx+i]
+		result[rbx+i] = result[rdx+i]
 	}
 	rbx += 0x10
 	rdx += 0x10
@@ -429,9 +304,8 @@ F0350:
 F03D0:
 	r8d = r14d
 	rcx = rbx
-	// TODO: call 3A2700
-	for i := rdx; i < r14d; i++ {
-		result[rbx+i] = r8d_data[i]
+	for i := 0; i < r14d; i++ {
+		result[rbx+i] = result[rdx+i]
 	}
 	// ret
 	rbx += r14d
@@ -439,14 +313,4 @@ F03D0:
 
 END:
 	return result
-}
-
-func uint16SliceToByteSlice(input []uint16) []byte {
-	var output []byte
-	for _, u := range input {
-		b := make([]byte, 2)
-		binary.LittleEndian.PutUint16(b, u)
-		output = append(output, b...)
-	}
-	return output
 }
