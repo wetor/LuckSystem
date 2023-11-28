@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/png"
 	"os"
+	"path"
 	"strconv"
 	"testing"
 
@@ -48,8 +49,8 @@ func TestCZ1(t *testing.T) {
 		fmt.Println()
 
 	}
-
 }
+
 func TestCZ1_2(t *testing.T) {
 	restruct.EnableExprBeta()
 
@@ -83,18 +84,6 @@ func TestLineDiff(t *testing.T) {
 	os.WriteFile("../data/LB_EN/IMAGE/2.dl", data1, 0666)
 
 }
-
-//func TestCZ2(t *testing.T) {
-//	restruct.EnableExprBeta()
-//	data, _ := os.ReadFile("../data/Other/CZ2/ゴシック14.cz2")
-//	cz := LoadCzImage(data)
-//	if err != nil {
-//		panic(err)
-//	}
-//	cz.Save("../data/Other/CZ2/ゴシック14.png")
-//	fmt.Println()
-//
-//}
 
 func TestCz3Image_Import(t *testing.T) {
 	restruct.EnableExprBeta()
@@ -170,4 +159,50 @@ func TestCz0Image_Import(t *testing.T) {
 	cz.Import(r, false)
 	cz.Write(w)
 	fmt.Println()
+}
+
+func TestCZ2(t *testing.T) {
+	restruct.EnableExprBeta()
+	dir := "C:/Users/wetor/Desktop/Prototype/CZ2/32"
+	list := []string{"明朝32"}
+	for _, name := range list {
+
+		data, _ := os.ReadFile(path.Join(dir, name))
+		cz := LoadCzImage(data)
+		w, _ := os.Create(path.Join(dir, name+".png"))
+		err := cz.Export(w)
+		if err != nil {
+			panic(err)
+		}
+		w.Close()
+		fmt.Println()
+
+	}
+}
+
+func TestCZ22(t *testing.T) {
+	restruct.EnableExprBeta()
+	dir := "C:/Users/wetor/Desktop/Prototype/"
+	list := []string{"cz2_12"}
+	for _, name := range list {
+
+		data, _ := os.ReadFile(path.Join(dir, name))
+		cz := LoadCzImage(data)
+		w, _ := os.Create(path.Join(dir, name+".png"))
+		err := cz.Export(w)
+		if err != nil {
+			panic(err)
+		}
+		w.Close()
+		fmt.Println()
+
+	}
+}
+
+func TestLZWdict2(t *testing.T) {
+
+	data, _ := os.ReadFile("C:\\Users\\wetor\\Desktop\\Prototype\\CZ2\\0.src.lzw")
+
+	result := DecompressLZWByAsm(data, 1892588)
+	os.WriteFile("C:\\Users\\wetor\\Desktop\\Prototype\\CZ2\\0.lzw.out", result, 0666)
 }
