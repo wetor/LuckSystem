@@ -1,6 +1,5 @@
 /*
 Copyright © 2022 NAME HERE <EMAIL ADDRESS>
-
 */
 package cmd
 
@@ -16,7 +15,7 @@ var imageCmd = &cobra.Command{
 	Short: "LucaSystem cz图像",
 	Long: `LucaSystem cz图像
 文件头为'CZ0'、'CZ1'、'CZ2'、'CZ3'、'CZ4'等
-目前实现'CZ0'、'CZ1'、'CZ3'`,
+目前实现'CZ0'、'CZ1'、'CZ3'和CZ2的导出`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("image called")
 	},

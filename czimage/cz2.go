@@ -1,6 +1,7 @@
 package czimage
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -51,7 +52,7 @@ func (cz *Cz2Image) decompress() {
 	if cz.Colorbits == 4 || cz.Colorbits == 8 {
 		offset += 1 << (cz.Colorbits + 2)
 	}
-	buf := Decompress3(cz.Raw[offset+cz.OutputInfo.Offset:], cz.OutputInfo)
+	buf := Decompress2(cz.Raw[offset+cz.OutputInfo.Offset:], cz.OutputInfo)
 	glog.V(6).Infoln("uncompress size", len(buf))
 
 	switch cz.Colorbits {
@@ -92,66 +93,10 @@ func (cz *Cz2Image) Export(w io.Writer) error {
 	return png.Encode(w, cz.Image)
 }
 
-// Import
-//
-//	Description
-//	Receiver cz *Cz1Image
-//	Param r io.Reader
-//	Param fillSize bool 是否填充大小
-//	Return error
 func (cz *Cz2Image) Import(r io.Reader, fillSize bool) error {
-	var err error
-	cz.PngImage, err = png.Decode(r)
-	if err != nil {
-		panic(err)
-	}
-	pic := cz.PngImage.(*image.NRGBA)
-	width := int(cz.Width)
-	height := int(cz.Heigth)
-	if fillSize == true {
-		// 填充大小
-		pic = FillImage(pic, width, height)
-	}
-
-	if width != pic.Rect.Size().X || height != pic.Rect.Size().Y {
-		glog.V(2).Infof("图片大小不匹配，应该为 w%d h%d\n", width, height)
-		return err
-	}
-	data := make([]byte, width*height)
-	i := 0
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			data[i] = pic.At(x, y).(color.NRGBA).A
-			i++
-		}
-	}
-	blockSize := 0
-	if len(cz.OutputInfo.BlockInfo) != 0 {
-		blockSize = int(cz.OutputInfo.BlockInfo[0].CompressedSize)
-	}
-	cz.Raw, cz.OutputInfo = Compress(data, blockSize)
-
-	cz.OutputInfo.TotalRawSize = 0
-	cz.OutputInfo.TotalCompressedSize = 0
-	for _, block := range cz.OutputInfo.BlockInfo {
-		cz.OutputInfo.TotalRawSize += int(block.RawSize)
-		cz.OutputInfo.TotalCompressedSize += int(block.CompressedSize)
-	}
-	cz.OutputInfo.Offset = 4 + int(cz.OutputInfo.FileCount)*8
-
-	return nil
+	return fmt.Errorf("not implemented")
 }
 
 func (cz *Cz2Image) Write(w io.Writer) error {
-	var err error
-	glog.V(6).Infoln(cz.CzHeader)
-	err = WriteStruct(w, &cz.CzHeader, cz.ColorPanel, cz.OutputInfo)
-
-	if err != nil {
-		return err
-	}
-	_, err = w.Write(cz.Raw)
-
-	return err
-
+	return fmt.Errorf("not implemented")
 }
