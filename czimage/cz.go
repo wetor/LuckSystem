@@ -2,15 +2,17 @@ package czimage
 
 import (
 	"encoding/binary"
-	"github.com/go-restruct/restruct"
-	"github.com/golang/glog"
 	"image"
 	"io"
 	"os"
+
+	"github.com/go-restruct/restruct"
+	"github.com/golang/glog"
 )
 
 // CzHeader
-//  Description 长度为15 byte
+//
+//	Description 长度为15 byte
 type CzHeader struct {
 	Magic        []byte `struct:"size=4"`
 	HeaderLength uint32
@@ -21,7 +23,8 @@ type CzHeader struct {
 }
 
 // CzData
-//  Description cz解析后的结构
+//
+//	Description cz解析后的结构
 type CzData struct {
 	Raw        []byte        // Load()
 	OutputInfo *CzOutputInfo // Load()
@@ -31,14 +34,16 @@ type CzData struct {
 }
 
 // CzBlockInfo
-//  Description 块大小
+//
+//	Description 块大小
 type CzBlockInfo struct {
 	CompressedSize uint32
 	RawSize        uint32
 }
 
 // CzOutputInfo
-//  Description 文件分块信息
+//
+//	Description 文件分块信息
 type CzOutputInfo struct {
 	Offset              int `struct:"-"`
 	TotalRawSize        int `struct:"-"`
@@ -77,9 +82,9 @@ func LoadCzImage(data []byte) CzImage {
 	case "CZ1":
 		cz = new(Cz1Image)
 		cz.Load(header, data)
-	//case "CZ2":
-	//	cz = new(Cz2Image)
-	//	cz.Load(header, data)
+	case "CZ2":
+		cz = new(Cz2Image)
+		cz.Load(header, data)
 	case "CZ3":
 		cz = new(Cz3Image)
 		cz.Load(header, data)
