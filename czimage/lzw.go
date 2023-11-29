@@ -100,217 +100,177 @@ func decompressLZW(compressed []uint16, size int) []byte {
 // DecompressLZWByAsm
 //
 //	CZ2的LZW解压算法，暂时汇编实现
-func DecompressLZWByAsm(ptr []byte, size int) []byte {
-	var rax, rbx, rcx, rdx, rsi, rdi, rbp int
-	var r8d, r9d, r10d, r11d, r12d, r14d, r15d int
-	rbp = size // 解压长度
-	r12d = len(ptr)
-	rsi = 0
-	ptr = append(ptr, []byte{0, 0}...)
-	result := make([]byte, rbp)
-	pos_map := map[int]int{}
+func DecompressLZWByAsm(data []byte, size int) []byte {
+	var rax, resultIndex, rcx, rdx, dataIndex, rdi, resultSize int
+	var r8d, r9d, r10d, r11d, dataSize, r14d, dictIndex int
+	resultSize = size // 解压长度
+	resultIndex = 0   // 解压指针
+	result := make([]byte, resultSize)
 
-F0150:
-	rcx = rdi
-	pos_map[r15d] = rbx
-	r15d++
-	rdx = int(ptr[rsi])
-	rax = 1
-	rdi++
-	rax <<= rcx & 0xFF // shl eax,cl
-	rax &= rdx
+	dataSize = len(data) // 待解压长度
+	dataIndex = 0        // 待解压指针
+	data = append(data, []byte{0, 0}...)
 
-	if rdi < 8 {
-		goto F0175
-	}
-	rdx = int(ptr[rsi+1]) // movzx edx,byte ptr [rsi+01]
-	rdi = 0               // xor edi,edi
-	rsi++                 // inc rsi
-F0175:
-	r10d = 8
-	r11d = rdx & 0xFF // movzx r11d,dl
-	rcx = rdi & 0xFF  // movzx ecx,dil
-	r10d -= rdi
-	r11d >>= rcx & 0xFF
+	posDict := map[int]int{}
 
-	rsi++ // inc rsi
-	r9d = rdi
-	if rax != 0 {
-		goto F01E2
-	}
-	r8d = int(ptr[rsi])
-	rcx = r10d
-	r8d <<= rcx & 0xFF // shl r8d,cl
-	rdi += 0x0F
-	r8d &= 0x7FFF
-	r8d |= r11d
-	if rdi <= 0x10 {
-		goto F01CE
-	}
+	for {
+		rcx = rdi
+		posDict[dictIndex] = resultIndex
+		dictIndex++
+		rdx = int(data[dataIndex])
+		rax = 1
+		rdi++
+		rax <<= rcx & 0xFF // shl eax,cl
+		rax &= rdx
 
-	rdx = int(ptr[rsi+1]) // movzx edx,byte ptr [rsi+01]
-	rsi++                 // inc rsi
-	rcx = 0x10            // mov ecx,00000010
-	rcx -= r9d            // sub ecx,r9d
-	rdx <<= rcx & 0xFF    // shl edx,cl
-	rdx &= 0x7FFF         // and edx,00007FFF
-	r8d |= rdx            // or r8d,edx
-	rdi &= 7              // and edi,07
-	goto F0243            // jmp LOOPERS.exe+F0243
-F01CE:
-	if rdi != 0x10 { // jle F01CE
-		goto F01D8
-	}
-	rsi++
-	rdi &= 7
-	goto F0243
+		if rdi >= 8 {
+			rdx = int(data[dataIndex+1]) // movzx edx,byte ptr [rsi+01]
+			rdi = 0                      // xor edi,edi
+			dataIndex++                  // inc rsi
+		}
+		r10d = 8
+		r11d = rdx & 0xFF // movzx r11d,dl
+		rcx = rdi & 0xFF  // movzx ecx,dil
+		r10d -= rdi
+		r11d >>= rcx & 0xFF
 
-F01D8:
-	// cmp edi,08
-	if rdi < 0x8 {
-		goto F0243
-	}
-	rdi &= 7
-	goto F0243
-F01E2:
-	rdx = int(ptr[rsi])   // movzx edx,byte ptr [rsi]
-	rax = rdi + 0x12      // lea eax,[rdi+12]
-	r8d = int(ptr[rsi+1]) // movzx r8d,byte ptr [rsi+01]
-	rsi++                 // inc rsi
-	rcx = 0x10            // mov ecx,00000010
-	rdi = rax             // mov edi,eax
-	rcx -= r9d            // sub ecx,r9d
-	r8d <<= rcx & 0xFF    // shl r8d,cl
-	rcx = r10d            // mov ecx,r10d
-	r8d &= 0x3FFFF        // and r8d,0003FFFF
-	rdx <<= rcx & 0xFF    // shl edx,cl
-	r8d |= rdx            // or r8d,edx
-	r8d |= r11d           // or r8d,r11d
-	if rax <= 0x18 {      // cmp eax,18
-		goto F0230 // jle LOOPERS.exe+F0230
-	}
+		dataIndex++ // inc rsi
+		r9d = rdi
+		if rax == 0 {
+			r8d = int(data[dataIndex])
+			rcx = r10d
+			r8d <<= rcx & 0xFF // shl r8d,cl
+			rdi += 0x0F
+			r8d &= 0x7FFF
+			r8d |= r11d
+			if rdi > 0x10 {
+				rdx = int(data[dataIndex+1]) // movzx edx,byte ptr [rsi+01]
+				dataIndex++                  // inc rsi
+				rcx = 0x10                   // mov ecx,00000010
+				rcx -= r9d                   // sub ecx,r9d
+				rdx <<= rcx & 0xFF           // shl edx,cl
+				rdx &= 0x7FFF                // and edx,00007FFF
+				r8d |= rdx                   // or r8d,edx
+				rdi &= 7                     // and edi,07
+			} else if rdi == 0x10 {
+				dataIndex++
+				rdi &= 7
+			} else if rdi >= 0x8 { // cmp edi,08
+				rdi &= 7
+			}
+		} else {
+			rdx = int(data[dataIndex])   // movzx edx,byte ptr [rsi]
+			rax = rdi + 0x12             // lea eax,[rdi+12]
+			r8d = int(data[dataIndex+1]) // movzx r8d,byte ptr [rsi+01]
+			dataIndex++                  // inc rsi
+			rcx = 0x10                   // mov ecx,00000010
+			rdi = rax                    // mov edi,eax
+			rcx -= r9d                   // sub ecx,r9d
+			r8d <<= rcx & 0xFF           // shl r8d,cl
+			rcx = r10d                   // mov ecx,r10d
+			r8d &= 0x3FFFF               // and r8d,0003FFFF
+			rdx <<= rcx & 0xFF           // shl edx,cl
+			r8d |= rdx                   // or r8d,edx
+			r8d |= r11d                  // or r8d,r11d
 
-	rdx = int(ptr[rsi+1]) // movzx edx,byte ptr [rsi+01]
-	rsi++                 // inc rsi
-	rcx = 0x18            // mov ecx,00000018
-	rcx -= r9d            // sub ecx,r9d
-	rdx <<= rcx & 0xFF    // shl edx,cl
-	rdx &= 0x3FFFF        // and edx,0003FFFF
-	r8d |= rdx            // or r8d,edx
-	goto F023C            // jmp LOOPERS.exe+F023C
-F0230:
-	if rax != 0x18 {
-		goto F0237 // jne LOOPERS.exe+F0237
-	}
-	rsi++      // inc rsi
-	goto F023C // jmp LOOPERS.exe+F023C
-F0237:
-	if rax < 0x8 { // cmp eax,08
-		goto F0243 // jl LOOPERS.exe+F0243
-	}
-F023C:
-	rax = rdi                         // mov eax,edi
-	rax = int(int32(rax) &^ int32(7)) // and eax,-08
-	rdi -= rax                        // sub edi,eax
-F0243:
-	if rsi > r12d {
-		goto END
-	}
-	if r8d >= 0x100 { // cmp r8d,0x100
-		goto F0260
-	}
+			flag := false
+			if rax > 0x18 { // cmp eax,18
+				rdx = int(data[dataIndex+1]) // movzx edx,byte ptr [rsi+01]
+				dataIndex++                  // inc rsi
+				rcx = 0x18                   // mov ecx,00000018
+				rcx -= r9d                   // sub ecx,r9d`
+				rdx <<= rcx & 0xFF           // shl edx,cl
+				rdx &= 0x3FFFF               // and edx,0003FFFF
+				r8d |= rdx                   // or r8d,edx
+			} else if rax == 0x18 {
+				dataIndex++ // inc rsi
+			} else if rax < 0x8 { // cmp eax,08
+				flag = true
+			}
+			if !flag {
+				rax = rdi                         // mov eax,edi
+				rax = int(int32(rax) &^ int32(7)) // and eax,-08
+				rdi -= rax                        // sub edi,eax
+			}
+		}
+		if dataIndex > dataSize {
+			break
+		}
+		if r8d < 0x100 { // cmp r8d,0x100
+			result[resultIndex] = byte(r8d) // mov [rbx],r8l
+			resultIndex++                   // inc rbx
+			continue
+		}
+		rax = r8d // movsxd rax,r8d
 
-	result[rbx] = byte(r8d) // mov [rbx],r8l
-	rbx++                   // inc rbx
+		r8d = posDict[rax-256] // mov r8,[r13+rax*8-00000800]
+		rdx = posDict[rax-257] // mov rdx,[r13+rax*8-00000808]
+		rcx = r8d
+		rcx -= rdx
+		rcx++
 
-	goto F0150
-F0260:
-	rax = r8d // movsxd rax,r8d
+		rax = rcx
+		rax += resultIndex // add rax,rbx
+		if rax >= resultSize {
+			rcx = resultSize   // mov ecx,ebp
+			rcx -= resultIndex // sub ecx,ebx
+			r8d = rcx          // movsxd  r8,ecx
+			r8d += rdx         // add r8,rdx
+		}
+		if rcx&1 != 0 {
+			result[resultIndex] = result[rdx]
+			rdx++
+			resultIndex++
+		}
+		if rcx&2 != 0 {
+			for i := 0; i < 2; i++ {
+				result[resultIndex+i] = result[rdx+i]
+			}
+			resultIndex += 2
+			rdx += 2
+		}
+		if rcx&4 != 0 {
+			for i := 0; i < 4; i++ {
+				result[resultIndex+i] = result[rdx+i]
+			}
+			resultIndex += 4
+			rdx += 4
+		}
+		if rcx&8 != 0 {
+			for i := 0; i < 8; i++ {
+				result[resultIndex+i] = result[rdx+i]
+			}
+			resultIndex += 8
+			rdx += 8
+		}
 
-	r8d = pos_map[rax-256] // mov r8,[r13+rax*8-00000800]
-	rdx = pos_map[rax-257] // mov rdx,[r13+rax*8-00000808]
-	rcx = r8d
-	rcx -= rdx
-	rcx++
-
-	rax = rcx
-	rax += rbx // add rax,rbx
-	if rax < rbp {
-		goto F028F
+		if rdx >= r8d {
+			continue
+		}
+		r14d = rcx
+		r14d = int(int64(r14d) &^ int64(0xF)) // and r14,-10
+		rax = r14d + rdx
+		if resultIndex != rax {
+			r8d = r14d
+			rcx = resultIndex
+			for i := 0; i < r14d; i++ {
+				result[resultIndex+i] = result[rdx+i]
+			}
+			// ret
+			resultIndex += r14d
+			continue
+		}
+		//nop dword ptr [rax+00]
+		for rdx < r8d {
+			for i := 0; i < 0x10; i++ {
+				result[resultIndex+i] = result[rdx+i]
+			}
+			resultIndex += 0x10
+			rdx += 0x10
+			//cmp rdx,r8
+			//jb LOOPERS.exe+F0350
+		}
+		continue //jmp LOOPERS.exe+F0150
 	}
-	rcx = rbp  // mov ecx,ebp
-	rcx -= rbx // sub ecx,ebx
-	r8d = rcx  // movsxd  r8,ecx
-	r8d += rdx // add r8,rdx
-F028F:
-	if rcx&1 == 0 {
-		goto F029F
-	}
-	result[rbx] = result[rdx]
-	rdx++
-	rbx++
-F029F:
-	if rcx&2 == 0 {
-		goto F02B8
-	}
-	for i := 0; i < 2; i++ {
-		result[rbx+i] = result[rdx+i]
-	}
-	rbx += 2
-	rdx += 2
-F02B8:
-	if rcx&4 == 0 {
-		goto F02DF
-	}
-	for i := 0; i < 4; i++ {
-		result[rbx+i] = result[rdx+i]
-	}
-	rbx += 4
-	rdx += 4
-F02DF:
-	if rcx&8 == 0 {
-		goto F0322
-	}
-	for i := 0; i < 8; i++ {
-		result[rbx+i] = result[rdx+i]
-	}
-	rbx += 8
-	rdx += 8
-F0322:
-	if rdx >= r8d {
-		goto F0150
-	}
-	r14d = rcx
-	r14d = int(int64(r14d) &^ int64(0xF)) // and r14,-10
-	rax = r14d + rdx
-	if rbx > rax {
-		goto F03D0
-	}
-	rax = r14d + rbx
-	if rax < rdx {
-		goto F03D0
-	}
-	//nop dword ptr [rax+00]
-F0350:
-	for i := 0; i < 0x10; i++ {
-		result[rbx+i] = result[rdx+i]
-	}
-	rbx += 0x10
-	rdx += 0x10
-	if rdx < r8d { //cmp rdx,r8
-		goto F0350 //jb LOOPERS.exe+F0350
-	}
-	goto F0150 //jmp LOOPERS.exe+F0150
-F03D0:
-	r8d = r14d
-	rcx = rbx
-	for i := 0; i < r14d; i++ {
-		result[rbx+i] = result[rdx+i]
-	}
-	// ret
-	rbx += r14d
-	goto F0150
-
-END:
 	return result
 }
