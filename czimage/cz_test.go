@@ -1,6 +1,8 @@
 package czimage
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"image"
@@ -201,8 +203,35 @@ func TestCZ22(t *testing.T) {
 
 func TestLZWdict2(t *testing.T) {
 
-	data, _ := os.ReadFile("C:\\Users\\wetor\\Desktop\\Prototype\\CZ2\\0.src.lzw")
+	lzwData, err := os.ReadFile("testdata/明朝32_0.lzw")
+	if err != nil {
+		panic(err)
+	}
+	data, err := os.ReadFile("testdata/明朝32_0.bin")
+	if err != nil {
+		panic(err)
+	}
+	h := md5.New()
+	h.Write(data)
+	dstMD5 := hex.EncodeToString(h.Sum(nil))
 
-	result := DecompressLZWByAsm(data, 1892588)
-	os.WriteFile("C:\\Users\\wetor\\Desktop\\Prototype\\CZ2\\0.lzw.out", result, 0666)
+	result := decompressLZW2(lzwData, len(data))
+	h.Reset()
+	h.Write(result)
+	resMD5 := hex.EncodeToString(h.Sum(nil))
+
+	if resMD5 != dstMD5 {
+		panic("不匹配")
+	} else {
+		fmt.Println(resMD5, dstMD5)
+	}
+}
+
+func TestNewBinIO(t *testing.T) {
+	bytes := []byte{0xFF, 0xF0, 0xFF, 0xFF, 0xFF}
+	b := NewBitIO(bytes)
+	for i := 0; i < len(bytes)*8/12; i++ {
+		fmt.Println(b.ReadBit(12))
+	}
+
 }
