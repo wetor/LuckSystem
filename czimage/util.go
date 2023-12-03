@@ -95,7 +95,7 @@ func Decompress2(data []byte, outputInfo *CzOutputInfo) []byte {
 		offset += int(block.CompressedSize)
 		//_ = os.WriteFile(fmt.Sprintf("C:\\Users\\wetor\\Desktop\\Prototype\\CZ2\\32\\%d_asm.src.lzw", i),
 		//	data[offsetTemp:offset], 0666)
-		rawBuf := DecompressLZWByAsm(data[offsetTemp:offset], int(block.RawSize))
+		rawBuf := decompressLZW2(data[offsetTemp:offset], int(block.RawSize))
 		//_ = os.WriteFile(fmt.Sprintf("C:\\Users\\wetor\\Desktop\\Prototype\\CZ2\\32\\%d_asm.src.out", i),
 		//	rawBuf, 0666)
 		outputBuf.Write(rawBuf)

@@ -101,7 +101,7 @@ func decompressLZW(compressed []uint16, size int) []byte {
 //
 //	CZ2的LZW解压算法，暂时汇编实现
 func DecompressLZWByAsm(data []byte, size int) []byte {
-	var maskBit, resultIndex, dataIndex, resultSize int
+	var lastBit, resultIndex, dataIndex, resultSize int
 	var dataSize, dictIndex int
 	resultSize = size // 解压长度
 	resultIndex = 0   // 解压指针
@@ -116,40 +116,39 @@ func DecompressLZWByAsm(data []byte, size int) []byte {
 	for {
 		posDict[dictIndex] = resultIndex
 		dictIndex++
-		code := int(data[dataIndex])
-		flag := code & (1 << maskBit)
-		maskBit++
-		if maskBit >= 8 {
+
+		flag := int(data[dataIndex]) & (1 << lastBit)
+
+		lastBit++
+		if lastBit >= 8 {
+			lastBit = 0
 			dataIndex++
-			code = int(data[dataIndex])
-			maskBit = 0
 		}
+		code := int(data[dataIndex]) >> lastBit
 		dataIndex++
-		code >>= maskBit
-		codeHigh := int(data[dataIndex]) << (8 - maskBit)
 
 		if flag == 0 {
-			code |= codeHigh & 0x7FFF
-			if maskBit > 1 {
+			code |= int(data[dataIndex]) << (8 - lastBit) & 0x7FFF // 低15位
+			if lastBit > 1 {
 				dataIndex++
-				code |= int(data[dataIndex]) << (16 - maskBit) & 0x7FFF
-			} else if maskBit == 1 {
+				code |= int(data[dataIndex]) << (16 - lastBit) & 0x7FFF // 低15位
+			} else if lastBit == 1 {
 				dataIndex++
 			}
-			maskBit += 15
+			lastBit += 15
 		} else {
+			code |= int(data[dataIndex]) << (8 - lastBit)
 			dataIndex++
-			code |= int(data[dataIndex]) << (16 - maskBit) & 0x3FFFF
-			code |= codeHigh
-			if maskBit > 6 {
+			code |= int(data[dataIndex]) << (16 - lastBit) & 0x3FFFF // 低18位
+			if lastBit > 6 {
 				dataIndex++
-				code |= int(data[dataIndex]) << (24 - maskBit) & 0x3FFFF // or r8d,edx
-			} else if maskBit == 6 {
-				dataIndex++ // inc rsi
+				code |= int(data[dataIndex]) << (24 - lastBit) & 0x3FFFF // 低18位
+			} else if lastBit == 6 {
+				dataIndex++
 			}
-			maskBit += 18
+			lastBit += 18
 		}
-		maskBit &= 7
+		lastBit &= 7
 
 		if dataIndex > dataSize {
 			break
@@ -160,6 +159,90 @@ func DecompressLZWByAsm(data []byte, size int) []byte {
 		} else {
 			dictValueEnd := posDict[code-256]   // mov r8,[r13+rax*8-00000800]
 			dictValueIndex := posDict[code-257] // mov rdx,[r13+rax*8-00000808]
+			dictValueSize := dictValueEnd - dictValueIndex + 1
+
+			resultIndex = writeResult(result, resultIndex, resultSize,
+				dictValueIndex, dictValueSize, dictValueEnd)
+		}
+
+	}
+	return result
+}
+
+func decompressLZW2(data []byte, size int) []byte {
+	dictionary := make(map[int][]byte)
+	for i := 0; i < 256; i++ {
+		dictionary[i] = []byte{byte(i)}
+	}
+	dictionaryCount := len(dictionary)
+	decompressed := make([]byte, 0, size)
+
+	dataSize := len(data)
+	data = append(data, []byte{0, 0}...)
+	bitIO := NewBitIO(data)
+	w := dictionary[0]
+
+	element := 0
+	for {
+		var entry []byte
+		flag := bitIO.ReadBit(1)
+		if flag == 0 {
+			element = int(bitIO.ReadBit(15))
+		} else {
+			element = int(bitIO.ReadBit(18))
+		}
+		if bitIO.ByteOffset() > dataSize {
+			break
+		}
+		if x, ok := dictionary[element]; ok {
+			entry = make([]byte, len(x))
+			copy(entry, x)
+		} else if element == dictionaryCount {
+			entry = make([]byte, len(w), len(w)+1)
+			copy(entry, w)
+			entry = append(entry, w[0])
+		} else {
+			panic(fmt.Sprintf("Bad compressed element: %d", element))
+		}
+		decompressed = append(decompressed, entry...)
+		w = append(w, entry[0])
+		dictionary[dictionaryCount] = w
+		dictionaryCount++
+		w = entry
+	}
+	return decompressed
+}
+
+func DecompressLZWByAsm2(data []byte, size int) []byte {
+	var resultIndex, resultSize int
+	var dictIndex, code int
+	resultSize = size // 解压长度
+	resultIndex = 0   // 解压指针
+	result := make([]byte, resultSize)
+	dataSize := len(data)
+	data = append(data, []byte{0, 0}...)
+	posDict := map[int]int{}
+	bitIO := NewBitIO(data)
+	for {
+		posDict[dictIndex] = resultIndex
+		dictIndex++
+
+		flag := bitIO.ReadBit(1)
+		if flag == 0 {
+			code = int(bitIO.ReadBit(15))
+		} else {
+			code = int(bitIO.ReadBit(18))
+		}
+
+		if bitIO.ByteOffset() > dataSize {
+			break
+		}
+		if code < 0x100 { // cmp r8d,0x100
+			result[resultIndex] = byte(code)
+			resultIndex++
+		} else {
+			dictValueEnd := posDict[code-256]
+			dictValueIndex := posDict[code-257]
 			dictValueSize := dictValueEnd - dictValueIndex + 1
 
 			resultIndex = writeResult(result, resultIndex, resultSize,
