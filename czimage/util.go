@@ -148,6 +148,45 @@ func Compress(data []byte, size int) (compressed []byte, outputInfo *CzOutputInf
 	return outputBuf.Bytes(), outputInfo
 }
 
+// Compress2 压缩数据 CZ2专用
+//
+//	Description 压缩数据
+//	Param data []byte 未压缩数据
+//	Param size int 分块大小
+//	Return compressed
+//	Return outputInfo
+func Compress2(data []byte, size int) (compressed []byte, outputInfo *CzOutputInfo) {
+
+	if size == 0 {
+		size = 0x87BDF
+	}
+	var partData []byte
+	offset := 0
+	count := 0
+	last := ""
+	outputBuf := &bytes.Buffer{}
+	outputInfo = &CzOutputInfo{
+		TotalRawSize: len(data),
+		BlockInfo:    make([]CzBlockInfo, 0),
+	}
+	for {
+		count, partData, last = compressLZW2(data[offset:], size, last)
+		if count == 0 {
+			break
+		}
+		offset += count
+		outputBuf.Write(partData)
+
+		outputInfo.BlockInfo = append(outputInfo.BlockInfo, CzBlockInfo{
+			CompressedSize: uint32(len(partData)),
+			RawSize:        uint32(count),
+		})
+		outputInfo.FileCount++
+	}
+	outputInfo.TotalCompressedSize = outputBuf.Len()
+	return outputBuf.Bytes(), outputInfo
+}
+
 // ImageToNRGBA convert image.Image to image.NRGBA
 func ImageToNRGBA(im image.Image) *image.NRGBA {
 	dst := image.NewNRGBA(im.Bounds())

@@ -1,7 +1,6 @@
 package czimage
 
 import (
-	"fmt"
 	"image"
 	"image/color"
 	"image/png"
@@ -10,11 +9,18 @@ import (
 	"github.com/golang/glog"
 )
 
+type Cz2Header struct {
+	Unknown1 uint8
+	Unknown2 uint8
+	Unknown3 uint8
+}
+
 // Cz2Image
 //
 //	Description Cz1.Load() 载入并解压数据，转化成Image
 type Cz2Image struct {
 	CzHeader
+	Cz2Header
 	ColorPanel []color.NRGBA // []BGRA
 	CzData
 }
@@ -54,7 +60,7 @@ func (cz *Cz2Image) decompress() {
 	}
 	buf := Decompress2(cz.Raw[offset+cz.OutputInfo.Offset:], cz.OutputInfo)
 	glog.V(6).Infoln("uncompress size", len(buf))
-
+	//_ = os.WriteFile("C:\\Users\\wetor\\Desktop\\Prototype\\CZ2\\32\\明朝32.cz2.bin", buf, 0666)
 	switch cz.Colorbits {
 	case 8:
 		i := 0
@@ -94,9 +100,58 @@ func (cz *Cz2Image) Export(w io.Writer) error {
 }
 
 func (cz *Cz2Image) Import(r io.Reader, fillSize bool) error {
-	return fmt.Errorf("not implemented")
+	var err error
+	cz.PngImage, err = png.Decode(r)
+	if err != nil {
+		panic(err)
+	}
+	pic := cz.PngImage.(*image.NRGBA)
+	width := int(cz.Width)
+	height := int(cz.Heigth)
+	if fillSize == true {
+		// 填充大小
+		pic = FillImage(pic, width, height)
+	}
+
+	if width != pic.Rect.Size().X || height != pic.Rect.Size().Y {
+		glog.V(2).Infof("图片大小不匹配，应该为 w%d h%d\n", width, height)
+		return err
+	}
+	data := make([]byte, width*height)
+	i := 0
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			data[i] = pic.At(x, y).(color.NRGBA).A
+			i++
+		}
+	}
+	blockSize := 0
+	if len(cz.OutputInfo.BlockInfo) != 0 {
+		blockSize = int(cz.OutputInfo.BlockInfo[0].CompressedSize)
+	}
+	cz.Raw, cz.OutputInfo = Compress2(data, blockSize)
+
+	cz.OutputInfo.TotalRawSize = 0
+	cz.OutputInfo.TotalCompressedSize = 0
+	for _, block := range cz.OutputInfo.BlockInfo {
+		cz.OutputInfo.TotalRawSize += int(block.RawSize)
+		cz.OutputInfo.TotalCompressedSize += int(block.CompressedSize)
+	}
+	cz.OutputInfo.Offset = 4 + int(cz.OutputInfo.FileCount)*8
+	glog.V(6).Infoln(cz.OutputInfo)
+	return nil
 }
 
 func (cz *Cz2Image) Write(w io.Writer) error {
-	return fmt.Errorf("not implemented")
+	var err error
+	glog.V(6).Infoln(cz.CzHeader)
+	err = WriteStruct(w, &cz.CzHeader, cz.Cz2Header, cz.ColorPanel, cz.OutputInfo)
+
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(cz.Raw)
+
+	return err
+
 }

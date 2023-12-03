@@ -14,14 +14,20 @@ type BitIO struct {
 
 func NewBitIO(data []byte) *BitIO {
 	return &BitIO{
-		data:     data,
-		byteSize: len(data),
-		bitSize:  len(data) * 8,
+		data: data,
 	}
 }
 
 func (b *BitIO) ByteOffset() int {
 	return b.byteOffset
+}
+
+func (b *BitIO) ByteSize() int {
+	return b.byteSize
+}
+
+func (b *BitIO) Bytes() []byte {
+	return b.data[:b.byteSize]
 }
 
 func (b *BitIO) ReadBit(bitLen int) uint64 {
@@ -55,4 +61,43 @@ func (b *BitIO) Read(byteLen int) uint64 {
 	copy(paddedSlice, b.data[b.byteOffset:b.byteOffset+byteLen])
 	b.byteOffset += byteLen
 	return binary.LittleEndian.Uint64(paddedSlice)
+}
+
+func (b *BitIO) WriteBit(data uint64, bitLen int) {
+	if bitLen > 8*8 {
+		panic("不支持，最多64位")
+	}
+
+	if bitLen%8 == 0 && b.bitOffset == 0 {
+		b.Write(data, bitLen/8)
+		return
+	}
+
+	for i := 0; i < bitLen; i++ {
+		// 从 value 中获取要写入的位
+		bitValue := (data >> uint(i)) & 1
+		// 清除目标字节中的目标位
+		b.data[b.byteOffset] &= ^(1 << uint(b.bitOffset))
+		// 将 bitValue 写入目标位
+		b.data[b.byteOffset] |= byte(bitValue << uint(b.bitOffset))
+
+		b.bitOffset++
+		if b.bitOffset == 8 {
+			b.byteOffset++
+			b.bitOffset = 0
+		}
+	}
+
+	b.byteSize = b.byteOffset + (b.bitOffset+7)/8
+}
+
+func (b *BitIO) Write(data uint64, byteLen int) {
+	if byteLen > 8 {
+		panic("不支持，最多64位")
+	}
+	paddedSlice := make([]byte, 8)
+	binary.LittleEndian.PutUint64(paddedSlice, data)
+	copy(b.data[b.byteOffset:b.byteOffset+byteLen], paddedSlice[:byteLen])
+	b.byteOffset += byteLen
+	b.byteSize = b.byteOffset + (b.bitOffset+7)/8
 }
