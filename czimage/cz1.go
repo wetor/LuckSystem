@@ -1,15 +1,17 @@
 package czimage
 
 import (
-	"github.com/golang/glog"
 	"image"
 	"image/color"
 	"image/png"
 	"io"
+
+	"github.com/golang/glog"
 )
 
 // Cz1Image
-//  Description Cz1.Load() 载入并解压数据，转化成Image
+//
+//	Description Cz1.Load() 载入并解压数据，转化成Image
 type Cz1Image struct {
 	CzHeader
 	ColorPanel []color.NRGBA // []BGRA
@@ -38,9 +40,9 @@ func (cz *Cz1Image) Load(header CzHeader, data []byte) {
 }
 
 // decompress
-//  Description 解压数据
-//  Receiver cz *Cz1Image
 //
+//	Description 解压数据
+//	Receiver cz *Cz1Image
 func (cz *Cz1Image) decompress() {
 	pic := image.NewNRGBA(image.Rect(0, 0, int(cz.CzHeader.Width), int(cz.CzHeader.Heigth)))
 	offset := int(cz.HeaderLength)
@@ -98,10 +100,10 @@ func (cz *Cz1Image) decompress() {
 }
 
 // GetImage
-//  Description 取得解压后的图像数据
-//  Receiver cz *Cz1Image
-//  Return image.Image
 //
+//	Description 取得解压后的图像数据
+//	Receiver cz *Cz1Image
+//	Return image.Image
 func (cz *Cz1Image) GetImage() image.Image {
 	if cz.Image == nil {
 		cz.decompress()
@@ -110,11 +112,11 @@ func (cz *Cz1Image) GetImage() image.Image {
 }
 
 // Export
-//  Description 导出图像到文件
-//  Receiver cz *Cz1Image
-//  Param w io.Writer
-//  Return error
 //
+//	Description 导出图像到文件
+//	Receiver cz *Cz1Image
+//	Param w io.Writer
+//	Return error
 func (cz *Cz1Image) Export(w io.Writer) error {
 	if cz.Image == nil {
 		cz.decompress()
@@ -123,12 +125,12 @@ func (cz *Cz1Image) Export(w io.Writer) error {
 }
 
 // Import
-//  Description
-//  Receiver cz *Cz1Image
-//  Param r io.Reader
-//  Param fillSize bool 是否填充大小
-//  Return error
 //
+//	Description
+//	Receiver cz *Cz1Image
+//	Param r io.Reader
+//	Param fillSize bool 是否填充大小
+//	Return error
 func (cz *Cz1Image) Import(r io.Reader, fillSize bool) error {
 	var err error
 	cz.PngImage, err = png.Decode(r)
@@ -171,6 +173,7 @@ func (cz *Cz1Image) Import(r io.Reader, fillSize bool) error {
 
 	return nil
 }
+
 func (cz *Cz1Image) Write(w io.Writer) error {
 	var err error
 	glog.V(6).Infoln(cz.CzHeader)

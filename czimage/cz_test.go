@@ -131,8 +131,8 @@ func TestCz1Image_Import(t *testing.T) {
 	//	panic(err)
 	//}
 	//cz.Export("../data/LB_EN/IMAGE/明朝20.cz1.png")
-
 }
+
 func TestCz0Image_Export(t *testing.T) {
 	restruct.EnableExprBeta()
 	data, _ := os.ReadFile("../data/LB_EN/FONT/明朝32")
@@ -182,6 +182,47 @@ func TestCZ2(t *testing.T) {
 	}
 }
 
+func TestCz2Image_Export_Import_Export(t *testing.T) {
+	restruct.EnableExprBeta()
+	var w *os.File
+	dir := "C:/Users/wetor/Desktop/Prototype/CZ2/32"
+	data, _ := os.ReadFile(path.Join(dir, "明朝32"))
+	cz := LoadCzImage(data)
+	w, _ = os.Create(path.Join(dir, "明朝32.png"))
+	cz.GetImage()
+	cz.Export(w)
+	w.Close()
+
+	r, _ := os.Open(path.Join(dir, "明朝32.png"))
+	defer r.Close()
+	w, _ = os.Create(path.Join(dir, "明朝32.cz2"))
+	defer w.Close()
+	cz.Import(r, false)
+	cz.Write(w)
+
+	fmt.Println()
+	data, _ = os.ReadFile(path.Join(dir, "明朝32.cz2"))
+	cz = LoadCzImage(data)
+	w, _ = os.Create(path.Join(dir, "明朝32.cz2.png"))
+	defer w.Close()
+	cz.Export(w)
+}
+
+func TestCz2Image_Import(t *testing.T) {
+	restruct.EnableExprBeta()
+	var w *os.File
+	dir := "C:/Users/wetor/Desktop/Prototype/CZ2/44"
+	data, _ := os.ReadFile(path.Join(dir, "明朝44"))
+	cz := LoadCzImage(data)
+
+	r, _ := os.Open(path.Join(dir, "明朝44.edit.png"))
+	defer r.Close()
+	w, _ = os.Create(path.Join(dir, "明朝44.edit.cz2"))
+	defer w.Close()
+	cz.Import(r, false)
+	cz.Write(w)
+}
+
 func TestCZ22(t *testing.T) {
 	restruct.EnableExprBeta()
 	dir := "C:/Users/wetor/Desktop/Prototype/"
@@ -201,8 +242,7 @@ func TestCZ22(t *testing.T) {
 	}
 }
 
-func TestLZWdict2(t *testing.T) {
-
+func TestDecompressLZW2(t *testing.T) {
 	lzwData, err := os.ReadFile("testdata/明朝32_0.lzw")
 	if err != nil {
 		panic(err)
@@ -227,11 +267,45 @@ func TestLZWdict2(t *testing.T) {
 	}
 }
 
-func TestNewBinIO(t *testing.T) {
-	bytes := []byte{0xFF, 0xF0, 0xFF, 0xFF, 0xFF}
+func TestCompressLZW2(t *testing.T) {
+	lzwData, err := os.ReadFile("testdata/明朝32_0.lzw")
+	if err != nil {
+		panic(err)
+	}
+	data, err := os.ReadFile("testdata/明朝32_0.bin")
+	if err != nil {
+		panic(err)
+	}
+	h := md5.New()
+	h.Write(lzwData)
+	lzwMD5 := hex.EncodeToString(h.Sum(nil))
+
+	count, result, last := compressLZW2(data, len(lzwData), "")
+	h.Reset()
+	h.Write(result)
+	dstMD5 := hex.EncodeToString(h.Sum(nil))
+	fmt.Println(count, []byte(last))
+	//_ = os.WriteFile("testdata/明朝32_0.bin.lzw", result, 0666)
+	if lzwMD5 != dstMD5 {
+		panic("不匹配")
+	} else {
+		fmt.Println(lzwMD5, dstMD5)
+	}
+}
+
+func TestNewBitIO(t *testing.T) {
+	val := uint64(0xFF7F)
+	bytes := make([]byte, 100)
 	b := NewBitIO(bytes)
-	for i := 0; i < len(bytes)*8/12; i++ {
-		fmt.Println(b.ReadBit(12))
+	for i := 0; i < 4; i++ {
+		b.WriteBit(val, 19)
 	}
 
+	b2 := NewBitIO(b.Bytes())
+	for i := 0; i < 4; i++ {
+		r := b2.ReadBit(19)
+		if r != val {
+			panic(fmt.Sprintf("写入和读取的值不同 %v!=%v", r, val))
+		}
+	}
 }
