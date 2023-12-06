@@ -29,6 +29,7 @@ var (
 	ScriptExportDir    string
 	ScriptImportDir    string
 	ScriptImportOutput string
+	ScriptNoSubDir     bool
 )
 
 func init() {
@@ -38,6 +39,6 @@ func init() {
 	scriptCmd.PersistentFlags().StringVarP(&Charset, "charset", "c", string(charset.UTF_8), "PAK文件字符串编码")
 	scriptCmd.PersistentFlags().StringVarP(&ScriptOpcode, "opcode", "O", "", "游戏的OPCODE文件")
 	scriptCmd.PersistentFlags().StringVarP(&ScriptPlugin, "plugin", "p", "", "游戏OPCODE解析插件")
-
+	scriptCmd.PersistentFlags().BoolVarP(&ScriptNoSubDir, "no_subdir", "n", false, "输入和输出路径的不追加 '/SCRIPT.PAK/' 子目录")
 	scriptCmd.MarkPersistentFlagRequired("source")
 }
