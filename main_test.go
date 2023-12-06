@@ -222,7 +222,7 @@ func TestLoopersExportScript(t *testing.T) {
 	g.LoadScriptResources("D:\\Game\\LOOPERS\\LOOPERS\\files\\src\\SCRIPT.PAK")
 	g.RunScript()
 
-	g.ExportScript("D:\\Game\\LOOPERS\\LOOPERS\\files\\Export")
+	g.ExportScript("D:\\Game\\LOOPERS\\LOOPERS\\files\\Export", false)
 
 }
 
@@ -237,7 +237,7 @@ func TestLoopersImportScript(t *testing.T) {
 		Mode:       enum.VMRunImport,
 	})
 	g.LoadScriptResources("D:\\Game\\LOOPERS\\LOOPERS\\files\\src\\SCRIPT.PAK")
-	g.ImportScript("D:\\Game\\LOOPERS\\LOOPERS\\files\\Export")
+	g.ImportScript("D:\\Game\\LOOPERS\\LOOPERS\\files\\Export", false)
 	g.RunScript()
 
 	g.ImportScriptWrite("D:\\Game\\LOOPERS\\LOOPERS\\files\\Import\\SCRIPT.PAK")

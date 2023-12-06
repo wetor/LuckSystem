@@ -34,7 +34,7 @@ func TestLoadPak(t *testing.T) {
 	game.LoadResources()
 	game.RunScript()
 
-	game.ExportScript("C:/Users/wetor/Desktop/Prototype/Export")
+	game.ExportScript("C:/Users/wetor/Desktop/Prototype/Export", false)
 
 }
 
@@ -49,7 +49,7 @@ func TestLoadPak2(t *testing.T) {
 		Mode:         enum.VMRunImport,
 	})
 	game.LoadResources()
-	game.ImportScript("C:/Users/wetor/Desktop/Prototype/Export")
+	game.ImportScript("C:/Users/wetor/Desktop/Prototype/Export", false)
 	game.RunScript()
 
 	game.ImportScriptWrite("C:/Users/wetor/Desktop/Prototype/Import/SCRIPT.PAK")

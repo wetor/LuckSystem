@@ -50,7 +50,7 @@ var (
 )
 
 func init() {
-	if os.Args[1] == "-h" || os.Args[1] == "--help" {
+	if len(os.Args) <= 1 || os.Args[1] == "-h" || os.Args[1] == "--help" {
 		_ = rootCmd.Help()
 		os.Exit(1)
 	}

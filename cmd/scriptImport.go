@@ -26,7 +26,7 @@ var scriptImportCmd = &cobra.Command{
 			Mode:       enum.VMRunImport,
 		})
 		g.LoadScriptResources(ScriptSource)
-		g.ImportScript(ScriptImportDir)
+		g.ImportScript(ScriptImportDir, ScriptNoSubDir)
 		g.RunScript()
 		g.ImportScriptWrite(ScriptImportOutput)
 
@@ -36,7 +36,7 @@ var scriptImportCmd = &cobra.Command{
 func init() {
 	scriptCmd.AddCommand(scriptImportCmd)
 
-	scriptImportCmd.Flags().StringVarP(&ScriptImportDir, "input", "i", "output", "同反编译输出路径（目录内包含SCRIPT.PAK文件夹）")
+	scriptImportCmd.Flags().StringVarP(&ScriptImportDir, "input", "i", "output", "输出的反编译脚本路径")
 	scriptImportCmd.Flags().StringVarP(&ScriptImportOutput, "output", "o", "SCRIPT.PAK.out", "输出的SCRIPT.PAK文件")
 
 	scriptImportCmd.MarkFlagsRequiredTogether("input", "output")

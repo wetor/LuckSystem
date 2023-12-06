@@ -113,8 +113,10 @@ func (g *Game) RunScript() {
 
 }
 
-func (g *Game) ExportScript(dir string) {
-	dir = path.Join(dir, ResScript)
+func (g *Game) ExportScript(dir string, noSubDir bool) {
+	if !noSubDir {
+		dir = path.Join(dir, ResScript)
+	}
 	exist, isDir := IsExistDir(dir)
 	if exist && !isDir {
 		panic("已存在同名文件")
@@ -123,8 +125,14 @@ func (g *Game) ExportScript(dir string) {
 		os.MkdirAll(dir, os.ModePerm)
 	}
 	for _, name := range g.ScriptList {
-		f, _ := os.Create(path.Join(dir, name+ResScriptExt))
-		g.VM.Scripts[name].Export(f)
+		f, err := os.Create(path.Join(dir, name+ResScriptExt))
+		if err != nil {
+			panic(err)
+		}
+		err = g.VM.Scripts[name].Export(f)
+		if err != nil {
+			panic(err)
+		}
 		f.Close()
 	}
 
@@ -133,11 +141,19 @@ func (g *Game) ExportScript(dir string) {
 	//}
 }
 
-func (g *Game) ImportScript(dir string) {
-	dir = path.Join(dir, ResScript)
+func (g *Game) ImportScript(dir string, noSubDir bool) {
+	if !noSubDir {
+		dir = path.Join(dir, ResScript)
+	}
 	for _, name := range g.ScriptList {
-		f, _ := os.Open(path.Join(dir, name+ResScriptExt))
-		g.VM.Scripts[name].Import(f)
+		f, err := os.Open(path.Join(dir, name+ResScriptExt))
+		if err != nil {
+			panic(err)
+		}
+		err = g.VM.Scripts[name].Import(f)
+		if err != nil {
+			panic(err)
+		}
 		f.Close()
 	}
 }

@@ -31,14 +31,14 @@ var scriptDecompileCmd = &cobra.Command{
 		g.LoadScriptResources(ScriptSource)
 		g.RunScript()
 
-		g.ExportScript(ScriptExportDir)
+		g.ExportScript(ScriptExportDir, ScriptNoSubDir)
 	},
 }
 
 func init() {
 	scriptCmd.AddCommand(scriptDecompileCmd)
 
-	scriptDecompileCmd.Flags().StringVarP(&ScriptExportDir, "output", "o", "output", "反编译输出路径（目录不能有SCRIPT.PAK同名文件）")
+	scriptDecompileCmd.Flags().StringVarP(&ScriptExportDir, "output", "o", "output", "反编译输出路径")
 
 	// Here you will define your flags and configuration settings.
 
