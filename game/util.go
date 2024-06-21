@@ -7,7 +7,7 @@ import (
 
 func ScriptCanLoad(name string) bool {
 	for _, n := range ScriptBlackList {
-		if strings.ToUpper(name) == n {
+		if strings.ToUpper(name) == strings.ToUpper(n) {
 			return false
 		}
 	}

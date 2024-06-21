@@ -16,6 +16,15 @@
 
 ## Example
 ```shell
+# 反编译SCRIPT.PAK，额外忽略_build_time, TEST脚本
+lucksystem script decompile \
+  -s D:/Game/LOOPERS/files/SCRIPT.PAK \
+  -c UTF-8 \
+  -O data/LOOPERS.txt \
+  -p data/LOOPERS.py \
+  -o D:/Game/LOOPERS/files/Export
+  -b _build_time,TEST
+
 # 导出CZ2图片
 lucksystem  image export \
   -i C:/Users/wetor/Desktop/Prototype/CZ2/32/明朝32 \
