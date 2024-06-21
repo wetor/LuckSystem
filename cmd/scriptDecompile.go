@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/go-restruct/restruct"
 	"lucksystem/charset"
@@ -21,6 +22,7 @@ var scriptDecompileCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("scriptExtract called")
 		restruct.EnableExprBeta()
+		game.ScriptBlackList = append(game.ScriptBlackList, strings.Split(ScriptBlackList, ",")...)
 		g := game.NewGame(&game.GameOptions{
 			GameName:   "Custom",
 			PluginFile: ScriptPlugin,

@@ -4,6 +4,8 @@ Copyright © 2022 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"strings"
+
 	"github.com/go-restruct/restruct"
 	"lucksystem/charset"
 	"lucksystem/game"
@@ -18,6 +20,7 @@ var scriptImportCmd = &cobra.Command{
 	Short: "导入反编译的脚本",
 	Run: func(cmd *cobra.Command, args []string) {
 		restruct.EnableExprBeta()
+		game.ScriptBlackList = append(game.ScriptBlackList, strings.Split(ScriptBlackList, ",")...)
 		g := game.NewGame(&game.GameOptions{
 			GameName:   "Custom",
 			PluginFile: ScriptPlugin,
