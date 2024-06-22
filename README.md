@@ -89,6 +89,9 @@ LucaSystem 引擎解析工具
 1. 《LOOPERS》 Steam
 2. LB_EN:《Little Busters! English Edition》 Steam
 3. SP:《Summer Pockets》 Nintendo Switch
+4. CartagraHD
+5. KANON
+6. HARMONIA
 
 ## 目前支持的指令
 
@@ -111,6 +114,15 @@ LucaSystem 引擎解析工具
 
 
 ## 更新日志
+
+### 2.3.1
+- 支持 Harmonia FULL HD Steam version [@Mishalac](https://github.com/MishaIac)
+
+### 2.3.0
+- 支持 Kanon [@Mishalac](https://github.com/MishaIac)
+
+### 2.2.3
+- 支持`-blacklist`命令，添加额外的脚本名黑名单
 
 ### 2.2.1 (2023.12.4)
 - 支持[CartagraHD](https://vndb.org/r78712)脚本导入导出（未测试）
