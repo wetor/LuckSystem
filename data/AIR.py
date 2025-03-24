@@ -1,5 +1,5 @@
 import core
-from base.kanon import *
+from base.air import *
 
 def Init():
     # core.Charset_UTF8
@@ -10,7 +10,7 @@ def Init():
                     default_export=True) # 未定义指令的参数是否全部导出
 
 def MESSAGE():
-    core.read_uint16(True)
+    core.read_uint16(False)
     txt = core.read_len_str(core.text)  # jp_len, jp_str
     if len(txt) > 0:
         core.read_len_str(core.expr)    # en_len, en_str
@@ -28,7 +28,7 @@ def MOVIE():
 def VARSTR_SET():
     core.read_uint16(False)             # const value
     core.read_str(core.expr)            # filename_str
-    core.read_uint16(True)              # ??
+    core.read_uint16(True)              # varstr_id
     txt = core.read_len_str(core.text)  # jp_len, jp_str
     if len(txt) > 0:
         core.read_len_str(core.text)    # en_len, en_str
@@ -38,8 +38,8 @@ def VARSTR_SET():
     core.end()
 
 def DIALOG():
-    core.read_uint16(True)
-    core.read_uint16(True)
+    core.read_uint16(False)
+    core.read_uint16(False)
     core.read_len_str(core.text)        # jp_len, jp_str
     core.read(True)
     core.end()
