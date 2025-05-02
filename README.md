@@ -90,14 +90,15 @@ LucaSystem 引擎解析工具
 2. LB_EN:《Little Busters! English Edition》 Steam
 3. SP:《Summer Pockets》 Nintendo Switch
 4. CartagraHD
-5. KANON
-6. HARMONIA
+5. KANON Steam
+6. HARMONIA Steam
+7. LUNARiA Steam
+8. AIR Steam
+9. Planetarian SG Steam
 
 ## 目前支持的指令
+- [Game List](data)
 
-- MESSAGE (LB_EN、SP、LOOPERS)
-- SELECT (LB_EN、SP)
-- IMAGELOAD (LB_EN、SP)
 
 - BATTLE (LB_EN)
 - EQU
@@ -114,6 +115,11 @@ LucaSystem 引擎解析工具
 
 
 ## 更新日志
+
+### 2.3.2
+- 支持 LUNARiA Steam version [@thedanill](https://github.com/thedanill)
+- 支持 AIR Steam version [@thedanill](https://github.com/thedanill)
+- 支持 Planetarian SG Steam version [@thedanill](https://github.com/thedanill)
 
 ### 2.3.1
 - 支持 Harmonia FULL HD Steam version [@Mishalac](https://github.com/MishaIac)
