@@ -19,7 +19,7 @@ const (
 	ResScriptExt = ".txt"
 )
 
-var ScriptBlackList = []string{"TEST", "_VOICEOTHER", "_VARNAME", "_VARNUM", "_CGMODE", "_SCR_LABEL", "_VOICE_PARAM", "_BUILD_COUNT", "_TASK", "_BUILD_TIME"}
+var ScriptBlackList = []string{"TEST", "_VOICEOTHER", "_VARNAME", "_VARNUM", "_CGMODE", "_SCR_LABEL", "_VOICE_PARAM", "_BUILD_COUNT", "_TASK", "_BUILD_TIME", "_VARSTRNAME"}
 
 type GameOptions struct {
 	GameName     string
