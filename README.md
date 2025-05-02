@@ -115,6 +115,11 @@ LucaSystem 引擎解析工具
 
 ## 更新日志
 
+### 2.3.2
+- 支持 LUNARiA Steam version [@thedanill](https://github.com/thedanill)
+- 支持 AIR Steam version [@thedanill](https://github.com/thedanill)
+- 支持 Planetarian SG Steam version [@thedanill](https://github.com/thedanill)
+
 ### 2.3.1
 - 支持 Harmonia FULL HD Steam version [@Mishalac](https://github.com/MishaIac)
 
