@@ -43,16 +43,21 @@ func (e *Entry) InitEntry() {
 }
 
 func (e *Entry) AddExportGotoLabel(codeIndex, pos int) int {
-
-	val, has := e.ELabelMap[pos]
-	if has {
-		e.EGotoMap[codeIndex] = val
-		return val
+	// if this offset has an assigned label, use it
+	if label, ok := e.ELabelMap[pos]; ok {
+		if _, used := e.EGotoMap[codeIndex]; !used {
+			e.EGotoMap[codeIndex] = label
+		}
+		return label
 	}
-	e.ELabelMap[pos] = e.IndexNext
-	e.EGotoMap[codeIndex] = e.IndexNext
+	// else create new label
+	label := e.IndexNext
+	e.ELabelMap[pos] = label
 	e.IndexNext++
-	return e.ELabelMap[pos]
+	if _, used := e.EGotoMap[codeIndex]; !used {
+		e.EGotoMap[codeIndex] = label
+	}
+	return label
 }
 
 // labelIndex, Goto参数位置
