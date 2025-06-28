@@ -137,6 +137,10 @@ func (p *PluginContext) SetConfig(self py.Object, args py.Tuple, kwargs py.Strin
 	return nil, nil
 }
 
+func (p *PluginContext) RemainingLength(self py.Object, args py.Tuple) (py.Object, error) {
+	return py.Int(len(p.op.data) - p.op.offset), nil
+}
+
 func init() {
 	pluginContext = &PluginContext{}
 
@@ -151,6 +155,7 @@ func init() {
 		py.MustNewMethod("end", pluginContext.End, 0, `end()`),
 		py.MustNewMethod("can_read", pluginContext.CanRead, 0, `can_read() -> bool`),
 		py.MustNewMethod("set_config", pluginContext.SetConfig, 0, `set_config(expr_charset, text_charset, default_export=True)`),
+		py.MustNewMethod("remaining_length", pluginContext.RemainingLength, 0, `remaining_length() -> int`),
 	}
 
 	py.RegisterModule(&py.ModuleImpl{
