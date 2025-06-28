@@ -19,16 +19,17 @@ func ToStringCodeParams(code *CodeLine) string {
 		case string:
 			paramStr = append(paramStr, `"`+param+`"`)
 		case *JumpParam:
-			if code.GotoIndex > 0 {
-				paramStr = append(paramStr, fmt.Sprintf("{goto label%d}", code.GotoIndex))
-			} else if param.GlobalIndex > 0 {
-				paramStr = append(paramStr, fmt.Sprintf(`{goto "%s" global%d}`, param.ScriptName, param.GlobalIndex))
+			if param.ScriptName != "" && param.LabelIndex > 0 {
+				// external jump in another script file
+				paramStr = append(paramStr, fmt.Sprintf(`{goto "%s" global%d}`, param.ScriptName, param.LabelIndex))
+			} else if param.LabelIndex > 0 {
+				// internal jump in the same file
+				paramStr = append(paramStr, fmt.Sprintf("{goto label%d}", param.LabelIndex))
 			} else {
 				paramStr = append(paramStr, fmt.Sprintf("{goto %d}", param.Position))
 			}
 		default:
 			paramStr = append(paramStr, fmt.Sprintf("%v", param))
-
 		}
 	}
 	str := strings.Join(paramStr, ", ")
@@ -91,6 +92,13 @@ func ParseCodeParams(code *CodeLine, codeStr string) {
 			}
 			if ch == '}' {
 				isSpecial = false
+				if gotoFile != "" || gotoIndex > 0 || globalGotoIndex > 0 {
+					params = append(params, &JumpParam{
+						LabelIndex: globalGotoIndex,
+						ScriptName: gotoFile,
+						Position:   gotoIndex + globalGotoIndex,
+					})
+				}
 			}
 		case ':':
 			if len(word) > 5 && string(word[0:5]) == "label" {
@@ -103,6 +111,9 @@ func ParseCodeParams(code *CodeLine, codeStr string) {
 			isString = true
 		case '{':
 			isSpecial = true
+			gotoIndex = 0
+			globalGotoIndex = 0
+			gotoFile = ""
 		default:
 			word = append(word, ch)
 		}
@@ -114,13 +125,6 @@ func ParseCodeParams(code *CodeLine, codeStr string) {
 	code.GlobalGotoIndex = globalGotoIndex
 	code.GlobalLabelIndex = globalLabelIndex
 
-	if gotoFile != "" || gotoIndex > 0 || globalGotoIndex > 0 {
-		params = append(params, &JumpParam{
-			GlobalIndex: globalGotoIndex,
-			ScriptName:  gotoFile,
-			Position:    gotoIndex + globalGotoIndex, // 填充使用
-		})
-	}
 	code.Params = params
 
 	// if labelIndex > 0 {
