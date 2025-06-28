@@ -154,7 +154,7 @@ func (op *OP) ReadFileJump(export bool, file string) uint32 {
 	if file != op.ctx.Script.Name &&
 		strings.ToUpper(file) != op.ctx.Script.Name &&
 		strings.ToLower(file) != op.ctx.Script.Name {
-		param.GlobalIndex = op.ctx.AddLabel(file, op.ctx.CIndex, int(val))
+		param.LabelIndex = op.ctx.AddLabel(file, op.ctx.CIndex, int(val))
 	}
 	op.params = append(op.params, Param{
 		Type:   "filejump",

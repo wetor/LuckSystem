@@ -156,8 +156,11 @@ func (s *Script) SetOperateParams(index int, mode enum.VMRunMode, params ...inte
 				}
 			case *JumpParam:
 				paramList = append(paramList, param)
-				if param.GlobalIndex == 0 {
-					s.AddExportGotoLabel(index, param.Position)
+				// if this is an internal jump, set the label index
+				// (in case of external jump, the label index was already set in the opcode/ReadFileJump func)
+				if param.LabelIndex == 0 {
+					label := s.AddExportGotoLabel(index, param.Position)
+					param.LabelIndex = label
 				}
 			case *StringParam:
 				paramList = append(paramList, param.Data)
@@ -340,37 +343,56 @@ func (s *Script) ReadData(data []byte) error {
 func (s *Script) CodeParamsToBytes(code *CodeLine, coding charset.Charset, params []interface{}) {
 	buf := &bytes.Buffer{}
 	size := 0
-	position := 0
 	for _, param := range code.FixedParam {
 		l, _ := SetParam(buf, param, coding, false)
 		size += l
 	}
-	for _, param := range params {
-		l, j := SetParam(buf, param, coding, false)
-		size += l
-		if j {
-			position = size - 4
-		}
 
+	type jumpInfo struct {
+		offset int
+		label  int
+		global bool
 	}
+	jumps := make([]jumpInfo, 0, len(params))
+
+	for _, param := range params {
+		before := size
+		l, isJump := SetParam(buf, param, coding, false)
+		size += l
+
+		if isJump {
+			ji := jumpInfo{offset: before}
+			if jp, ok := param.(*JumpParam); ok && jp.LabelIndex > 0 {
+				ji.label = jp.LabelIndex
+				ji.global = true
+			} else if ok {
+				ji.label = param.(*JumpParam).Position
+				ji.global = false
+			}
+			jumps = append(jumps, ji)
+		}
+	}
+
 	if buf.Len() != len(code.RawBytes) {
 		glog.V(4).Infof("%v %v\n\t%v %v\n\t%v %v\n", code.OpStr, params, buf.Len(), buf.Bytes(), len(code.RawBytes), code.RawBytes)
 	}
 	code.Len = uint16(size + 4)
-	position += 4
 	code.Align = make([]byte, code.Len&1)
 	code.RawBytes = buf.Bytes()
 	if code.LabelIndex > 0 {
 		s.AddImportLabel(code.LabelIndex, s.CurPos)
 	}
-	if code.GotoIndex > 0 {
-		s.AddImportGoto(s.CurPos+position, code.GotoIndex)
-	}
 	if code.GlobalLabelIndex > 0 {
 		s.AddImportGlobalLabel(code.GlobalLabelIndex, s.CurPos)
 	}
-	if code.GlobalGotoIndex > 0 {
-		s.AddImportGlobalGoto(s.CurPos+position, code.GlobalGotoIndex)
+	// processing multi-jump instructions (e.g., ONGOTO)
+	for _, ji := range jumps {
+		pos := s.CurPos + 4 + ji.offset
+		if ji.global {
+			s.AddImportGlobalGoto(pos, ji.label)
+		} else {
+			s.AddImportGoto(pos, ji.label)
+		}
 	}
 
 	s.CurPos += int(code.Len + code.Len&1)
@@ -474,7 +496,7 @@ func SetParam(buf *bytes.Buffer, param interface{}, coding charset.Charset, hasL
 		//if value.ScriptName != "" {
 		//	size += CodeString(buf, value.ScriptName, false, coding)
 		//}
-		if value.Position > 0 || value.GlobalIndex > 0 { // 现在为labelIndex
+		if value.Position > 0 || value.LabelIndex > 0 { // 现在为labelIndex
 			jump = true
 			binary.Write(buf, binary.LittleEndian, uint32(value.Position))
 			size += 4
