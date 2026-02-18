@@ -19,3 +19,4 @@
 log/
 lucksystem
 main
+pak/pak_test.go

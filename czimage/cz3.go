@@ -80,7 +80,23 @@ func (cz *Cz3Image) Export(w io.Writer) error {
 	if cz.Image == nil {
 		cz.decompress()
 	}
-	return png.Encode(w, cz.Image)
+	
+	// PATCH YOREMI: S'assurer que l'image est en NRGBA pour avoir 4 bytes/pixel
+	var nrgbaImg *image.NRGBA
+	if img, ok := cz.Image.(*image.NRGBA); ok {
+		nrgbaImg = img
+	} else {
+		glog.V(0).Infof("Export: Converting image to NRGBA (was %T)\n", cz.Image)
+		nrgbaImg = ImageToNRGBA(cz.Image)
+	}
+	
+	glog.V(0).Infof("Export: %dx%d, Colorbits=%d, pix_len=%d bytes\n",
+		nrgbaImg.Rect.Dx(), nrgbaImg.Rect.Dy(), cz.CzHeader.Colorbits, len(nrgbaImg.Pix))
+	
+	// Note: png.Encode() va optimiser en RGB si tous les alpha sont 255
+	// C'est un comportement standard de la lib PNG de Go
+	// Import() doit gérer ça en reconvertissant RGB → RGBA
+	return png.Encode(w, nrgbaImg)
 }
 
 // Import
@@ -96,11 +112,45 @@ func (cz *Cz3Image) Import(r io.Reader, fillSize bool) error {
 	if err != nil {
 		return err
 	}
+	
+	// PATCH YOREMI: LOG le format PNG source pour debug
+	glog.V(0).Infof("Import: PNG source type=%T, bounds=%v\n", 
+		cz.PngImage, cz.PngImage.Bounds())
+	
+	// FORCER conversion en NRGBA (4 bytes/pixel)
 	pic, ok := cz.PngImage.(*image.NRGBA)
 	if !ok {
+		glog.V(0).Infof("Import: Converting to NRGBA (source was %T)\n", cz.PngImage)
 		pic = ImageToNRGBA(cz.PngImage)
 	}
+	
+	// VÉRIFICATION CRITIQUE: pic.Pix doit avoir exactement width * height * 4 bytes
+	expectedPixLen := pic.Rect.Dx() * pic.Rect.Dy() * 4
+	if len(pic.Pix) != expectedPixLen {
+		glog.Errorf("Import: CRITICAL ERROR - Pix length mismatch! expected=%d, got=%d\n",
+			expectedPixLen, len(pic.Pix))
+	}
+	
+	// VÉRIFICATION: CzHeader.Colorbits doit être 32 (AIR attend toujours RGBA)
+	if cz.CzHeader.Colorbits != 32 {
+		glog.Warningf("Import: CzHeader.Colorbits=%d (expected 32), may cause corruption\n",
+			cz.CzHeader.Colorbits)
+	}
+	
+	glog.V(0).Infof("Import: Calling DiffLine with Colorbits=%d, pic=%dx%d stride=%d\n",
+		cz.CzHeader.Colorbits, pic.Rect.Dx(), pic.Rect.Dy(), pic.Stride)
+	
 	data := DiffLine(cz.CzHeader, pic)
+	
+	// VÉRIFICATION: data doit être width * height * (Colorbits/8)
+	expectedDataLen := int(cz.Width) * int(cz.Heigth) * int(cz.CzHeader.Colorbits/8)
+	if len(data) != expectedDataLen {
+		glog.Errorf("Import: CRITICAL ERROR - DiffLine output size mismatch! expected=%d, got=%d\n",
+			expectedDataLen, len(data))
+	} else {
+		glog.V(0).Infof("Import: DiffLine OK, generated %d bytes\n", len(data))
+	}
+	
 	blockSize := 0
 	if len(cz.OutputInfo.BlockInfo) != 0 {
 		blockSize = int(cz.OutputInfo.BlockInfo[0].CompressedSize)
@@ -115,6 +165,9 @@ func (cz *Cz3Image) Import(r io.Reader, fillSize bool) error {
 		cz.OutputInfo.TotalCompressedSize += int(block.CompressedSize)
 	}
 	cz.OutputInfo.Offset = 4 + int(cz.OutputInfo.FileCount)*8
+	
+	glog.V(0).Infof("Import: Compressed to %d bytes (RawSize=%d)\n",
+		cz.OutputInfo.TotalCompressedSize, cz.OutputInfo.TotalRawSize)
 
 	return nil
 }
@@ -127,7 +180,20 @@ func (cz *Cz3Image) Import(r io.Reader, fillSize bool) error {
 //
 func (cz *Cz3Image) Write(w io.Writer) error {
 	var err error
+	// PATCH YOREMI: Force le Magic à rester "CZ3" au lieu de "CZ0"
+	// Le bug causait la conversion CZ3 → CZ0, rendant les fichiers illisibles par le jeu
+	cz.CzHeader.Magic = []byte{'C', 'Z', '3', 0}
+	
+	// PATCH YOREMI: Forcer Colorbits à 32 (AIR attend toujours RGBA)
+	if cz.CzHeader.Colorbits != 32 {
+		glog.Warningf("Write: Forcing Colorbits from %d to 32\n", cz.CzHeader.Colorbits)
+		cz.CzHeader.Colorbits = 32
+	}
+	
 	glog.V(6).Infoln(cz.CzHeader)
+	glog.V(0).Infof("Write: CZ3 %dx%d, Colorbits=%d, %d blocks, RawSize=%d\n",
+		cz.Width, cz.Heigth, cz.CzHeader.Colorbits, cz.OutputInfo.FileCount,
+		cz.OutputInfo.TotalRawSize)
 	err = WriteStruct(w, &cz.CzHeader, &cz.Cz3Header, cz.OutputInfo)
 
 	if err != nil {
