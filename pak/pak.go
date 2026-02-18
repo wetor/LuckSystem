@@ -353,6 +353,29 @@ func (p *Pak) Write(w io.Writer) error {
 		}
 	}
 
+	// PATCH YOREMI: Ajouter padding pour aligner sur block_size
+	// Calculer la position du dernier byte écrit
+	var lastFileEnd uint32 = 0
+	for _, f := range p.Files {
+		fileEnd := f.Offset + f.Length
+		if fileEnd > lastFileEnd {
+			lastFileEnd = fileEnd
+		}
+	}
+
+	// Ajouter padding si nécessaire pour aligner sur block_size
+	if lastFileEnd%p.BlockSize != 0 {
+		paddingSize := p.BlockSize - (lastFileEnd % p.BlockSize)
+		padding := make([]byte, paddingSize)
+		// Utiliser WriteAt pour écrire le padding à la position correcte
+		_, err = file.WriteAt(padding, int64(lastFileEnd))
+		if err != nil {
+			glog.V(8).Infoln("file.WriteAt.padding", err)
+			return err
+		}
+		glog.V(2).Infof("Added %d bytes of padding for block alignment\n", paddingSize)
+	}
+
 	return nil
 }
 
