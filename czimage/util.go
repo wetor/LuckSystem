@@ -3,6 +3,7 @@ package czimage
 import (
 	"bytes"
 	"encoding/binary"
+	"github.com/golang/glog"
 	"image"
 	"image/draw"
 	"io"
@@ -120,6 +121,7 @@ func Compress(data []byte, size int) (compressed []byte, outputInfo *CzOutputInf
 	offset := 0
 	count := 0
 	last := ""
+	prevCarry := 0
 	tmp := make([]byte, 2)
 	outputBuf := &bytes.Buffer{}
 	outputInfo = &CzOutputInfo{
@@ -137,6 +139,92 @@ func Compress(data []byte, size int) (compressed []byte, outputInfo *CzOutputInf
 			outputBuf.Write(tmp)
 		}
 
+		// FIX: Correct RawSize accounting for LZW carry-over between blocks.
+		//
+		// compressLZW's carry-over (lastElement) always represents exactly 1 data
+		// byte when non-empty, because break only triggers after the else-branch
+		// which resets element to string(c) (a single input byte).
+		//
+		// CRITICAL: We must NOT use len(last) to count data bytes, because Go's
+		// string(byte(c)) produces UTF-8: for c > 127, len(string(c)) == 2,
+		// but it still represents only 1 original data byte. Using len(last)
+		// would cause ±1 RawSize errors on blocks where the carry byte crosses
+		// the 128 boundary.
+		//
+		// RawSize = data bytes carried in from previous block
+		//         + data bytes consumed from input (count)
+		//         - data bytes carried out to next block
+		carry := 0
+		if len(last) > 0 {
+			carry = 1
+		}
+		rawSize := prevCarry + count - carry
+
+		outputInfo.BlockInfo = append(outputInfo.BlockInfo, CzBlockInfo{
+			CompressedSize: uint32(len(partData)),
+			RawSize:        uint32(rawSize),
+		})
+		outputInfo.FileCount++
+		prevCarry = carry
+	}
+	outputInfo.TotalCompressedSize = outputBuf.Len() / 2
+
+	return outputBuf.Bytes(), outputInfo
+}
+
+// Compress2 压缩数据 CZ2专用
+//
+//	Description 压缩数据
+//	Param data []byte 未压缩数据
+
+// CompressWithRawSizes PATCH YOREMI: Compresse les données en préservant les RawSize originaux
+// Cette fonction garantit que la répartition des blocs LZW est identique à celle du CZ3 original
+// Cela résout le problème d'artefacts dans le jeu qui attend une structure de blocs exacte
+func CompressWithRawSizes(data []byte, blockSize int, targetRawSizes []int) (compressed []byte, outputInfo *CzOutputInfo) {
+
+	if blockSize == 0 {
+		blockSize = 0xFEFD
+	}
+	var partData []uint16
+	offset := 0
+	count := 0
+	last := ""
+	tmp := make([]byte, 2)
+	outputBuf := &bytes.Buffer{}
+	outputInfo = &CzOutputInfo{
+		TotalRawSize: len(data),
+		BlockInfo:    make([]CzBlockInfo, 0),
+	}
+	
+	// Compresser bloc par bloc en respectant les RawSize originaux
+	for blockIdx, targetSize := range targetRawSizes {
+		if offset >= len(data) {
+			break
+		}
+		
+		// Calculer la fin de ce chunk (limité aux données restantes)
+		chunkEnd := offset + targetSize
+		if chunkEnd > len(data) {
+			chunkEnd = len(data)
+		}
+		
+		// Compresser EXACTEMENT targetSize bytes (size=0 pour illimité)
+		count, partData, last = compressLZW(data[offset:chunkEnd], 0, last)
+		
+		// Vérification: count devrait être égal à targetSize
+		expectedCount := chunkEnd - offset
+		if count != expectedCount {
+			glog.V(2).Infof("Block %d: compressed %d bytes, expected %d\n", blockIdx, count, expectedCount)
+		}
+		
+		offset = chunkEnd
+		
+		// Écrire les codes LZW compressés
+		for _, d := range partData {
+			binary.LittleEndian.PutUint16(tmp, d)
+			outputBuf.Write(tmp)
+		}
+
 		outputInfo.BlockInfo = append(outputInfo.BlockInfo, CzBlockInfo{
 			CompressedSize: uint32(len(partData)),
 			RawSize:        uint32(count),
@@ -148,10 +236,6 @@ func Compress(data []byte, size int) (compressed []byte, outputInfo *CzOutputInf
 	return outputBuf.Bytes(), outputInfo
 }
 
-// Compress2 压缩数据 CZ2专用
-//
-//	Description 压缩数据
-//	Param data []byte 未压缩数据
 //	Param size int 分块大小
 //	Return compressed
 //	Return outputInfo
@@ -164,6 +248,7 @@ func Compress2(data []byte, size int) (compressed []byte, outputInfo *CzOutputIn
 	offset := 0
 	count := 0
 	last := ""
+	prevCarry := 0
 	outputBuf := &bytes.Buffer{}
 	outputInfo = &CzOutputInfo{
 		TotalRawSize: len(data),
@@ -177,11 +262,20 @@ func Compress2(data []byte, size int) (compressed []byte, outputInfo *CzOutputIn
 		offset += count
 		outputBuf.Write(partData)
 
+		// FIX: same carry-over correction as Compress()
+		// See Compress() comments for full explanation.
+		carry := 0
+		if len(last) > 0 {
+			carry = 1
+		}
+		rawSize := prevCarry + count - carry
+
 		outputInfo.BlockInfo = append(outputInfo.BlockInfo, CzBlockInfo{
 			CompressedSize: uint32(len(partData)),
-			RawSize:        uint32(count),
+			RawSize:        uint32(rawSize),
 		})
 		outputInfo.FileCount++
+		prevCarry = carry
 	}
 	outputInfo.TotalCompressedSize = outputBuf.Len()
 	return outputBuf.Bytes(), outputInfo

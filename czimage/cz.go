@@ -88,6 +88,9 @@ func LoadCzImage(data []byte) CzImage {
 	case "CZ3":
 		cz = new(Cz3Image)
 		cz.Load(header, data)
+	case "CZ4":
+		cz = new(Cz4Image)
+		cz.Load(header, data)
 	default:
 		glog.Fatalln("Unknown Cz image type")
 	}
