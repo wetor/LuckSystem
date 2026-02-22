@@ -68,6 +68,18 @@ func LoadCzImageFile(file string) CzImage {
 	return LoadCzImage(data)
 }
 func LoadCzImage(data []byte) CzImage {
+	// Safety check: file must be at least 15 bytes for a valid CZ header
+	if len(data) < 15 {
+		glog.Warningf("File too small for CZ header (%d bytes), skipping\n", len(data))
+		return nil
+	}
+
+	// Check magic bytes before unpacking
+	if data[0] != 'C' || data[1] != 'Z' {
+		glog.Warningf("Not a CZ file (magic: 0x%02x%02x), skipping\n", data[0], data[1])
+		return nil
+	}
+
 	header := CzHeader{}
 	err := restruct.Unpack(data[:15], binary.LittleEndian, &header)
 	if err != nil {
@@ -92,7 +104,8 @@ func LoadCzImage(data []byte) CzImage {
 		cz = new(Cz4Image)
 		cz.Load(header, data)
 	default:
-		glog.Fatalln("Unknown Cz image type")
+		glog.Warningf("Unknown CZ image type: %s, skipping\n", string(header.Magic[:3]))
+		return nil
 	}
 
 	return cz

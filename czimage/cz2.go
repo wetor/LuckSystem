@@ -105,7 +105,20 @@ func (cz *Cz2Image) Import(r io.Reader, fillSize bool) error {
 	if err != nil {
 		panic(err)
 	}
-	pic := cz.PngImage.(*image.NRGBA)
+	// Yoremi Patch 3: safe type conversion instead of direct assertion
+	var pic *image.NRGBA
+	switch src := cz.PngImage.(type) {
+	case *image.NRGBA:
+		pic = src
+	default:
+		dst := image.NewNRGBA(src.Bounds())
+		for y := src.Bounds().Min.Y; y < src.Bounds().Max.Y; y++ {
+			for x := src.Bounds().Min.X; x < src.Bounds().Max.X; x++ {
+				dst.Set(x, y, src.At(x, y))
+			}
+		}
+		pic = dst
+	}
 	width := int(cz.Width)
 	height := int(cz.Heigth)
 	if fillSize == true {
@@ -114,8 +127,15 @@ func (cz *Cz2Image) Import(r io.Reader, fillSize bool) error {
 	}
 
 	if width != pic.Rect.Size().X || height != pic.Rect.Size().Y {
-		glog.V(2).Infof("图片大小不匹配，应该为 w%d h%d\n", width, height)
-		return err
+		// Yoremi Patch 3: update CzHeader to match new image dimensions
+		// (happens when font.ReplaceChars changes the image height after append/insert)
+		newW := pic.Rect.Size().X
+		newH := pic.Rect.Size().Y
+		glog.V(2).Infof("CZ2 dimensions updated: %dx%d -> %dx%d\n", width, height, newW, newH)
+		cz.Width = uint16(newW)
+		cz.Heigth = uint16(newH)
+		width = newW
+		height = newH
 	}
 	data := make([]byte, width*height)
 	i := 0
@@ -140,6 +160,14 @@ func (cz *Cz2Image) Import(r io.Reader, fillSize bool) error {
 	cz.OutputInfo.Offset = 4 + int(cz.OutputInfo.FileCount)*8
 	glog.V(6).Infoln(cz.OutputInfo)
 	return nil
+}
+
+// SetDimensions updates the CzHeader width/height.
+// Yoremi Patch 3: called by font.Write before Import when ReplaceChars
+// has changed the image size (append/insert modes).
+func (cz *Cz2Image) SetDimensions(w, h uint16) {
+	cz.CzHeader.Width = w
+	cz.CzHeader.Heigth = h
 }
 
 func (cz *Cz2Image) Write(w io.Writer) error {
