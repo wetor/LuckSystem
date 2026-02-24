@@ -1,4 +1,178 @@
-# Technical Analysis — LuckSystem Patches Yoremi
+# V3 — Patch 3 : Correction import CZ2 (fonts)
+
+## Fichiers modifiés
+- `czimage/cz2.go` — `Import()` : gestion correcte du redimensionnement + assertion de type sûre
+- `czimage/cz2.go` — ajout de `SetDimensions(w, h uint16)`
+- `font/font.go` — `Write()` : synchronisation du `CzHeader` avant `Import()`
+
+## Bug : crash `invalid argument` dans `font edit` (modes append/insert)
+
+### Contexte
+`lucksystem font edit` avec les modes `-a` (append) ou `-i N` (insert) modifie une police CZ2 en ajoutant de nouveaux glyphes. La chaîne d'appel complète est :
+
+```
+fontEdit.go → LucaFont.Import() → LucaFont.ReplaceChars() → LucaFont.Write()
+                                                                     ↓
+                                                         CzImage.Import(img, fillSize=true)
+                                                                     ↓
+                                                              CzImage.Write()
+```
+
+### Cause racine (3 bugs imbriqués)
+
+**Bug 1 — Dimensions non synchronisées**
+`ReplaceChars()` crée une nouvelle image de dimensions :
+```go
+imageW := size*100 + 4
+imageH := size * int(math.Ceil(float64(f.Info.CharNum) / 100.0))  // augmente si CharNum > old
+```
+Mais `CzHeader.Width` et `CzHeader.Heigth` conservent les valeurs du fichier original. Lors de l'appel `f.CzImage.Import(img, true)`, ces vieilles dimensions sont utilisées comme cible.
+
+**Bug 2 — Retour nil silencieux dans Cz2Image.Import()**
+```go
+func (cz *Cz2Image) Import(r io.Reader, fillSize bool) error {
+    var err error          // err = nil, jamais assigné sur ce chemin
+    // ...
+    pic = FillImage(pic, oldWidth, oldHeight)  // tronque la nouvelle image !
+    if width != pic.Rect.Size().X || height != pic.Rect.Size().Y {
+        return err         // retourne nil — silencieusement
+    }
+    // Le reste (compression) n'est jamais atteint
+    // Raw et OutputInfo restent nil/vides
+```
+La fonction retourne `nil` (succès apparent) mais `cz.Raw` et `cz.OutputInfo` restent dans leur état initial non-compressé.
+
+**Bug 3 — WriteStruct sur OutputInfo vide**
+```go
+func (cz *Cz2Image) Write(w io.Writer) error {
+    err = WriteStruct(w, &cz.CzHeader, cz.Cz2Header, cz.ColorPanel, cz.OutputInfo)
+    // cz.OutputInfo = nil → restruct.Pack → "invalid argument"
+```
+
+### Fix
+
+**`czimage/cz2.go` — Import()**
+```go
+// AVANT : retour silencieux si dimensions différentes
+if width != pic.Rect.Size().X || height != pic.Rect.Size().Y {
+    glog.V(2).Infof("图片大小不匹配...")
+    return err  // err = nil, Raw reste vide → crash dans Write()
+}
+
+// APRÈS : mise à jour du header pour accepter les nouvelles dimensions
+if width != pic.Rect.Size().X || height != pic.Rect.Size().Y {
+    // Cas légitime : ReplaceChars a agrandi l'image (append/insert)
+    cz.Width  = uint16(pic.Rect.Size().X)
+    cz.Heigth = uint16(pic.Rect.Size().Y)
+    width  = pic.Rect.Size().X
+    height = pic.Rect.Size().Y
+    glog.V(2).Infof("CZ2 dimensions updated: %dx%d -> %dx%d", ...)
+}
+// → suite du code : compression normale, Raw et OutputInfo correctement remplis
+```
+
+**`czimage/cz2.go` — SetDimensions()**
+```go
+func (cz *Cz2Image) SetDimensions(w, h uint16) {
+    cz.CzHeader.Width  = w
+    cz.CzHeader.Heigth = h
+}
+```
+
+**`font/font.go` — Write()**
+```go
+// Sync CzHeader avec les dimensions de l'image AVANT Import()
+if setter, ok := f.CzImage.(interface {
+    SetDimensions(w, h uint16)
+}); ok {
+    setter.SetDimensions(
+        uint16(f.Image.Bounds().Size().X),
+        uint16(f.Image.Bounds().Size().Y),
+    )
+}
+err = f.CzImage.Import(img, true)
+```
+
+**`czimage/cz2.go` — safe type assertion**
+```go
+// AVANT : assertion directe, panic si PNG n'est pas NRGBA
+pic := cz.PngImage.(*image.NRGBA)
+
+// APRÈS : conversion sûre pour tout format PNG
+var pic *image.NRGBA
+switch src := cz.PngImage.(type) {
+case *image.NRGBA:
+    pic = src
+default:
+    // Conversion explicite pixel par pixel
+    dst := image.NewNRGBA(src.Bounds())
+    // ...
+    pic = dst
+}
+```
+
+### Portée
+Affecte uniquement `font edit` en modes append (`-a`) et insert (`-i N`). Le mode redraw (`-r`) ne change pas les dimensions et n'est pas impacté. Le format CZ2 est utilisé exclusivement pour les polices de caractères (FONT.PAK, FONT__INFO.PAK).
+
+### Jeux concernés
+Tous les jeux Visual Art's/Key utilisant des polices CZ2 (AIR, Kanon, CLANNAD, Little Busters, etc.).
+
+---
+
+
+
+# V3 — Patch 1 : CZ1 32-bit Import/Export + CZ0 logging
+
+## Fichiers modifiés
+- `czimage/cz1.go` — réécriture Import/Export/Write
+- `czimage/cz.go` — gestion gracieuse des fichiers non-CZ
+- `czimage/cz0.go` — ajout log V(0) dans decompress()
+
+## Bugs corrigés
+
+### 1. Extended header manquant dans Write()
+Le `Write()` original n'écrivait que les 15 bytes du `CzHeader` struct, ignorant les 13 bytes d'extended header (offsets, crop, bounds). Le fichier produit avait la block table à l'offset 15 au lieu de 28 → crash à la relecture.
+
+**Fix** : Sauvegarde des bytes raw 15→HeaderLength dans `ExtendedHeader` au `Load()`, réécriture dans `Write()`.
+
+### 2. Import() ne gérait que l'alpha
+L'Import 32-bit ne compressait que le canal A (`data[i] = pic.A`), jetant RGB. Résultat : écran blanc/transparent en jeu.
+
+**Fix** : Import multi-mode selon Colorbits (4, 8, 24, 32). Le mode 32-bit fait une copie directe de `pic.Pix` (RGBA).
+
+### 3. Colorbits > 32 (palette 8-bit)
+Les fichiers CZ1 palette utilisent Colorbits=248 (0xF8), un marqueur propriétaire Visual Art's. LuckSystem ne le reconnaissait pas → palette ignorée → `GetOutputInfo()` lisait la palette comme block table → crash (`slice bounds out of range`).
+
+**Fix** : Normalisation `if Colorbits > 32 → Colorbits = 8` (même approche que lbee-utils).
+
+### 4. Fichiers non-CZ dans les PAK
+Les fichiers sans magic "CZ" (ex: トーンカーブ_夕/夜, des LUTs 768 bytes) causaient un `glog.Fatalln("Unknown Cz image type")`.
+
+**Fix** : Vérification du magic avant unpacking, retour `nil` avec warning au lieu de crash.
+
+### 5. Palette BGRA dans Write()
+La palette est lue en BGRA (fichier) et stockée en NRGBA (Go). L'ancien Write via `restruct` sérialisait en RGBA → couleurs inversées R↔B. 
+
+**Fix** : Écriture manuelle de chaque entrée palette en [B,G,R,A].
+
+### 6. CZ0 invisible dans les logs d'extraction
+Les fichiers CZ0 n'avaient que du logging `V(6)` (debug profond), alors que CZ4 log en `V(0)` (toujours visible). Lors de l'extraction d'un PAK contenant un mix CZ0/CZ4, les dernières lignes visibles avant un CZ0 provenaient du CZ4 précédent, donnant l'impression que les CZ0 étaient traités comme CZ4.
+
+**Fix** : Ajout d'un `glog.V(0).Infof("Decompress CZ0: %dx%d, Colorbits=%d")` dans `cz0.go:decompress()` (ligne 78) pour identifier clairement le format dans les logs.
+
+## Format CZ1 confirmé
+- 32-bit : pixels stockés en **RGBA** (pas BGRA comme CZ3)
+- 8-bit palette : entrées stockées en **BGRA**, données = 1 byte/pixel (index)
+- Extended header : 13 bytes obligatoires (même structure que Cz3Header)
+
+## Statut
+- ✅ CZ1 32-bit : round-trip OK, testé en jeu (systemmenu FR)
+- ⏳ CZ1 8-bit palette : code prêt, à tester (system_icon, NUM files)
+- ✅ Fichiers non-CZ : warning au lieu de crash
+- ✅ CZ0 : correctement identifié dans les logs d'extraction
+
+
+# Technical Analysis — LuckSystem-Yoremi-version 2
 
 Technical document detailing the 7 patches applied to LuckSystem 2.3.2 for visual novel translation support.
 
