@@ -1,3 +1,167 @@
+# V3.1 — Patch 1 : Correction décompilation scripts Little Busters EN
+
+## Fichiers modifiés
+- `game/operator/generic.go` — **nouveau** : opérateur fallback générique
+- `game/VM/vm.go` — nil guard + instanciation fallback
+- `cmd/scriptDecompile.go` — auto-détection GameName depuis chemin OPCODE
+- `cmd/scriptImport.go` — même auto-détection
+- `game/game.go` — validation des entrées scripts + panic recovery
+
+## Bug 1 : nil pointer dereference dans `NewVM()` (vm.go:48)
+
+### Contexte
+La commande `script decompile` sans flag `-p` (plugin Python) passe par `scriptDecompile.go` qui construit les options VM avec `GameName: "Custom"`. La chaîne d'appel :
+
+```
+scriptDecompile.go → game.LoadGame() → game.load() → VM.NewVM(opts)
+                                                          ↓
+                                                   switch opts.GameName {
+                                                   case "LB_EN": vm.Operate = operator.NewLB_EN()
+                                                   case "SP":    vm.Operate = operator.NewSP()
+                                                   }
+                                                   // "Custom" → aucun case → vm.Operate = nil
+                                                   vm.Operate.Init(vm.Runtime)  ← PANIC
+```
+
+### Stack trace
+```
+goroutine 1 [running]:
+lucksystem/game/VM.(*VM).NewVM(...)
+    game/VM/vm.go:48
+lucksystem/game.(*Game).load(...)
+    game/game.go:53
+lucksystem/cmd.scriptDecompile(...)
+    cmd/scriptDecompile.go:26
+```
+
+### Fix
+
+**`cmd/scriptDecompile.go` — auto-détection**
+```go
+func detectGameName(opcodePath string) string {
+    if opcodePath == "" { return "Custom" }
+    dir := filepath.Dir(opcodePath)
+    dirName := strings.ToUpper(filepath.Base(dir))
+    knownGames := []string{"LB_EN", "SP"}
+    for _, g := range knownGames {
+        if dirName == g { return g }
+    }
+    return "Custom"
+}
+```
+Avec `data\LB_EN\OPCODE.txt` → `filepath.Dir` = `data\LB_EN` → `filepath.Base` = `LB_EN` → match → utilise opérateur LB_EN (MESSAGE, SELECT, BATTLE, TASK, SAYAVOICETEXT, VARSTR_SET, IMAGELOAD, MOVE).
+
+**`game/VM/vm.go` — nil guard**
+```go
+if vm.Operate == nil {
+    glog.Warningf("No game-specific operator for '%s', using generic fallback\n", opts.GameName)
+    vm.Operate = operator.NewGeneric()
+}
+vm.Runtime = runtime.NewRuntime(opts.Mode)
+vm.Operate.Init(vm.Runtime)
+```
+
+**`game/operator/generic.go` — opérateur générique**
+```go
+type Generic struct {
+    LucaOperateUndefined  // UNDEFINED dump pour opcodes inconnus
+    LucaOperateDefault    // IFN, IFY, GOTO, JUMP, FARCALL, GOSUB
+    LucaOperateExpr       // EQU, EQUN, ADD, RANDOM
+}
+
+func (g *Generic) Init(ctx *runtime.Runtime) {
+    ctx.Init(charset.ShiftJIS, charset.Unicode, true)
+}
+```
+Implémente l'interface `api.Operator` (seule méthode requise : `Init`). Les opcodes courants sont gérés par les structs embarquées, les opcodes inconnus sont dumpés via `LucaOperateUndefined`.
+
+## Bug 2 : SEEN8500/SEEN8501 — tables de données parsées comme scripts
+
+### Contexte
+SCRIPT.PAK de Little Busters contient 169 entrées dans sa table d'index (2916 slots, dont 169 non-nuls). Parmi elles, SEEN8500 et SEEN8501 ne sont **pas** des scripts mais des tables de données du mini-jeu de baseball.
+
+### Analyse du format PAK
+```
+SCRIPT.PAK header: 2916 entries, block_size=4, flags=0x200
+
+Script normal (SEEN0513):
+  offset=0, length=49052, data: [25 00 5b 01 ...]
+  → firstLen = 0x0025 = 37 bytes (longueur de la première CodeLine)
+
+Table de données (SEEN8500):
+  offset=17210032, length=7962, data: [00 00 5b 01 ...]
+  → firstLen = 0x0000 = 0 (pas un script!)
+
+Table de données (SEEN8501):
+  offset=17217996, length=52724, data: [00 00 5b 01 ...]
+  → firstLen = 0x0000 = 0 (pas un script!)
+```
+
+### Mécanisme du crash
+Dans `script.LoadScript()`, le parsing d'une CodeLine lit `Len` (uint16) en premiers 2 octets, puis appelle `restruct.Unpack` avec une taille calculée comme `size = Len - 4`. Avec `Len = 0` :
+```
+size = uint16(0) - 4 = 65532 (underflow uint16)
+→ restruct.Unpack tente de lire 65532 bytes → panic
+```
+
+### Fix
+
+**`game/game.go` — validation + recovery**
+```go
+func isValidScript(data []byte) bool {
+    if len(data) < 4 { return false }
+    firstLen := binary.LittleEndian.Uint16(data[0:2])
+    if firstLen < 4 { return false }  // Minimum CodeLine = 4 bytes (len + opcode + flag)
+    return true
+}
+
+func safeLoadScript(opts *script.LoadOptions) (scr *script.Script, err error) {
+    defer func() {
+        if r := recover(); r != nil {
+            err = fmt.Errorf("failed to parse script '%s': %v", opts.Entry.Name, r)
+            scr = nil
+        }
+    }()
+    scr = script.LoadScript(opts)
+    return scr, nil
+}
+```
+
+Dans `load()` :
+```go
+if !isValidScript(entry.Data) {
+    glog.Warningf("Skipping invalid script entry '%s' (firstLen < 4, likely data table)\n", entry.Name)
+    continue
+}
+scr, loadErr := safeLoadScript(&script.LoadOptions{Entry: entry})
+if loadErr != nil {
+    glog.Warningf("Skipping script '%s': %v\n", entry.Name, loadErr)
+    continue
+}
+```
+Double protection : validation structurelle + panic recovery pour les cas imprévus.
+
+## Résultat extraction Little Busters EN
+
+| Métrique | Valeur |
+|----------|--------|
+| Entrées PAK | 169 (sur 2916 slots) |
+| Scripts valides | 167 |
+| Scripts skippés | 2 (SEEN8500, SEEN8501) |
+| Scripts exportés | 161 (+ 6 scripts utilitaires : _ARFLAG, _VARSTR, _QUAKE, _SAYAVOICE, _KEYWORD, et scripts sans MESSAGE) |
+| Lignes MESSAGE | 102 795 |
+| Warnings opcodes | 1 461 (HAIKEI_SET, INIT, DRAW, WAIT, BGM, SE, FARRETURN, END, BTFUNC, KOEP, etc.) |
+
+Les warnings sont des opcodes visuels/audio non implémentés dans l'opérateur LB_EN. Ils n'affectent pas l'extraction du texte — les scripts sont exportés correctement avec toutes les lignes MESSAGE au format bilingue `MESSAGE (id, "日本語", "English")`.
+
+### Portée
+Affecte tout jeu LucaSystem sans fichier plugin Python dédié. La protection est double :
+1. **Auto-détection** : évite 99% des cas (l'utilisateur spécifie le bon chemin OPCODE)
+2. **Generic fallback** : empêche le crash pour tout jeu inconnu (opérateur minimal)
+3. **Validation scripts** : protège contre les entrées PAK non-script dans tout jeu
+
+---
+
 # V3 — Patch 3 : Correction import CZ2 (fonts)
 
 ## Fichiers modifiés
@@ -419,13 +583,22 @@ Using `data/base/air.py` directly as the `-p` argument avoids the import error, 
 
 | File | Patch | Description |
 |------|-------|-------------|
+| `game/operator/generic.go` | 15 | New: generic fallback operator |
+| `game/VM/vm.go` | 15 | Nil guard + generic fallback instantiation |
+| `cmd/scriptDecompile.go` | 15 | Auto-detection of GameName from OPCODE path |
+| `cmd/scriptImport.go` | 15 | Same auto-detection as scriptDecompile |
+| `game/game.go` | 15 | isValidScript() + safeLoadScript() |
+| `czimage/cz2.go` | 13 | CZ2 Import() resize fix + SetDimensions() |
+| `font/font.go` | 13 | Write() header sync before Import() |
+| `czimage/cz1.go` | 8-10 | CZ1 32-bit + 8-bit Import/Export rewrite |
+| `czimage/cz.go` | 10, 5 | Non-CZ graceful handling + CZ4 dispatcher |
+| `czimage/cz0.go` | 11 | CZ0 logging visibility |
 | `script/script.go` | 1 | Variable-length script import |
 | `czimage/cz3.go` | 2 | Magic byte, NRGBA conversion, logging |
 | `czimage/imagefix.go` | 2, 5 | Buffer aliasing fix + CZ4 delta encode/decode |
 | `czimage/lzw.go` | 3 | LZW dictionary memory corruption |
 | `czimage/util.go` | 4 | RawSize carry-over + UTF-8 length |
 | `czimage/cz4.go` | 5 | New: CZ4 format support |
-| `czimage/cz.go` | 5 | CZ4 dispatcher in LoadCzImage |
 | `pak/pak.go` | 6 | PAK block alignment padding |
 | `data/AIR.py` | 7 | Self-contained module, no base/ dependency |
 

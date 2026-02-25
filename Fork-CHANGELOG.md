@@ -2,6 +2,43 @@
 
 ---
 
+# V3.1 — Patch 1: Little Busters EN script decompile fix
+
+24/02/2026
+
+## Bug fixed: nil pointer crash + invalid script entries in `script decompile`
+
+### Problem
+`lucksystem script decompile -s SCRIPT.PAK -c UTF-8 -o WORK -O data\LB_EN\OPCODE.txt` crashed immediately with a nil pointer dereference. Two independent bugs prevented Little Busters EN (and any game without a `-p` plugin flag) from being decompiled.
+
+### Root cause 1 — `NewVM()` nil pointer on unknown GameName
+`scriptDecompile.go` hardcoded `GameName: "Custom"` when no `-p` plugin was specified. In `vm.go:NewVM()`, the switch only matched `"LB_EN"` and `"SP"` — any other value left `vm.Operate = nil`. Line 48 then called `vm.Operate.Init(vm.Runtime)` → panic nil pointer dereference.
+
+### Root cause 2 — SEEN8500/SEEN8501 data tables parsed as scripts
+SCRIPT.PAK contains 169 entries but only 167 are actual scripts. SEEN8500 and SEEN8501 are baseball mini-game data tables with `firstLen=0` (first 2 bytes of entry data). When `script.LoadScript()` called `restruct.Unpack` with `Len=0`, it computed `size = Len - 4` → unsigned underflow → crash.
+
+### Fix (5 files)
+
+**`game/operator/generic.go` (new)** — Generic fallback operator that handles common opcodes (IFN, IFY, GOTO, JUMP, FARCALL, GOSUB, EQU, EQUN, ADD, RANDOM) via embedded `LucaOperateDefault` + `LucaOperateExpr`. Unknown opcodes are dumped as `UNDEFINED` with uint16 params.
+
+**`game/VM/vm.go`** — Nil guard after the GameName switch: if `vm.Operate` is still nil, instantiate `operator.NewGeneric()` with a warning. This prevents the nil pointer crash for any unsupported game.
+
+**`cmd/scriptDecompile.go`** — Auto-detection of GameName from the OPCODE path: `data\LB_EN\OPCODE.txt` → parent dir `LB_EN` → uses the LB_EN-specific operator (MESSAGE, SELECT, BATTLE, TASK handlers). Falls back to `"Custom"` if the directory name doesn't match any known game.
+
+**`cmd/scriptImport.go`** — Same auto-detection logic as scriptDecompile.go.
+
+**`game/game.go`** — Added `isValidScript()` pre-check (rejects entries with `firstLen < 4`) and `safeLoadScript()` panic recovery wrapper. SEEN8500/SEEN8501 are now skipped with a warning instead of crashing.
+
+### Result
+- 161 scripts decompiled successfully (SEEN8500/8501 skipped with warning)
+- 102,795 MESSAGE lines extracted (bilingual JP/EN format)
+- 1,461 opcode warnings for unhandled visual/audio opcodes (HAIKEI_SET, INIT, DRAW, WAIT, BGM, SE…) — expected, does not affect text extraction
+
+### Games affected
+Any game without a dedicated Python plugin file, including Little Busters EN, Kanon, Harmonia, LOOPERS, LUNARiA, Planetarian.
+
+---
+
 # V3 — Patch 3: CZ2 Font Import Fix + GUI improvements
 
 22/02/2026
@@ -187,6 +224,43 @@ The AIR.py definition script used `from base.air import *` to import functions f
 - **Yoremi** — all patches, AIR French translation, GUI
 
 ---
+---
+
+# V3.1 — Patch 1 : Correction décompilation scripts Little Busters EN
+
+24/02/2026
+
+## Bug corrigé : crash nil pointer + entrées de scripts invalides dans `script decompile`
+
+### Problème
+`lucksystem script decompile -s SCRIPT.PAK -c UTF-8 -o WORK -O data\LB_EN\OPCODE.txt` crashait immédiatement avec un nil pointer dereference. Deux bugs indépendants empêchaient Little Busters EN (et tout jeu sans flag `-p` plugin) d'être décompilé.
+
+### Cause racine 1 — Nil pointer dans `NewVM()` sur GameName inconnu
+`scriptDecompile.go` codait en dur `GameName: "Custom"` quand aucun `-p` plugin n'était spécifié. Dans `vm.go:NewVM()`, le switch ne matchait que `"LB_EN"` et `"SP"` — toute autre valeur laissait `vm.Operate = nil`. La ligne 48 appelait ensuite `vm.Operate.Init(vm.Runtime)` → panic nil pointer dereference.
+
+### Cause racine 2 — SEEN8500/SEEN8501 (tables de données parsées comme scripts)
+SCRIPT.PAK contient 169 entrées mais seulement 167 sont des scripts. SEEN8500 et SEEN8501 sont des tables de données du mini-jeu de baseball avec `firstLen=0` (premiers 2 octets des données). Quand `script.LoadScript()` appelait `restruct.Unpack` avec `Len=0`, il calculait `size = Len - 4` → underflow non signé → crash.
+
+### Fix (5 fichiers)
+
+**`game/operator/generic.go` (nouveau)** — Opérateur fallback générique qui gère les opcodes courants (IFN, IFY, GOTO, JUMP, FARCALL, GOSUB, EQU, EQUN, ADD, RANDOM) via `LucaOperateDefault` + `LucaOperateExpr` embarqués. Les opcodes inconnus sont dumpés en `UNDEFINED` avec les paramètres en uint16.
+
+**`game/VM/vm.go`** — Nil guard après le switch GameName : si `vm.Operate` est toujours nil, instanciation de `operator.NewGeneric()` avec un warning. Cela empêche le crash nil pointer pour tout jeu non supporté.
+
+**`cmd/scriptDecompile.go`** — Auto-détection du GameName depuis le chemin OPCODE : `data\LB_EN\OPCODE.txt` → dossier parent `LB_EN` → utilise l'opérateur spécifique LB_EN (handlers MESSAGE, SELECT, BATTLE, TASK). Retombe sur `"Custom"` si le nom de dossier ne correspond à aucun jeu connu.
+
+**`cmd/scriptImport.go`** — Même logique d'auto-détection que scriptDecompile.go.
+
+**`game/game.go`** — Ajout de `isValidScript()` (rejette les entrées avec `firstLen < 4`) et `safeLoadScript()` (recovery de panic). SEEN8500/SEEN8501 sont désormais skippés avec un warning au lieu de crasher.
+
+### Résultat
+- 161 scripts décompilés avec succès (SEEN8500/8501 skippés avec warning)
+- 102 795 lignes MESSAGE extraites (format bilingue JP/EN)
+- 1 461 warnings d'opcodes non gérés pour les opcodes visuels/audio (HAIKEI_SET, INIT, DRAW, WAIT, BGM, SE…) — attendu, n'affecte pas l'extraction du texte
+
+### Jeux concernés
+Tout jeu sans fichier plugin Python dédié, dont Little Busters EN, Kanon, Harmonia, LOOPERS, LUNARiA, Planetarian.
+
 ---
 
 # V3 — Patch 3 : Correction import CZ2 (fonts) + améliorations GUI
