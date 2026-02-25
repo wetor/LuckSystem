@@ -44,6 +44,15 @@ func NewVM(opts *Options) *VM {
 			vm.Operate = operator.NewSP()
 		}
 	}
+	// PATCH YOREMI: Fallback — if no operator was matched (no plugin, unknown GameName),
+	// use a generic operator to avoid nil pointer dereference.
+	// The generic operator handles common opcodes (IFN, IFY, GOTO, JUMP, EQU, etc.)
+	// but game-specific opcodes (MESSAGE, SELECT, BATTLE, TASK...) will be handled
+	// by UNDEFINED which dumps params as uint16.
+	if vm.Operate == nil {
+		glog.Warningf("No game-specific operator for '%s', using generic fallback\n", opts.GameName)
+		vm.Operate = operator.NewGeneric()
+	}
 	vm.Runtime = runtime.NewRuntime(opts.Mode)
 	vm.Operate.Init(vm.Runtime)
 	return vm

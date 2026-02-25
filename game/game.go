@@ -2,6 +2,8 @@ package game
 
 import (
 	"bytes"
+	"encoding/binary"
+	"fmt"
 	"os"
 	"path"
 	"path/filepath"
@@ -72,6 +74,36 @@ func (g *Game) LoadScriptResources(file string) {
 	g.load()
 }
 
+// PATCH YOREMI: isValidScript checks if entry data looks like a valid LucaSystem script.
+// Invalid entries (data tables, mini-game data, etc.) have firstLen=0 or firstLen < 4,
+// which would cause restruct.Unpack to panic with size underflow.
+// A valid CodeLine needs at least 4 bytes: 2 (Len) + 1 (Opcode) + 1 (FixedFlag).
+func isValidScript(data []byte) bool {
+	if len(data) < 4 {
+		return false
+	}
+	firstLen := binary.LittleEndian.Uint16(data[0:2])
+	// Minimum valid CodeLine length is 4 (header only, no params)
+	// Also reject suspiciously large values that would exceed the data
+	if firstLen < 4 {
+		return false
+	}
+	return true
+}
+
+// PATCH YOREMI: safeLoadScript wraps script.LoadScript with panic recovery
+// to gracefully skip scripts that cause parsing errors.
+func safeLoadScript(opts *script.LoadOptions) (scr *script.Script, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("failed to parse script '%s': %v", opts.Entry.Name, r)
+			scr = nil
+		}
+	}()
+	scr = script.LoadScript(opts)
+	return scr, nil
+}
+
 func (g *Game) load() {
 	var err error
 	for key, p := range g.Resources {
@@ -87,10 +119,27 @@ func (g *Game) load() {
 					glog.V(6).Infoln("Pass", entry.Name)
 					continue
 				}
+
+				// PATCH YOREMI: Validate script data before attempting to parse.
+				// Some PAK entries (e.g. SEEN8500, SEEN8501 in Little Busters)
+				// are data tables, not scripts. Their firstLen=0 causes
+				// restruct.Unpack to panic with size underflow.
+				if !isValidScript(entry.Data) {
+					glog.Warningf("Skipping invalid script entry '%s' (firstLen < 4, likely data table)\n", entry.Name)
+					continue
+				}
+
 				glog.V(6).Infof("%v %v\n", entry.Name, len(entry.Data))
-				scr := script.LoadScript(&script.LoadOptions{
+
+				// PATCH YOREMI: Use safe loading with panic recovery
+				scr, loadErr := safeLoadScript(&script.LoadOptions{
 					Entry: entry,
 				})
+				if loadErr != nil {
+					glog.Warningf("Skipping script '%s': %v\n", entry.Name, loadErr)
+					continue
+				}
+
 				g.VM.LoadScript(scr, false)
 				g.ScriptList = append(g.ScriptList, scr.Name)
 				g.VM.ScriptNames[scr.Name] = struct{}{}
