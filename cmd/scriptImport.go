@@ -4,6 +4,7 @@ Copyright © 2022 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/go-restruct/restruct"
@@ -21,8 +22,18 @@ var scriptImportCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		restruct.EnableExprBeta()
 		game.ScriptBlackList = append(game.ScriptBlackList, strings.Split(ScriptBlackList, ",")...)
+
+		// PATCH YOREMI: Auto-detect game name from opcode file path (same as decompile)
+		gameName := "Custom"
+		if ScriptPlugin == "" && ScriptOpcode != "" {
+			gameName = detectGameName(ScriptOpcode)
+			if gameName != "Custom" {
+				fmt.Printf("Auto-detected game: %s (from opcode path)\n", gameName)
+			}
+		}
+
 		g := game.NewGame(&game.GameOptions{
-			GameName:   "Custom",
+			GameName:   gameName,
 			PluginFile: ScriptPlugin,
 			OpcodeFile: ScriptOpcode,
 			Coding:     charset.Charset(Charset),
