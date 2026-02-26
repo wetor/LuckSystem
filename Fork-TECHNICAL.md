@@ -1,3 +1,206 @@
+# V3.1.2 — Patch 1 : Correction séparateurs de chemins PAK (Windows)
+
+## Fichiers modifiés
+- `pak/pak.go` — `path.Base`/`path.Join` → `filepath.Base`/`filepath.Join` + fuite err/fd
+
+## Bug 1 : crash `pak replace` mode dossier — `path.Base` vs `filepath.Base`
+
+### Contexte
+La commande `pak replace` en mode dossier (`-i <folder>`) utilise `utils.GetDirFileList()` qui appelle `filepath.Walk()` pour lister les fichiers. Sous Windows, les chemins retournés utilisent `\` comme séparateur.
+
+### Mécanisme du crash
+```go
+// pak.go ligne 532 (original)
+name := path.Base(file)
+// file = "C:\Users\jeuxpc\Desktop\WORK\CG FR\OTHCG\Nouveau dossier\msg_01k_en"
+// path.Base (package "path", POSIX) ne reconnaît que '/' comme séparateur
+// → name = "C:\Users\jeuxpc\Desktop\WORK\CG FR\OTHCG\Nouveau dossier\msg_01k_en"
+//   (chemin complet retourné tel quel !)
+
+p.CheckName(name)           // → false (aucun fichier PAK ne porte ce nom)
+id, err = strconv.Atoi(name) // → strconv.Atoi("C:\Users\...") → erreur
+glog.V(2).Infof("Skip File: %s\n", name)  // → skip
+continue
+// ... après le dernier fichier, la boucle se termine
+// → return err  ← err contient encore l'erreur strconv.Atoi du dernier skip
+```
+
+Le `return err` en ligne 559 propage l'erreur au lieu de `nil` car `err` est la variable du scope externe, écrasée par `strconv.Atoi`.
+
+### Stack trace
+```
+F0226 17:47:57.895715 pakReplace.go:38] strconv.Atoi: parsing "C:\Users\...\msg_01k_en": invalid syntax
+```
+Le `glog.Fatalln(err)` dans `pakReplace.go:38` capture l'erreur retournée par `p.Import()`.
+
+### Fix
+```go
+// AVANT (bugged)
+name := path.Base(file)         // POSIX seulement
+fs, _ := os.Open(file)          // erreur ignorée, fd jamais fermé si skip
+id, err = strconv.Atoi(name)    // écrase err du scope externe
+
+// APRÈS (fixed)
+name := filepath.Base(file)     // séparateur natif OS
+fs, openErr := os.Open(file)    // erreur gérée
+if openErr != nil {
+    glog.V(2).Infof("Skip File (open error): %s — %v\n", name, openErr)
+    continue
+}
+// ...
+id, parseErr := strconv.Atoi(name)  // variable locale, pas de fuite
+if parseErr != nil {
+    glog.V(2).Infof("Skip File: %s\n", name)
+    fs.Close()                       // fd fermé avant continue
+    continue
+}
+```
+
+## Bug 2 : corruption CZ via fichiers liste à chemins mixtes — `path.Join` vs `filepath.Join`
+
+### Contexte
+La commande `pak extract --all` génère un fichier liste (txt) avec un chemin par ligne :
+```
+name:aug_01,C:\Users\jeuxpc\Desktop\WORK\OTHCG_extracted/aug_01
+```
+
+Le `/` en fin de chemin vient de `path.Join()` (POSIX) utilisé dans `Export()` lignes 412/415, alors que le préfixe du chemin utilise `\` (Windows natif via `filepath.Abs()`).
+
+### Mécanisme de la corruption
+Lors du `pak replace -l` avec ce fichier liste, `os.Open(mixedPath)` réussit (Windows tolère les `/`), mais le matching avec les entrées PAK produit des incohérences subtiles dans le calcul des offsets lors du rebuild, corrompant les données des fichiers voisins non-remplacés.
+
+### Fix
+```go
+// AVANT
+file = path.Join(dir, e.Name)              // → "C:\...\extracted/aug_01" (mixte)
+
+// APRÈS
+file = filepath.Join(dir, e.Name)           // → "C:\...\extracted\aug_01" (natif)
+```
+
+### Bugs secondaires corrigés
+
+**Fuite de descripteur de fichier** : `fs, _ := os.Open(file)` était appelé avant toute vérification. Si le fichier était skippé via `continue`, le fd n'était jamais fermé → fuite de ressources proportionnelle au nombre de fichiers skippés.
+
+**Import `"path"` inutile** : Après remplacement de tous les `path.X` par `filepath.X`, l'import `"path"` a été supprimé.
+
+### Portée
+Affecte **uniquement Windows** — sur Linux/macOS, `path.Base` et `filepath.Base` produisent le même résultat car le séparateur est `/` dans les deux cas. Le bug était présent depuis l'écriture originale de pak.go par wetor (toutes les versions).
+
+---
+
+# V3.1.1 — Patch 1 : Réduction verbosité warnings opcodes indéfinis
+
+## Fichiers modifiés
+- `game/operator/undefined_operate.go` — remplacement logging per-opcode par compteur silencieux + résumé
+- `cmd/scriptDecompile.go` — appel résumé après RunScript()
+- `cmd/scriptImport.go` — même appel résumé
+
+## Problème : fausse boucle infinie lors de la décompilation LB_EN
+
+### Contexte
+La méthode `UNDEFINED()` dans `undefined_operate.go` est appelée par la VM pour chaque opcode non reconnu par l'opérateur du jeu. Pour LB_EN, 1 461 opcodes visuels/audio (HAIKEI_SET, INIT, DRAW, WAIT, BGM, SE, etc.) ne sont pas implémentés et transitent tous par `UNDEFINED()`.
+
+### Mécanisme du problème
+```go
+func (g *LucaOperateUndefined) UNDEFINED(ctx *runtime.Runtime, opcode string) engine.HandlerFunc {
+    glog.V(5).Infoln(ctx.CIndex, "Operation不存在", opcode)  // ← 1461 appels
+    // ...
+}
+```
+
+Chaque appel à `glog.V(5).Infoln()` produit une ligne de log. Avec 1 461 opcodes indéfinis, cela représente 89% du log total (1 461 lignes sur 1 642). Sur une machine lente ou via la GUI (qui capture stdout en temps réel), le défilement des warnings prend plus de 2 minutes, créant l'illusion d'une boucle infinie.
+
+L'extraction réelle (parsing PAK + exécution VM + export fichiers) ne prend que ~5 secondes.
+
+### Fix
+
+**`game/operator/undefined_operate.go` — opcodeTracker**
+
+Remplacement du logging immédiat par un accumulateur thread-safe :
+
+```go
+var undefinedTracker = &opcodeTracker{
+    counts: make(map[string]int),
+}
+
+type opcodeTracker struct {
+    mu     sync.Mutex
+    counts map[string]int  // opcode name → occurrence count
+    total  int
+}
+
+func (t *opcodeTracker) Track(opcode string) {
+    t.mu.Lock()
+    defer t.mu.Unlock()
+    t.counts[opcode]++
+    t.total++
+}
+```
+
+La méthode `Summary()` produit un bloc formaté trié par fréquence décroissante :
+```go
+func (t *opcodeTracker) Summary() string {
+    // Sort by count descending
+    // Format: "[INFO] 1461 undefined opcodes skipped (15 unique types):\n"
+    //         "  HAIKEI_SET            x312\n"
+    //         "  WAIT                  x245\n"
+    //         ...
+}
+```
+
+La fonction exportée `PrintUndefinedOpcodeSummary()` affiche le résumé puis réinitialise le tracker :
+```go
+func PrintUndefinedOpcodeSummary() {
+    summary := undefinedTracker.Summary()
+    if summary != "" {
+        fmt.Println(summary)
+    }
+    undefinedTracker.Reset()
+}
+```
+
+La méthode `UNDEFINED()` ne log plus rien, elle accumule silencieusement :
+```go
+func (g *LucaOperateUndefined) UNDEFINED(ctx *runtime.Runtime, opcode string) engine.HandlerFunc {
+    code := ctx.Code()
+    if len(opcode) == 0 {
+        opcode = ToString("%X", code.Opcode)
+    }
+    undefinedTracker.Track(opcode)  // silencieux
+    // ... reste du traitement identique
+}
+```
+
+**`cmd/scriptDecompile.go` et `cmd/scriptImport.go`**
+
+Ajout de l'import `"lucksystem/game/operator"` et appel après `g.RunScript()` :
+```go
+g.RunScript()
+operator.PrintUndefinedOpcodeSummary()  // ← nouveau
+g.ExportScript(ScriptExportDir, ScriptNoSubDir)
+```
+
+### Thread safety
+Le `sync.Mutex` est nécessaire car `UNDEFINED()` peut être appelé depuis plusieurs goroutines si la VM exécute des scripts en parallèle. En pratique, l'exécution actuelle est séquentielle (`RunScript()` itère les scripts un par un), mais la protection est préventive.
+
+### Sortie console résultante
+```
+[INFO] 1461 undefined opcodes skipped (15 unique types):
+  HAIKEI_SET            x312
+  WAIT                  x245
+  DRAW                  x198
+  BGM                   x87
+  SE                    x74
+  ...
+These are non-text opcodes (visual/audio/system) and can be safely ignored for translation work.
+```
+
+### Portée
+Affecte toute décompilation/import produisant des opcodes indéfinis. Le comportement fonctionnel est identique — seul l'affichage change (1 bloc résumé au lieu de N lignes individuelles).
+
+---
+
 # V3.1 — Patch 1 : Correction décompilation scripts Little Busters EN
 
 ## Fichiers modifiés
@@ -583,10 +786,12 @@ Using `data/base/air.py` directly as the `-p` argument avoids the import error, 
 
 | File | Patch | Description |
 |------|-------|-------------|
+| `game/operator/undefined_operate.go` | 16 | Silent opcode tracker + summary |
+| `pak/pak.go` | 6, 17 | Block alignment padding + path separator fix (filepath.Base/Join) |
+| `cmd/scriptDecompile.go` | 15, 16 | Auto-detection GameName + opcode summary call |
+| `cmd/scriptImport.go` | 15, 16 | Same auto-detection + opcode summary call |
 | `game/operator/generic.go` | 15 | New: generic fallback operator |
 | `game/VM/vm.go` | 15 | Nil guard + generic fallback instantiation |
-| `cmd/scriptDecompile.go` | 15 | Auto-detection of GameName from OPCODE path |
-| `cmd/scriptImport.go` | 15 | Same auto-detection as scriptDecompile |
 | `game/game.go` | 15 | isValidScript() + safeLoadScript() |
 | `czimage/cz2.go` | 13 | CZ2 Import() resize fix + SetDimensions() |
 | `font/font.go` | 13 | Write() header sync before Import() |
@@ -599,7 +804,6 @@ Using `data/base/air.py` directly as the `-p` argument avoids the import error, 
 | `czimage/lzw.go` | 3 | LZW dictionary memory corruption |
 | `czimage/util.go` | 4 | RawSize carry-over + UTF-8 length |
 | `czimage/cz4.go` | 5 | New: CZ4 format support |
-| `pak/pak.go` | 6 | PAK block alignment padding |
 | `data/AIR.py` | 7 | Self-contained module, no base/ dependency |
 
 ## Known remaining issues

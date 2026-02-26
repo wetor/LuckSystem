@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -409,10 +408,10 @@ func (p *Pak) Export(w io.Writer, mode string, value interface{}) error {
 			line := ""
 			if len(e.Name) != 0 {
 
-				file = path.Join(dir, e.Name)
+				file = filepath.Join(dir, e.Name)
 				line = fmt.Sprintf("name:%s,%s\n", e.Name, file)
 			} else {
-				file = path.Join(dir, strconv.Itoa(e.ID))
+				file = filepath.Join(dir, strconv.Itoa(e.ID))
 				line = fmt.Sprintf("id:%d,%s\n", e.ID, file)
 			}
 			_, err = w.Write([]byte(line))
@@ -523,30 +522,36 @@ func (p *Pak) Import(r io.Reader, mode string, value interface{}) error {
 
 	case "dir":
 		var files []string
-		var id int
 		files, err = utils.GetDirFileList(value.(string))
 		if err != nil {
 			return err
 		}
 		for _, file := range files {
-			name := path.Base(file)
-			fs, _ := os.Open(file)
+			name := filepath.Base(file)
+			fs, openErr := os.Open(file)
+			if openErr != nil {
+				glog.V(2).Infof("Skip File (open error): %s — %v\n", name, openErr)
+				continue
+			}
 			if p.CheckName(name) {
 				err = p.Set(name, fs)
 			} else {
-				id, err = strconv.Atoi(name)
-				if err != nil {
+				id, parseErr := strconv.Atoi(name)
+				if parseErr != nil {
 					glog.V(2).Infof("Skip File: %s\n", name)
+					fs.Close()
 					continue
 				}
 				if p.CheckId(id) {
 					err = p.SetById(id, fs)
 				} else {
 					glog.V(2).Infof("Skip File: %s\n", name)
+					fs.Close()
 					continue
 				}
 			}
 			if err != nil {
+				fs.Close()
 				glog.V(2).Infof("%v %s\n", err, file)
 				return err
 			}
