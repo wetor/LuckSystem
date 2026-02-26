@@ -39,7 +39,21 @@ A Linux version is available as separate binaries (GUI + CLI). See the releases 
 
 ## Patches
 
-### Version 3.1 — Patch 1 *(latest)*
+### Version 3.1.2 — Patch 1 *(latest)*
+
+17. **PAK Import/Export path separator fix (Windows)** — `pak/pak.go`
+    - `path.Base()` → `filepath.Base()` in Import dir mode: fixed crash `strconv.Atoi` on full Windows paths
+    - `path.Join()` → `filepath.Join()` in Export: fixed mixed `/`+`\` separators in list files causing CZ corruption on re-import
+    - Fixed error variable leak (`err` scope) and file handle leak on skipped files
+
+### Version 3.1.1 — Patch 1
+
+16. **Undefined opcode warning verbosity reduction** — `game/operator/undefined_operate.go`, `cmd/scriptDecompile.go`, `cmd/scriptImport.go`
+    - Replaced per-opcode `glog.V(5).Infoln()` (1,461 lines for LB_EN) with silent `opcodeTracker` accumulator
+    - Single sorted summary block printed after `RunScript()` completes
+    - Eliminates false "infinite loop" appearance on slow machines and in GUI
+
+### Version 3.1 — Patch 1
 
 15. **Little Busters EN script decompile fix** — `game/VM/vm.go`, `game/game.go`, `game/operator/generic.go` (new), `cmd/scriptDecompile.go`, `cmd/scriptImport.go`
     - `NewVM()`: nil pointer crash when no game-specific operator matched (e.g., `GameName: "Custom"`) — added nil guard + generic fallback operator
@@ -142,7 +156,7 @@ lucksystem font edit -s 明朝32 -S info32 -f Arial.ttf -o 明朝32_out -O info3
 - **[wetor](https://github.com/wetor)** — LuckSystem original
 - **masagrator** — RawSize bug identification (CZ3 layers)
 - **[G2-Games](https://github.com/G2-Games)** — CZ4 reference ([lbee-utils](https://github.com/G2-Games/lbee-utils))
-- **Yoremi** — patches 1-14, AIR French translation, GUI
+- **Yoremi** — patches 1-17, AIR French translation, GUI
 --------------------
 # Important
 This project only accepts **bug issues** and **pull requests**, and does not provide assistance in use  
