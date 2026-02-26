@@ -4,13 +4,13 @@ Copyright © 2022 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/go-restruct/restruct"
 	"lucksystem/charset"
 	"lucksystem/game"
 	"lucksystem/game/enum"
+	"lucksystem/game/operator"
 
 	"github.com/spf13/cobra"
 )
@@ -22,18 +22,8 @@ var scriptImportCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		restruct.EnableExprBeta()
 		game.ScriptBlackList = append(game.ScriptBlackList, strings.Split(ScriptBlackList, ",")...)
-
-		// PATCH YOREMI: Auto-detect game name from opcode file path (same as decompile)
-		gameName := "Custom"
-		if ScriptPlugin == "" && ScriptOpcode != "" {
-			gameName = detectGameName(ScriptOpcode)
-			if gameName != "Custom" {
-				fmt.Printf("Auto-detected game: %s (from opcode path)\n", gameName)
-			}
-		}
-
 		g := game.NewGame(&game.GameOptions{
-			GameName:   gameName,
+			GameName:   "Custom",
 			PluginFile: ScriptPlugin,
 			OpcodeFile: ScriptOpcode,
 			Coding:     charset.Charset(Charset),
@@ -42,6 +32,10 @@ var scriptImportCmd = &cobra.Command{
 		g.LoadScriptResources(ScriptSource)
 		g.ImportScript(ScriptImportDir, ScriptNoSubDir)
 		g.RunScript()
+
+		// Print summary of undefined (non-text) opcodes that were skipped
+		operator.PrintUndefinedOpcodeSummary()
+
 		g.ImportScriptWrite(ScriptImportOutput)
 
 	},
