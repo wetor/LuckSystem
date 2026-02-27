@@ -36,6 +36,12 @@ Une version Linux est disponibleen binaires séparés (GUI + CLI). Voir les rele
 A Linux version is available as separate binaries (GUI + CLI). See the releases for download.
 
 ---
+### Version 3.1.3 — Patch 1 *(latest)*
+
+18. **Script decompile GameName auto-detection** — `cmd/scriptDecompile.go`, `cmd/scriptImport.go`
+    - Added `detectGameName()`: extracts game name from OPCODE path (e.g. `data/LB_EN/OPCODE.txt` → `LB_EN`)
+    - Ensures `LB_EN` operator is used instead of generic fallback → MESSAGE/SELECT/BATTLE decoded as text, not raw codepoints
+    - Priority: plugin `.py` > auto-detect from `-O` path > `"Custom"` generic fallback
 
 ## Patches
 
