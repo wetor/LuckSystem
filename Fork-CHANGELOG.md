@@ -1,7 +1,69 @@
 # LuckSystem — Yoremi Fork — CHANGELOG
 
----
+# V3.1.3 — Patch 1: Script decompile GameName auto-detection fix
 
+27/02/2026
+
+## Bug fixed: MESSAGE/SELECT/BATTLE opcodes exported as raw codepoints instead of text
+
+### Problem
+Decompiling LB_EN scripts with `lucksystem script decompile -s SCRIPT.PAK -O data/LB_EN/OPCODE.txt` produced MESSAGE lines with raw Unicode codepoints instead of readable text:
+
+```
+MESSAGE (0, 12502, 12523, 12523, 12523, 12523, 8230, 12288, ...)
+```
+
+Expected output:
+```
+MESSAGE (0, "ブルルルル…　ブルルルル…", "Burururururu...  Burururururu...", 0x5)
+```
+
+All 161 scripts were affected — no dialogue text was visible, only numeric sequences. The same issue affected `script import` (round-trip would fail).
+
+### Root cause — `GameName: "Custom"` hardcoded in scriptDecompile.go / scriptImport.go
+
+Both `scriptDecompile.go` and `scriptImport.go` passed `GameName: "Custom"` to `game.NewGame()`, regardless of the OPCODE path provided. The dispatch chain:
+
+```
+scriptDecompile.go:  GameName: "Custom"          ← always hardcoded
+        ↓
+vm.go NewVM():  switch "Custom" → no match (not "LB_EN" nor "SP")
+        ↓
+vm.Operate = nil → fallback NewGeneric()         ← patch 15 safety net
+        ↓
+Generic has no MESSAGE() method → dispatch to UNDEFINED()
+        ↓
+UNDEFINED() calls AllToUint16() → dumps codepoints as numbers
+```
+
+The `LB_EN` operator (`operator/LB_EN.go`) already fully implements MESSAGE, SELECT, BATTLE, TASK, SAYAVOICETEXT, and VARSTR_SET with proper `DecodeString()` calls — it was simply never instantiated because the GameName never matched `"LB_EN"` in the switch.
+
+### Note on patch 15 (v3.1)
+Patch 15 documented "auto-detection of GameName from OPCODE path" but the implementation was incomplete — the `detectGameName()` function was not present in the delivered files. The generic fallback added in patch 15 prevented the nil pointer crash but did not solve the text decoding issue. This patch completes the auto-detection.
+
+### Fix (2 files)
+
+**`cmd/scriptDecompile.go`**
+- Added `detectGameName(opcodePath string) string` function: extracts parent directory from OPCODE path using `filepath.Dir()` + `filepath.Base()`, compares case-insensitive against known games (`LB_EN`, `SP`)
+- Auto-detection only runs when no plugin file (`-p`) is provided (plugins take priority)
+- Prints `[INFO] Auto-detected game: LB_EN (from OPCODE path)` when a match is found
+- Replaced `GameName: "Custom"` with `GameName: gameName`
+
+**`cmd/scriptImport.go`**
+- Same auto-detection logic using `detectGameName()` (defined in `scriptDecompile.go`, same package `cmd`)
+- Replaced `GameName: "Custom"` with `GameName: gameName`
+
+### Priority chain
+```
+Plugin (-p file.py)  →  highest priority (always used if provided)
+Auto-detect from -O  →  "data/LB_EN/OPCODE.txt" → "LB_EN"
+Fallback             →  "Custom" → NewGeneric()
+```
+
+### Games affected
+LB_EN and SP — any game that uses a Go operator (not a Python plugin) and has its OPCODE file in a subdirectory matching the game name.
+
+---
 # V3.1.2 — Patch 1: PAK Import/Export path separator fix (Windows)
 
 26/02/2026
