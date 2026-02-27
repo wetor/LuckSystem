@@ -1,3 +1,109 @@
+# V3.1.3 — Patch 1 : Correction auto-détection GameName (scripts LB_EN/SP)
+
+## Fichiers modifiés
+- `cmd/scriptDecompile.go` — ajout `detectGameName()` + remplacement `GameName: "Custom"` → dynamique
+- `cmd/scriptImport.go` — même auto-détection via `detectGameName()`
+
+## Contexte : architecture opérateur/VM
+
+Le système de décompilation de scripts fonctionne avec des **opérateurs** spécifiques à chaque jeu :
+
+```
+vm.go NewVM() — switch sur GameName :
+  "LB_EN" → operator.NewLB_EN()    ← MESSAGE(), SELECT(), BATTLE(), TASK(), SAYAVOICETEXT(), VARSTR_SET()
+  "SP"    → operator.NewSP()       ← MESSAGE(), SELECT()
+  autre   → operator.NewGeneric()  ← IFN, IFY, GOTO, JUMP, EQU... mais pas MESSAGE
+```
+
+Chaque opérateur définit des méthodes Go correspondant aux opcodes du jeu. La VM utilise la réflexion (`reflect.ValueOf(vm.Operate).MethodByName(opname)`) pour dispatcher chaque opcode vers la bonne méthode. Si la méthode n'existe pas, `UNDEFINED()` est appelé en fallback.
+
+L'opérateur `LB_EN.go` contient le parsing complet de MESSAGE :
+```go
+func (g *LB_EN) MESSAGE(ctx *runtime.Runtime) engine.HandlerFunc {
+    // ...
+    next = GetParam(code.ParamBytes, &msgStr_jp, next, 0, ctx.TextCharset)
+    next = GetParam(code.ParamBytes, &msgStr_en, next, 0, ctx.TextCharset)
+    // GetParam → DecodeString() → charset.ToUTF8(Unicode, bytes) → texte lisible
+}
+```
+
+## Bug : GameName jamais détecté
+
+### Flux avant patch
+```go
+// cmd/scriptDecompile.go (AVANT)
+g := game.NewGame(&game.GameOptions{
+    GameName: "Custom",        // ← TOUJOURS "Custom", même avec -O data/LB_EN/OPCODE.txt
+    // ...
+})
+```
+
+Résultat : `NewVM()` ne matche ni `"LB_EN"` ni `"SP"` → `NewGeneric()` → MESSAGE n'est pas défini → `UNDEFINED()` → `AllToUint16()` → codepoints bruts :
+```
+MESSAGE (0, 12502, 12523, 12523, 12523, 12523, 8230, ...)
+         ↑   ↑ブ    ↑ル    ↑ル    ↑ル    ↑ル    ↑…
+```
+
+### Flux après patch
+```go
+// cmd/scriptDecompile.go (APRÈS)
+gameName := "Custom"
+if ScriptPlugin == "" && ScriptOpcode != "" {
+    gameName = detectGameName(ScriptOpcode)
+}
+g := game.NewGame(&game.GameOptions{
+    GameName: gameName,        // ← "LB_EN" détecté depuis le chemin OPCODE
+    // ...
+})
+```
+
+## Implémentation de detectGameName()
+
+```go
+func detectGameName(opcodePath string) string {
+    if opcodePath == "" {
+        return "Custom"
+    }
+    dir := filepath.Dir(opcodePath)       // "data/LB_EN/OPCODE.txt" → "data/LB_EN"
+    name := filepath.Base(dir)            // "data/LB_EN" → "LB_EN"
+
+    knownGames := []string{"LB_EN", "SP"}
+    for _, g := range knownGames {
+        if strings.EqualFold(name, g) {   // comparaison insensible à la casse
+            return g
+        }
+    }
+    return "Custom"
+}
+```
+
+### Cas testés
+
+| Chemin OPCODE | `filepath.Dir()` | `filepath.Base()` | Résultat |
+|---|---|---|---|
+| `data/LB_EN/OPCODE.txt` | `data/LB_EN` | `LB_EN` | **LB_EN** |
+| `data\LB_EN\OPCODE.txt` | `data\LB_EN` | `LB_EN` | **LB_EN** |
+| `C:\...\data\LB_EN\OPCODE.txt` | `C:\...\data\LB_EN` | `LB_EN` | **LB_EN** |
+| `data/SP/OPCODE.txt` | `data/SP` | `SP` | **SP** |
+| `data/AIR.txt` | `data` | `data` | Custom (pas de match → plugin `.py` utilisé) |
+| `` (vide) | — | — | Custom |
+
+### Garde : priorité du plugin
+```go
+if ScriptPlugin == "" && ScriptOpcode != "" {
+    gameName = detectGameName(ScriptOpcode)
+}
+```
+Si un plugin `.py` est fourni (`-p data/AIR.py`), l'auto-détection est court-circuitée. Le plugin est toujours prioritaire car c'est lui qui fournit l'opérateur via gpython, indépendamment du GameName.
+
+### Note sur le patch 15
+Le patch 15 (v3.1) documentait l'auto-détection comme implémentée, mais les fichiers livrés contenaient encore `GameName: "Custom"`. Le fallback `NewGeneric()` ajouté au patch 15 empêchait le crash nil pointer (ce qui était l'objectif principal), mais ne résolvait pas le décodage des chaînes dans MESSAGE. Ce patch complète le travail.
+
+### Portée
+Affecte LB_EN et SP (jeux avec opérateur Go natif). Les jeux utilisant des plugins Python (AIR, LOOPERS, KANON, HARMONIA, etc.) ne sont pas affectés car le plugin crée son propre opérateur indépendamment du GameName.
+
+---
+
 # V3.1.2 — Patch 1 : Correction séparateurs de chemins PAK (Windows)
 
 ## Fichiers modifiés
