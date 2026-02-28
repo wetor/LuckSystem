@@ -18,24 +18,55 @@ import (
 )
 
 // detectGameName extracts the game name from the OPCODE file path.
-// For example: "data/LB_EN/OPCODE.txt" → "LB_EN", "data\LB_EN\OPCODE.txt" → "LB_EN"
+// It first checks the parent directory name (e.g. "data/LB_EN/OPCODE.txt"),
+// then falls back to searching anywhere in the path for a known game name.
 // Known game names: LB_EN, SP (matching the switch in vm.go NewVM)
 // Returns "Custom" if no known game name is found.
 func detectGameName(opcodePath string) string {
 	if opcodePath == "" {
 		return "Custom"
 	}
-	// Extract parent directory name using filepath (OS-native separators)
+
+	knownGames := []string{"LB_EN", "SP"}
+
+	// Strategy 1: Check parent directory name (most precise)
 	dir := filepath.Dir(opcodePath)
 	name := filepath.Base(dir)
-
-	// Check against known game names in vm.go
-	knownGames := []string{"LB_EN", "SP"}
 	for _, g := range knownGames {
 		if strings.EqualFold(name, g) {
-			return g // Return canonical name
+			return g
 		}
 	}
+
+	// Strategy 2: Search anywhere in the full path (case-insensitive)
+	normalizedPath := filepath.ToSlash(opcodePath)
+	upperPath := strings.ToUpper(normalizedPath)
+	for _, g := range knownGames {
+		if strings.Contains(upperPath, strings.ToUpper(g)) {
+			return g
+		}
+	}
+
+	return "Custom"
+}
+
+// resolveGameName determines the game name from explicit flag, auto-detection, or default.
+func resolveGameName() string {
+	// Priority 1: Explicit --game flag
+	if ScriptGameName != "" {
+		fmt.Printf("[INFO] Using game: %s (from --game flag)\n", ScriptGameName)
+		return ScriptGameName
+	}
+
+	// Priority 2: Auto-detect from OPCODE path
+	if ScriptPlugin == "" && ScriptOpcode != "" {
+		gameName := detectGameName(ScriptOpcode)
+		if gameName != "Custom" {
+			fmt.Printf("[INFO] Auto-detected game: %s (from OPCODE path)\n", gameName)
+			return gameName
+		}
+	}
+
 	return "Custom"
 }
 
@@ -48,17 +79,10 @@ var scriptDecompileCmd = &cobra.Command{
 		restruct.EnableExprBeta()
 		game.ScriptBlackList = append(game.ScriptBlackList, strings.Split(ScriptBlackList, ",")...)
 
-		// PATCH YOREMI: Auto-detect GameName from OPCODE path when no plugin is provided.
-		// e.g. -O data/LB_EN/OPCODE.txt → GameName="LB_EN" → uses operator.NewLB_EN()
+		// PATCH YOREMI: Resolve game name from --game flag or auto-detect from OPCODE path.
 		// This ensures MESSAGE/SELECT/BATTLE opcodes are properly decoded as text
 		// instead of raw uint16 codepoints via the generic fallback.
-		gameName := "Custom"
-		if ScriptPlugin == "" && ScriptOpcode != "" {
-			gameName = detectGameName(ScriptOpcode)
-			if gameName != "Custom" {
-				fmt.Printf("[INFO] Auto-detected game: %s (from OPCODE path)\n", gameName)
-			}
-		}
+		gameName := resolveGameName()
 
 		g := game.NewGame(&game.GameOptions{
 			GameName:   gameName,
