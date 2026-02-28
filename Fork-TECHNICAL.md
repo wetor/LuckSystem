@@ -1,3 +1,201 @@
+# V3.1.3 — Patch 3 : GUI — Détection automatique des presets de jeu depuis data/
+
+## Fichiers modifiés
+
+### GUI (LuckSystemGUI)
+- `app.go` — ajout `GamePreset` struct + `ScanGameData()`, import `sort`
+- `frontend/src/App.svelte` — import `ScanGameData`, variables `gamePresets`/`selectedPreset`, dropdown dynamique dans Decompile/Compile, rescan au changement de chemin lucksystem
+- `frontend/wailsjs/go/main/App.js` — binding `ScanGameData()`
+- `frontend/wailsjs/go/main/App.d.ts` — déclaration TypeScript
+
+## Contexte
+
+Patch 2 introduisait un dropdown statique avec seulement LB_EN / SP / Auto-detect. Or le dossier `data/` contient les fichiers OPCODE/plugin de 9 jeux (AIR, CartagraHD, HARMONIA, KANON, LB_EN, LOOPERS, LUNARiA, PlanetarianSG, SP). L'utilisateur devait manuellement parcourir les fichiers pour chaque jeu.
+
+## Structure du dossier data/
+
+```
+data/
+├── AIR.txt              ← OPCODE (racine)
+├── AIR.py               ← plugin Python
+├── CartagraHD.txt
+├── CartagraHD.py
+├── HARMONIA.txt
+├── HARMONIA.py
+├── KANON.txt
+├── KANON.py
+├── LB_EN/
+│   └── OPCODE.txt       ← OPCODE (sous-dossier)
+├── LOOPERS.txt
+├── LOOPERS.py
+├── LUNARiA.txt
+├── LUNARiA.py
+├── PlanetarianSG.txt
+├── PlanetarianSG.py
+├── SP/
+│   └── OPCODE.txt       ← OPCODE (sous-dossier)
+├── SP.py                ← plugin Python (au niveau racine)
+└── base/                ← modules Python internes (EXCLU du scan)
+    ├── air.py
+    ├── cartagrahd.py
+    └── ...
+```
+
+Deux conventions coexistent :
+- Jeux avec plugin Python : `data/GAME.txt` + `data/GAME.py` (AIR, KANON, HARMONIA, LOOPERS, LUNARiA, PlanetarianSG, CartagraHD)
+- Jeux avec opérateur Go uniquement : `data/GAME/OPCODE.txt` (LB_EN, SP — SP a aussi un plugin)
+
+## Implémentation : ScanGameData()
+
+```go
+type GamePreset struct {
+    Name       string `json:"name"`       // "AIR", "LB_EN", etc.
+    OpcodeFile string `json:"opcodeFile"` // Chemin absolu vers le .txt
+    PluginFile string `json:"pluginFile"` // Chemin absolu vers le .py (peut être vide)
+    GameFlag   string `json:"gameFlag"`   // Valeur pour le flag -g
+}
+
+func (a *App) ScanGameData() []GamePreset {
+    dataDir = filepath.Dir(a.lucksystem) + "/data"
+
+    // 1) Scan des sous-dossiers (LB_EN/, SP/)
+    //    Pour chaque sous-dossier (sauf base/), cherche les .txt
+    //    → GamePreset{Name: "LB_EN", OpcodeFile: ".../data/LB_EN/OPCODE.txt", ...}
+
+    // 2) Scan des .txt à la racine (AIR.txt, KANON.txt...)
+    //    → GamePreset{Name: "AIR", OpcodeFile: ".../data/AIR.txt", ...}
+
+    // Pour chaque preset : vérifie l'existence de data/GAME.py → PluginFile
+
+    // Tri alphabétique par nom
+    sort.Slice(presets, ...)
+}
+```
+
+### Résultat du scan sur data/
+
+| Preset | OpcodeFile | PluginFile | GameFlag |
+|---|---|---|---|
+| AIR | `data/AIR.txt` | `data/AIR.py` | AIR |
+| CartagraHD | `data/CartagraHD.txt` | `data/CartagraHD.py` | CartagraHD |
+| HARMONIA | `data/HARMONIA.txt` | `data/HARMONIA.py` | HARMONIA |
+| KANON | `data/KANON.txt` | `data/KANON.py` | KANON |
+| LB_EN | `data/LB_EN/OPCODE.txt` | *(aucun)* | LB_EN |
+| LOOPERS | `data/LOOPERS.txt` | `data/LOOPERS.py` | LOOPERS |
+| LUNARiA | `data/LUNARiA.txt` | `data/LUNARiA.py` | LUNARiA |
+| PlanetarianSG | `data/PlanetarianSG.txt` | `data/PlanetarianSG.py` | PlanetarianSG |
+| SP | `data/SP/OPCODE.txt` | `data/SP.py` | SP |
+
+### Frontend : dropdown dynamique
+
+Le dropdown "Game preset" remplace le dropdown statique LB_EN/SP/Auto-detect. Il est affiché uniquement si `gamePresets.length > 0`. Chaque entrée montre `(plugin)` si un fichier .py est associé.
+
+La sélection d'un preset appelle `applyPreset()` qui remplit automatiquement les champs `opcodeFile`, `pluginFile` et `gameName`. Le mode "— Manual —" vide les champs et laisse l'utilisateur parcourir manuellement.
+
+Les boutons "Select" manuels restent disponibles et réinitialisent `selectedPreset = ''` en cas d'override.
+
+Les presets sont re-scannés quand l'utilisateur change le chemin lucksystem via "Locate".
+
+---
+
+# V3.1.3 — Patch 2 : Flag `--game` / `-g` pour forcer le type de jeu (CLI + GUI)
+
+## Fichiers modifiés
+
+### CLI (lucksystem)
+- `cmd/script.go` — ajout `ScriptGameName` + flag persistant `--game`/`-g`
+- `cmd/scriptDecompile.go` — `resolveGameName()` : priorité flag > auto-detect > Custom ; `detectGameName()` étendu avec Strategy 2 (recherche dans tout le chemin)
+- `cmd/scriptImport.go` — utilise `resolveGameName()` partagé, suppression logique dupliquée et import `fmt` inutilisé
+
+### GUI (LuckSystemGUI)
+- `app.go` — paramètre `gameName` ajouté à `ScriptDecompile()` et `ScriptCompile()`, passé en `-g` si non vide
+- `frontend/src/App.svelte` — variable `gameName`, dropdown Game dans les formulaires Decompile/Compile
+- `frontend/wailsjs/go/main/App.js` — signatures mises à jour (6 args → 7 pour ScriptCompile, 5 → 6 pour ScriptDecompile)
+- `frontend/wailsjs/go/main/App.d.ts` — déclarations TypeScript mises à jour
+
+## Problème résolu
+
+Sous Linux, l'auto-détection du GameName depuis le chemin OPCODE (Patch 1) ne fonctionnait que si le dossier parent s'appelait exactement `LB_EN` ou `SP`. Si le fichier OPCODE était placé dans un dossier arbitraire (ex: `~/Bureau/OPCODE.txt`), le jeu retombait en "Custom" → opérateur générique → MESSAGE en codepoints bruts.
+
+## Implémentation CLI
+
+### Nouveau flag persistant (cmd/script.go)
+```go
+var ScriptGameName string
+scriptCmd.PersistentFlags().StringVarP(&ScriptGameName, "game", "g", "",
+    "Game name (e.g. LB_EN, SP). Overrides auto-detection from OPCODE path")
+```
+
+### resolveGameName() (cmd/scriptDecompile.go)
+```go
+func resolveGameName() string {
+    // Priority 1: Explicit --game flag (always wins)
+    if ScriptGameName != "" {
+        return ScriptGameName
+    }
+    // Priority 2: Auto-detect from OPCODE path
+    if ScriptPlugin == "" && ScriptOpcode != "" {
+        gameName := detectGameName(ScriptOpcode)
+        if gameName != "Custom" { return gameName }
+    }
+    return "Custom"
+}
+```
+
+### detectGameName() étendu — 2 stratégies
+```go
+func detectGameName(opcodePath string) string {
+    knownGames := []string{"LB_EN", "SP"}
+
+    // Strategy 1: Check parent directory (original — most precise)
+    dir := filepath.Dir(opcodePath)
+    name := filepath.Base(dir)
+    for _, g := range knownGames {
+        if strings.EqualFold(name, g) { return g }
+    }
+
+    // Strategy 2: Search anywhere in path (NEW — catches LB_EN in any position)
+    normalizedPath := filepath.ToSlash(opcodePath)
+    upperPath := strings.ToUpper(normalizedPath)
+    for _, g := range knownGames {
+        if strings.Contains(upperPath, strings.ToUpper(g)) { return g }
+    }
+
+    return "Custom"
+}
+```
+
+### Cas testés
+
+| Scénario | Résultat |
+|---|---|
+| `-O /tmp/opcode_plain/OPCODE.txt` (pas de LB_EN dans chemin) | `Custom` (bug reproduit) |
+| `-O /tmp/opcode_plain/OPCODE.txt -g LB_EN` | `LB_EN` (flag explicite) |
+| `-O /tmp/LB_EN/OPCODE.txt` | `LB_EN` (Strategy 1 : parent dir) |
+| `-O /tmp/project_LB_EN_scripts/opcodes/OPCODE.txt` | `LB_EN` (Strategy 2 : dans le chemin) |
+
+## Implémentation GUI
+
+### Backend (app.go)
+```go
+// Signatures modifiées — ajout du paramètre gameName
+func (a *App) ScriptDecompile(pakFile, opcodeFile, pluginFile, charsetStr, outputDir, gameName string) string {
+    // ...
+    if gameName != "" {
+        args = append(args, "-g", gameName)
+    }
+}
+
+func (a *App) ScriptCompile(pakFile, opcodeFile, pluginFile, charsetStr, importDir, outputPak, gameName string) string {
+    // même ajout de -g
+}
+```
+
+### Frontend (App.svelte)
+Dropdown "Game" ajouté entre Plugin et Charset dans les deux formulaires, avec les options Auto-detect / LB_EN / SP. La variable `gameName` est passée aux appels `ScriptDecompile()` et `ScriptCompile()`.
+
+---
+
 # V3.1.3 — Patch 1 : Correction auto-détection GameName (scripts LB_EN/SP)
 
 ## Fichiers modifiés
@@ -894,8 +1092,8 @@ Using `data/base/air.py` directly as the `-p` argument avoids the import error, 
 |------|-------|-------------|
 | `game/operator/undefined_operate.go` | 16 | Silent opcode tracker + summary |
 | `pak/pak.go` | 6, 17 | Block alignment padding + path separator fix (filepath.Base/Join) |
-| `cmd/scriptDecompile.go` | 15, 16 | Auto-detection GameName + opcode summary call |
-| `cmd/scriptImport.go` | 15, 16 | Same auto-detection + opcode summary call |
+| `cmd/scriptDecompile.go` | 15, 16, 18 | Auto-detection GameName + opcode summary call |
+| `cmd/scriptImport.go` | 15, 16, 18 | Auto-detection GameName + opcode summary call |
 | `game/operator/generic.go` | 15 | New: generic fallback operator |
 | `game/VM/vm.go` | 15 | Nil guard + generic fallback instantiation |
 | `game/game.go` | 15 | isValidScript() + safeLoadScript() |
