@@ -37,6 +37,26 @@ The GUI auto-detects `lucksystem.exe` in the same directory, current working dir
 | **Font Edit** | Redraw/append characters using a TTF font |
 | **Image Export** | Convert CZ images to PNG (single or batch) |
 | **Image Import** | Convert PNG back to CZ format (single or batch) |
+| **Dialogue Extract** | Extract translatable dialogue from decompiled scripts to TSV (single file or batch) |
+| **Dialogue Import** | Reimport translated dialogue from TSV back into scripts (single file or batch) |
+
+### Dialogue Extract / Import
+
+The Dialogue Extract and Import functions provide a streamlined translation workflow based on TSV files, replacing manual script editing.
+
+**Extract** scans decompiled script files (`.txt`) for translatable lines (`MESSAGE` and `LOG_BEGIN` entries) and exports them to tab-separated `.tsv` files. The language columns are numbered (Lang 1, Lang 2, Lang 3, Lang 4) rather than named, since the order of languages varies between games. You select which columns to extract via checkboxes.
+
+**Import** reads a translated `.tsv` file and reinjects the text back into the corresponding decompiled script. You select which column number contains the target language. Matching is done by sequential ID for robustness.
+
+Both operations support single-file and batch modes. The format auto-detection scans the script to determine the number of available language columns.
+
+**TSV format example:**
+```
+ID	TAG	Lang 2
+1	MESSAGE	`Rin@❝Stop bullying the weak!❞
+2	MESSAGE	`Riki@❝Masato... where are you going?❞
+3	LOG_BEGIN	Chapter 1
+```
 
 ## Supported games
 
