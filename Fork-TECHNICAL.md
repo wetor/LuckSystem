@@ -1,3 +1,220 @@
+# V3.1.4 — Patch 1 : Résolution des imports plugins et fix du crash nil-module
+
+## Fichiers modifiés
+
+### CLI (lucksystem)
+- `game/operator/plugin.go` — `NewPlugin()` : résolution absolue du chemin + ajout du dossier plugin à `sys.path` + correction de `CurDir` ; `Init()` et `UNDEFINED()` : nil-guard sur `g.module` ; nouveau log d'erreur lisible en cas d'échec de chargement
+
+## Contexte
+
+Le décompilateur de scripts plantait avec un panic Go (`nil pointer dereference`) sur tous les jeux dont le plugin Python utilise des imports de type package (`from base.xxx import *`). Seuls AIR (inliné en patch 7) et les jeux à opérateur Go (LB_EN, SP) fonctionnaient. Le panic masquait l'erreur Python réelle (`FileNotFoundError: 'Failed to resolve "base/kanon"'`) derrière une stack trace Go, rendant le diagnostic difficile.
+
+## Architecture des plugins Python
+
+Le dossier `data/` mélange deux types de fichiers :
+
+```
+data/
+├── KANON.txt              ← définitions OPCODE
+├── KANON.py               ← plugin (point d'entrée)
+├── AIR.txt
+├── AIR.py                 ← plugin inliné (pas d'import base/)
+├── ...
+└── base/                  ← modules partagés
+    ├── kanon.py           ← importé par KANON.py
+    ├── air.py
+    └── ...
+```
+
+`KANON.py` commence par :
+
+```python
+import core
+from base.kanon import *
+```
+
+L'import `from base.kanon import *` exige que le dossier contenant `base/` soit dans `sys.path` au moment où gpython résout l'import.
+
+## Diagnostic des deux bugs
+
+### Bug 1 — `sys.path` mal configuré dans `NewPlugin()`
+
+Code original :
+
+```go
+func NewPlugin(file string) *Plugin {
+    p := &Plugin{
+        file: file,
+        ctx: py.NewContext(py.ContextOpts{
+            SysPaths: []string{"."},        // ← cwd du process, pas du plugin
+        }),
+    }
+    var err error
+    p.module, err = py.RunFile(p.ctx, p.file, py.CompileOpts{
+        CurDir: "/",                        // ← invalide sous Windows
+    }, nil)
+    ...
+}
+```
+
+Deux problèmes :
+1. `SysPaths: []string{"."}` → gpython cherche `base/kanon.py` dans le **cwd du process** (généralement le dossier d'où `lucksystem.exe` a été lancé), pas dans le dossier du plugin (`data/`)
+2. `CurDir: "/"` → la racine du système ; sous Windows c'est invalide, sous Linux c'est inutile
+
+Conséquence : l'import échoue sauf si l'utilisateur lance lucksystem depuis le dossier `data/` lui-même — ce qui n'arrive jamais en pratique (la GUI lance depuis le dossier du binaire, et la CLI est typiquement lancée depuis le dossier de travail du patch).
+
+### Bug 2 — Pas de nil-check sur `g.module` après échec
+
+Code original :
+
+```go
+p.module, err = py.RunFile(p.ctx, p.file, ...)
+if err != nil {
+    py.TracebackDump(err)               // ← log uniquement, pas de return
+}
+return p                                // ← retourne *Plugin avec module == nil
+```
+
+Puis dans `Init()` :
+
+```go
+func (g *Plugin) Init(ctx *runtime.Runtime) {
+    ctx.Init(charset.ShiftJIS, charset.Unicode, true)
+    pluginContext.ctx = ctx
+    call, ok := g.module.Globals["Init"] // ← PANIC si g.module == nil
+    ...
+}
+```
+
+Le panic se produit ligne 40 de `plugin.go`, en aval de l'erreur Python, ce qui masque la cause réelle.
+
+## Implémentation du fix
+
+### Diff conceptuel
+
+```diff
++import (
++    "fmt"
++    "path/filepath"
++    ...
++)
+
+ func NewPlugin(file string) *Plugin {
++    absFile, err := filepath.Abs(file)
++    if err != nil {
++        absFile = file
++    }
++    pluginDir := filepath.Dir(absFile)
++
+     p := &Plugin{
+-        file: file,
++        file: absFile,
+         ctx: py.NewContext(py.ContextOpts{
+-            SysPaths: []string{"."},
++            SysPaths: []string{pluginDir, "."},
+         }),
+     }
+-    var err error
+     p.module, err = py.RunFile(p.ctx, p.file, py.CompileOpts{
+-        CurDir: "/",
++        CurDir: pluginDir,
+     }, nil)
+     if err != nil {
+         py.TracebackDump(err)
++        fmt.Printf("[ERROR] Failed to load plugin %q: %v\n", p.file, err)
+     }
+     return p
+ }
+
+ func (g *Plugin) Init(ctx *runtime.Runtime) {
+     ctx.Init(charset.ShiftJIS, charset.Unicode, true)
+     pluginContext.ctx = ctx
++    if g.module == nil {
++        return
++    }
+     call, ok := g.module.Globals["Init"]
+     ...
+ }
+
+ func (g *Plugin) UNDEFINED(ctx *runtime.Runtime, opcode string) engine.HandlerFunc {
++    if g.module == nil {
++        return func() { ctx.ChanEIP <- 0 }
++    }
+     if strings.HasPrefix(opcode, "0x") {
+     ...
+ }
+```
+
+### Choix de design
+
+| Décision | Raison |
+|---|---|
+| `SysPaths: [pluginDir, "."]` (plugin en premier) | Priorité au dossier du plugin pour les imports `base/` ; `"."` conservé en fallback pour rétrocompat |
+| `filepath.Abs()` avec fallback gracieux | Garantit un chemin absolu pour `CurDir` même si l'utilisateur passe un chemin relatif ; ne casse jamais si la résolution échoue |
+| `CurDir: pluginDir` (au lieu de `"/"`) | Cohérent avec le `sys.path` ; valide sous Windows et Linux |
+| `fmt.Printf` en plus de `py.TracebackDump` | Le traceback gpython est verbeux et peut être ignoré ; le `[ERROR]` une-ligne est immédiatement visible dans la GUI et la console |
+| Nil-guard `return` (au lieu de panic) | Permet à l'utilisateur de voir l'erreur Python plutôt qu'une stack trace Go ; le VM continue (mais ne fait rien d'utile) |
+| Pas de marqueur `PATCH YOREMI` | Code prêt pour merge upstream chez wetor |
+
+### Pourquoi conserver `"."` dans `SysPaths`
+
+Théoriquement le dossier du plugin suffit. Mais certaines configurations historiques de wetor (cf. `game_test.go`) utilisent des chemins absolus complets et s'attendaient peut-être à pouvoir trouver des modules dans le cwd. Garder `"."` en deuxième position préserve cette possibilité sans interférer avec la nouvelle résolution.
+
+## Validation
+
+### Avant le fix
+```
+$ lucksystem.exe script decompile -s SCRIPT.PAK -p data/KANON.py -g KANON ...
+[INFO] Using game: KANON (from --game flag)
+Traceback (most recent call last):
+  File "data/KANON.py", line 2, in <module>
+FileNotFoundError: 'Failed to resolve "base/kanon"'
+panic: runtime error: invalid memory address or nil pointer dereference
+        game/operator/plugin.go:40 +0x82
+```
+
+### Après le fix (cas nominal)
+```
+$ lucksystem.exe script decompile -s SCRIPT.PAK -p data/KANON.py -g KANON ...
+[INFO] Using game: KANON (from --game flag)
+scriptExtract called
+[décompilation normale...]
+```
+
+### Après le fix (cas d'erreur Python — ex. plugin avec syntaxe cassée)
+```
+$ lucksystem.exe script decompile -s SCRIPT.PAK -p data/BROKEN.py -g BROKEN ...
+[INFO] Using game: BROKEN (from --game flag)
+Traceback (most recent call last):
+  File "data/BROKEN.py", line 5, in <module>
+SyntaxError: invalid syntax
+[ERROR] Failed to load plugin "C:\...\data\BROKEN.py": ...
+[le VM continue mais ne fait rien — pas de panic Go]
+```
+
+## Jeux concernés
+
+Tous les jeux dont le plugin utilise `from base.xxx import *` :
+- Kanon
+- HARMONIA
+- LOOPERS
+- LUNARiA
+- PlanetarianSG
+- CartagraHD
+
+AIR n'était pas affecté car son plugin avait été inliné en patch 7. LB_EN et SP n'étaient pas affectés car ils utilisent un opérateur Go, pas de plugin Python.
+
+## Compatibilité upstream
+
+Le patch est rédigé pour merge direct dans le dépôt de wetor :
+- Aucun marqueur `PATCH YOREMI`
+- Commentaires en anglais, orientés mainteneur
+- Signatures publiques inchangées
+- Aucune nouvelle dépendance externe (`path/filepath` est stdlib)
+- Comportement antérieur préservé via le fallback `"."` dans `SysPaths`
+
+---
+
 # V3.1.3 — Patch 3 : GUI — Détection automatique des presets de jeu depuis data/
 
 ## Fichiers modifiés
