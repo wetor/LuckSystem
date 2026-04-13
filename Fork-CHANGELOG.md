@@ -1,3 +1,68 @@
+# V3.1.4 — Patch 1: Plugin import resolution and nil-module crash fix
+
+13/04/2026
+
+## Bug fixed: `script decompile` panics on plugins using `from base.xxx import *` (Kanon, AIR, HARMONIA, LOOPERS, LUNARiA, PlanetarianSG, CartagraHD)
+
+### Problem
+Decompiling Kanon Steam scripts crashed with a Go panic:
+
+```
+> lucksystem.exe script decompile -s SCRIPT.PAK -c UTF-8 -o TRAD \
+    -O data/KANON.txt -p data/KANON.py -g KANON
+[INFO] Using game: KANON (from --game flag)
+Traceback (most recent call last):
+  File "data/KANON.py", line 2, in <module>
+FileNotFoundError: 'Failed to resolve "base/kanon"'
+panic: runtime error: invalid memory address or nil pointer dereference
+[signal 0xc0000005 code=0x0 addr=0x8 pc=0x...]
+goroutine 1 [running]:
+lucksystem/game/operator.(*Plugin).Init(...)
+        game/operator/plugin.go:40 +0x82
+```
+
+The error affected every plugin that uses package-style imports (`from base.kanon import *`) — i.e. all games except AIR (which had been manually inlined in patch 7) and SP/LB_EN (which use Go operators, no Python plugin).
+
+### Root cause — two cumulative bugs in `game/operator/plugin.go`
+
+**Bug 1 — gpython sys.path misconfigured.** `NewPlugin()` initialised the gpython context with `SysPaths: []string{"."}` and `CurDir: "/"`. `from base.kanon import *` caused gpython to look for `base/kanon.py` relative to the *process working directory* (and `/` is not a valid `CurDir` on Windows anyway). The import only succeeded when lucksystem was launched from the directory containing the plugin's `base/` folder — which was never the case in the GUI or in normal CLI usage.
+
+**Bug 2 — no nil-check after import failure.** When `py.RunFile()` failed, the error was logged via `py.TracebackDump()` but `p.module` remained `nil`. The function still returned a non-nil `*Plugin`. The next time `Init()` or `UNDEFINED()` accessed `g.module.Globals[...]`, the runtime panicked with a nil pointer dereference, hiding the real (Python) error behind a Go stack trace.
+
+### Fix (1 file — CLI)
+
+**`game/operator/plugin.go`**
+- `NewPlugin()`:
+  - Resolve plugin file to an absolute path via `filepath.Abs()` (graceful fallback to the original path if resolution fails)
+  - Add the plugin's directory to `SysPaths` *before* `"."` → package imports like `from base.xxx import *` now resolve against the plugin tree regardless of cwd or OS
+  - Use the plugin directory as `CurDir` (replaces the hardcoded `"/"`)
+  - On load failure, print a readable `[ERROR] Failed to load plugin "<path>": <err>` line in addition to the Python traceback
+- `Init()`: nil-guard on `g.module` — skip Python `Init()` call instead of panicking
+- `UNDEFINED()`: nil-guard on `g.module` — fall through to default "advance PC" behaviour instead of panicking
+
+### Why this matters
+
+Without this fix, **only AIR (Steam) and the LB_EN/SP Go operators worked**. Every other game in the data/ tree (Kanon, HARMONIA, LOOPERS, LUNARiA, PlanetarianSG, CartagraHD) crashed at the first decompile attempt — silently for the user, since the panic came after the `[INFO] Using game: ...` line and looked like a tool bug rather than a plugin path issue.
+
+### Backward compatibility
+- `SysPaths` keeps `"."` as a fallback → no regression for setups that worked before
+- `NewPlugin()` / `Init()` / `UNDEFINED()` signatures unchanged
+- No new external dependency (`path/filepath` is stdlib)
+- The patch is upstream-ready (no fork-specific markers); intended for merge into the wetor repo
+
+### Games affected
+Kanon, HARMONIA, LOOPERS, LUNARiA, PlanetarianSG, CartagraHD — and any future plugin that uses `base/` shared modules.
+
+### Testing
+Confirmed working on Kanon Steam (`KANON.py` + `base/kanon.py`):
+```
+lucksystem.exe script decompile -s SCRIPT.PAK -c UTF-8 \
+    -o TRAD -O data/KANON.txt -p data/KANON.py -g KANON
+```
+Decompilation completes; `from base.kanon import *` resolves correctly; no panic.
+
+---
+
 # LuckSystem — Yoremi Fork — CHANGELOG
 
 ---
@@ -259,7 +324,7 @@ SCRIPT.PAK contains 169 entries but only 167 are actual scripts. SEEN8500 and SE
 - 1,461 opcode warnings for unhandled visual/audio opcodes (HAIKEI_SET, INIT, DRAW, WAIT, BGM, SE…) — expected, does not affect text extraction
 
 ### Games affected
-Any game without a dedicated Python plugin file, including Little Busters EN, Kanon, Harmonia, LOOPERS, LUNARiA, Planetarian.
+Any game without a dedicated Python plugin file
 
 ---
 

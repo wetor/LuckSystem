@@ -1,4 +1,4 @@
-# LuckSystem 2.3.2 — Yoremi Fork
+# LuckSystem 2.3.2 — Yoremi Fork (v3.1.4)
 
 Fork de [LuckSystem](https://github.com/wetor/LuckSystem) avec corrections de bugs, support de nouveaux formats, et interface graphique pour la traduction de visual novels Visual Art's/Key.
 
@@ -42,7 +42,15 @@ A Linux version is available as separate binaries (GUI + CLI). See the releases 
 
 ## Patches
 
-### Version 3.1.3 — Patch 3 *(latest)*
+### Version 3.1.4 — Patch 1 *(latest)*
+
+21. **Plugin import resolution and nil-module crash fix** — `game/operator/plugin.go`
+    - `NewPlugin()`: resolve plugin file to absolute path; add plugin's directory to gpython `SysPaths` so `from base.xxx import *` resolves correctly; replace hardcoded `CurDir: "/"` with the plugin's directory; emit a readable `[ERROR]` log line on load failure
+    - `Init()` and `UNDEFINED()`: nil-guard on `g.module` — replaces a Go panic (`nil pointer dereference`) with a clean error path when a plugin fails to load
+    - Fixes `script decompile` / `script import` crash on Kanon, HARMONIA, LOOPERS, LUNARiA, PlanetarianSG, CartagraHD (every plugin using `base/` shared modules)
+    - Upstream-ready (no fork-specific markers, no API change, no new dependency)
+
+### Version 3.1.3 — Patch 3
 
 20. **GUI: Game preset auto-scan from data/ folder** — `app.go`, `frontend/src/App.svelte`, `wailsjs/go/main/App.js`, `App.d.ts`
     - `ScanGameData()` scans `data/` next to lucksystem, discovers all OPCODE `.txt` files (recursive, excluding `base/`)
@@ -170,7 +178,7 @@ lucksystem font edit -s 明朝32 -S info32 -f Arial.ttf -o 明朝32_out -O info3
 
 - **AIR** (Steam) — French translation complete (scripts + CG + UI)
 - **Summer Pockets** — RawSize fix confirmed
-- **Kanon** — CZ2 font fix confirmed
+- **Kanon** (Steam) — CZ2 font fix confirmed; script decompile confirmed (plugin import fix v3.1.4)
 - **Little Busters English** — CZ4 confirmed, script decompile confirmed (161 scripts, 102k+ MESSAGE lines, text properly decoded)
 
 ---
@@ -180,7 +188,7 @@ lucksystem font edit -s 明朝32 -S info32 -f Arial.ttf -o 明朝32_out -O info3
 - **[wetor](https://github.com/wetor)** — LuckSystem original
 - **masagrator** — RawSize bug identification (CZ3 layers)
 - **[G2-Games](https://github.com/G2-Games)** — CZ4 reference ([lbee-utils](https://github.com/G2-Games/lbee-utils))
-- **Yoremi** — patches 1-20, AIR French translation, GUI
+- **Yoremi** — patches 1-21, AIR French translation, GUI
 --------------------
 # Important
 This project only accepts **bug issues** and **pull requests**, and does not provide assistance in use  
