@@ -1,3 +1,77 @@
+# V3.1.5 — Amélioration du reporting d'erreurs à l'import de scripts et suppression du log raw-bytes
+
+## Fichiers modifiés
+
+### CLI (lucksystem)
+- `script/script.go` — `Import()` : messages d'erreur enrichis avec nom du script et numéro de ligne ; détection des lignes excédentaires en fin de fichier ; `SetOperateParams()` : assertions de type sécurisées avec `ok`-check et messages d'erreur contextuels ; `CodeParamsToBytes()` : log des raw bytes déplacé de `V(4)` à `V(8)`
+- `game/VM/vm.go` — `Run()` : ajout d'un `defer/recover` pour capturer les panics et les reformater avec le contexte du script (nom, ligne, opcode)
+- `game/operator/opcode.go` — `SetOperateParams()` : propagation de l'erreur retournée par `script.SetOperateParams()` (était ignorée avec `_ =`)
+
+## Contexte
+
+Lors de la traduction de Kanon, un retour à la ligne accidentel dans un dialogue (entre `autres` et `❞` dans seen110.txt ligne 1137) a créé une ligne excédentaire dans le fichier. LuckSystem lit exactement N lignes (une par opcode du script binaire), donc toutes les lignes suivantes étaient décalées d'un rang. Le décalage provoquait un panic Go cryptique sur un SELECT/IFN, sans aucune indication du fichier ou de la ligne fautive :
+
+```
+panic: interface conversion: interface {} is *script.JumpParam, not string
+```
+
+Le diagnostic nécessitait une recherche manuelle dans 3000+ lignes de script avec un diff entre version originale et traduite.
+
+## Détail des corrections
+
+### 1. Détection des lignes excédentaires — `Import()`
+
+Après avoir lu les N lignes attendues, `Import()` tente de lire une ligne supplémentaire. Si elle existe et n'est pas vide, l'erreur est signalée immédiatement :
+
+```
+[seen110] file has 1 extra line(s) beyond expected 3206 (check for stray newlines in translated text)
+```
+
+Cela attrape la cause la plus courante (un `\n` parasite dans un texte traduit) avant même que l'import ne tente de recompiler les opcodes.
+
+### 2. Assertions de type sécurisées — `SetOperateParams()`
+
+Les trois casts `code.Params[i].(string)` dans la boucle de conversion de types (`byte`, `uint16`, `uint32`) et le cast dans la boucle de merge (`*StringParam`) étaient des assertions non vérifiées. Si le paramètre importé n'était pas du type attendu (à cause du décalage de lignes), Go faisait un panic avec un message générique.
+
+Chaque assertion est maintenant un `str, ok := code.Params[pi].(string)` avec un message d'erreur contextuel :
+
+```
+[seen110] line 1137 (MESSAGE): parameter 2 type mismatch: expected string, got *script.JumpParam
+(likely a stray newline in the script file shifted all lines)
+```
+
+### 3. Recover au niveau VM — `Run()`
+
+Un `defer/recover` dans `VM.Run()` capture tout panic non géré pendant l'exécution d'un script et le reformate avec le nom du script, l'index de la ligne et l'opcode courant :
+
+```go
+defer func() {
+    if r := recover(); r != nil {
+        panic(fmt.Sprintf("[%s] line %d (%s): %v", scriptName, codeIndex+1, opStr, r))
+    }
+}()
+```
+
+### 4. Propagation d'erreur — `opcode.go`
+
+`SetOperateParams()` dans `opcode.go` ignorait le retour d'erreur de `script.SetOperateParams()` avec `_ =`. L'erreur est maintenant vérifiée et propagée via `panic(err)`, permettant au recover de la capturer et de l'afficher avec le contexte.
+
+### 5. Suppression du log raw-bytes — `CodeParamsToBytes()`
+
+Le log à `V(4)` dans `CodeParamsToBytes()` dumpait les tableaux d'octets complets (paramètres + RawBytes) pour chaque opcode dont la taille changeait après import. Comme chaque ligne traduite a une taille différente de l'original, ce log se déclenchait sur **chaque MESSAGE, SELECT, LOG_BEGIN** traduit, produisant des milliers de lignes de nombres bruts dans la console. Ce volume rendait impossible la lecture des vrais messages d'erreur.
+
+Le log est déplacé à `V(8)` avec un format réduit (`MESSAGE: size 120 -> 145`) pour un diagnostic bas-niveau si nécessaire.
+
+## Compatibilité
+
+- Aucune signature de fonction modifiée
+- Aucune nouvelle dépendance
+- Format d'export/import des scripts inchangé
+- Sortie PAK identique
+- Le log `V(4)` est désormais silencieux sur les changements de taille attendus ; `V(8)` restaure le détail complet
+
+---
+
 # V3.1.4 — Patch 1 : Résolution des imports plugins et fix du crash nil-module
 
 ## Fichiers modifiés
