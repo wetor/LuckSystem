@@ -1,3 +1,61 @@
+# V3.1.5 — Improved error reporting for script import and silent raw-byte log removal
+
+23/04/2026
+
+## Bug fixed: `script import` crashes with cryptic panic on stray newlines in translated scripts
+
+### Problem
+When a translated script file contained an accidental newline inside a dialogue line (e.g. a line break before a closing `❞`), all subsequent opcodes were shifted by one line. The import continued silently until it hit a type mismatch deep in `SetOperateParams`, producing an unreadable Go panic:
+
+```
+panic: interface conversion: interface {} is *script.JumpParam, not string
+
+goroutine 1 [running]:
+lucksystem/script.(*Script).SetOperateParams(0xc00022e480, 0x691, 0x2, ...)
+        script/script.go:218 +0x13c5
+```
+
+The panic gave no indication of which script file, which line, or which opcode was at fault. With 30+ script files and thousands of lines each, finding the stray newline required manual binary search across all translated files.
+
+### Root cause
+A single extra `\n` inside a MESSAGE text (e.g. line break between `autres` and `❞`) created one extra line in the `.txt` file. Since LuckSystem reads exactly N lines (one per opcode in the binary script), every line after the break was mapped to the wrong opcode. The mismatch eventually reached a SELECT/IFN opcode where a `*JumpParam` was cast as `string`, triggering the panic.
+
+### Fix (3 files — CLI)
+
+**`script/script.go`**
+- `Import()`: error messages now include script name and line number; new end-of-file check detects extra lines and reports:
+  `[seen110] file has 1 extra line(s) beyond expected 3206 (check for stray newlines in translated text)`
+- `SetOperateParams()`: all `.(string)` type assertions replaced with safe `ok`-checked assertions; on mismatch, returns a clear error:
+  `[seen110] line 1137 (MESSAGE): parameter 2 type mismatch: expected string, got *script.JumpParam (likely a stray newline shifted all lines)`
+- `CodeParamsToBytes()`: raw-byte dump log moved from `V(4)` to `V(8)` — eliminates the massive console output that made real errors invisible (this log fired on every translated line since French text has different byte length than English/Japanese)
+
+**`game/VM/vm.go`**
+- `Run()`: added `defer/recover` that catches any panic during script processing and reformats it with context:
+  `[seen110] line 1137 (MESSAGE): <original panic message>`
+
+**`game/operator/opcode.go`**
+- `SetOperateParams()`: error return from `script.SetOperateParams()` is now propagated (was silently discarded with `_ =`)
+
+### Why this matters
+
+A single misplaced newline in any of 30+ translated script files would crash the entire import with no indication of which file or line was responsible. The translator had to resort to binary search across thousands of lines to find the problem. With this fix:
+
+1. **Extra-line detection** catches the most common cause (stray newlines) before the crash even happens
+2. **Safe type assertions** turn the cryptic Go panic into a readable error with file + line + opcode
+3. **VM-level recover** ensures that even unexpected panics include script context
+4. **Silent log cleanup** removes the raw-byte dump that flooded the console and hid real errors
+
+### Backward compatibility
+- All function signatures unchanged
+- No new external dependency
+- No change to exported script format or PAK output
+- Log behavior: `V(4)` users will see less noise; `V(8)` restores full debug output if needed
+
+### Testing
+Confirmed on Kanon Steam: import of 30+ script files completes cleanly; intentionally broken file (stray newline in seen110.txt) produces clear error message instead of panic.
+
+---
+
 # V3.1.4 — Patch 1: Plugin import resolution and nil-module crash fix
 
 13/04/2026
