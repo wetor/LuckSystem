@@ -116,6 +116,20 @@ func (vm *VM) Run() {
 		glog.Warning("OPCODE not loaded, import will not be supported")
 	}
 	glog.V(2).Infoln("Run: ", vm.CScriptName)
+
+	// Catch panics and report script context
+	defer func() {
+		if r := recover(); r != nil {
+			scriptName := vm.CScriptName
+			codeIndex := vm.CIndex
+			opStr := ""
+			if scr, ok := vm.Scripts[scriptName]; ok && codeIndex < scr.CodeNum {
+				opStr = scr.Codes[codeIndex].OpStr
+			}
+			panic(fmt.Sprintf("[%s] line %d (%s): %v", scriptName, codeIndex+1, opStr, r))
+		}
+	}()
+
 	vm.EIP = 0
 	vm.CIndex = 0
 	vm.CNext = 0
