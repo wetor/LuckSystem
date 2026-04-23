@@ -184,13 +184,28 @@ func (s *Script) SetOperateParams(index int, mode enum.VMRunMode, params ...inte
 		for i := 0; i < maxLen; i++ {
 			switch paramList[i].(type) {
 			case byte:
-				val, _ := strconv.ParseUint(code.Params[i].(string)[2:], 16, 8)
+				str, ok := code.Params[i].(string)
+				if !ok {
+					return fmt.Errorf("[%s] line %d (%s): param %d type mismatch: expected string for byte conversion, got %T",
+						s.Name, index+1, code.OpStr, i, code.Params[i])
+				}
+				val, _ := strconv.ParseUint(str[2:], 16, 8)
 				code.Params[i] = byte(val)
 			case uint16:
-				val, _ := strconv.ParseUint(code.Params[i].(string), 10, 16)
+				str, ok := code.Params[i].(string)
+				if !ok {
+					return fmt.Errorf("[%s] line %d (%s): param %d type mismatch: expected string for uint16 conversion, got %T",
+						s.Name, index+1, code.OpStr, i, code.Params[i])
+				}
+				val, _ := strconv.ParseUint(str, 10, 16)
 				code.Params[i] = uint16(val)
 			case uint32:
-				val, _ := strconv.ParseUint(code.Params[i].(string), 10, 32)
+				str, ok := code.Params[i].(string)
+				if !ok {
+					return fmt.Errorf("[%s] line %d (%s): param %d type mismatch: expected string for uint32 conversion, got %T",
+						s.Name, index+1, code.OpStr, i, code.Params[i])
+				}
+				val, _ := strconv.ParseUint(str, 10, 32)
 				code.Params[i] = uint32(val)
 			}
 			//fmt.Println(code.OpStr, code.Params[i], paramList[i])
@@ -215,7 +230,12 @@ func (s *Script) SetOperateParams(index int, mode enum.VMRunMode, params ...inte
 					}
 				case *StringParam:
 					if pi < len(code.Params) {
-						param.Data = code.Params[pi].(string)
+						str, ok := code.Params[pi].(string)
+						if !ok {
+							return fmt.Errorf("[%s] line %d (%s): parameter %d type mismatch: expected string, got %T (likely a stray newline in the script file shifted all lines)",
+								s.Name, index+1, code.OpStr, pi, code.Params[pi])
+						}
+						param.Data = str
 					}
 					// Toujours ajouter le StringParam même si pi dépasse
 					allParamList = append(allParamList, param)
@@ -293,11 +313,11 @@ func (s *Script) Import(r io.Reader) error {
 	for i, code := range s.Codes {
 		line, err := br.ReadString('\n')
 		if len(line) <= 1 {
-			return errors.New("文本行不能为空 " + strconv.Itoa(i))
+			return fmt.Errorf("[%s] line %d: empty line (expected opcode)", s.Name, i+1)
 		} else if err == io.EOF {
-			return errors.New("文本行数不匹配 " + strconv.Itoa(i))
+			return fmt.Errorf("[%s] line %d: unexpected end of file (expected %d lines, got %d)", s.Name, i+1, s.CodeNum, i)
 		} else if err != nil {
-			return err
+			return fmt.Errorf("[%s] line %d: read error: %v", s.Name, i+1, err)
 		}
 		line = strings.Replace(line, "\\n", "\n", -1)
 		ParseCodeParams(code, line)
@@ -313,6 +333,25 @@ func (s *Script) Import(r io.Reader) error {
 		}
 
 	}
+
+	// Check for extra lines after the expected end
+	extraLine, err := br.ReadString('\n')
+	if err == nil && len(strings.TrimSpace(extraLine)) > 0 {
+		// Count remaining extra lines
+		extraCount := 1
+		for {
+			extra, e := br.ReadString('\n')
+			if len(strings.TrimSpace(extra)) > 0 {
+				extraCount++
+			}
+			if e != nil {
+				break
+			}
+		}
+		return fmt.Errorf("[%s] file has %d extra line(s) beyond expected %d (check for stray newlines in translated text)",
+			s.Name, extraCount, s.CodeNum)
+	}
+
 	return nil
 }
 
@@ -371,7 +410,7 @@ func (s *Script) CodeParamsToBytes(code *CodeLine, coding charset.Charset, param
 
 	}
 	if buf.Len() != len(code.RawBytes) {
-		glog.V(4).Infof("%v %v\n\t%v %v\n\t%v %v\n", code.OpStr, params, buf.Len(), buf.Bytes(), len(code.RawBytes), code.RawBytes)
+		glog.V(8).Infof("%s: size %d -> %d\n", code.OpStr, len(code.RawBytes), buf.Len())
 	}
 	code.Len = uint16(size + 4)
 	position += 4

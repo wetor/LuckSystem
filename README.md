@@ -1,4 +1,4 @@
-# LuckSystem 2.3.2 — Yoremi Fork (v3.1.4)
+# LuckSystem 2.3.2 — Yoremi Fork (v3.1.5)
 
 Fork de [LuckSystem](https://github.com/wetor/LuckSystem) avec corrections de bugs, support de nouveaux formats, et interface graphique pour la traduction de visual novels Visual Art's/Key.
 
@@ -42,7 +42,16 @@ A Linux version is available as separate binaries (GUI + CLI). See the releases 
 
 ## Patches
 
-### Version 3.1.4 — Patch 1 *(latest)*
+### Version 3.1.5 — Patch 1 *(latest)*
+
+22. **Improved error reporting for script import + silent raw-byte log removal** — `script/script.go`, `game/VM/vm.go`, `game/operator/opcode.go`
+    - `Import()`: error messages now include script name and line number; detects extra lines in translated files and reports: `[seen110] file has 1 extra line(s) beyond expected 3206 (check for stray newlines)`
+    - `SetOperateParams()`: all unsafe `.(string)` casts replaced with safe type assertions; on mismatch, returns `[script] line N (OPCODE): type mismatch` instead of a cryptic Go panic
+    - `VM.Run()`: `defer/recover` catches any panic during import and reformats it with script name, line number, and opcode
+    - `opcode.go`: error from `SetOperateParams()` is now propagated (was silently discarded with `_ =`)
+    - `CodeParamsToBytes()`: raw-byte dump moved from `V(4)` to `V(8)` — removes thousands of noisy log lines during normal import (fired on every translated line due to size changes)
+
+### Version 3.1.4 — Patch 1
 
 21. **Plugin import resolution and nil-module crash fix** — `game/operator/plugin.go`
     - `NewPlugin()`: resolve plugin file to absolute path; add plugin's directory to gpython `SysPaths` so `from base.xxx import *` resolves correctly; replace hardcoded `CurDir: "/"` with the plugin's directory; emit a readable `[ERROR]` log line on load failure
