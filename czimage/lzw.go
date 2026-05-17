@@ -106,8 +106,19 @@ func decompressLZW2(data []byte, size int) []byte {
 	result := make([]byte, 0, size)
 
 	dataSize := len(data)
-	data = append(data, []byte{0, 0}...)
-	bitIO := NewBitIO(data)
+	// Yoremi Patch: copy into a fresh buffer with explicit capacity before
+	// appending the 2 padding bytes. The original code did
+	//   data = append(data, []byte{0, 0}...)
+	// which writes into data's underlying array when cap(data) > len(data).
+	// In Decompress2, `data` is `parent[offsetTemp:offset]`, a sub-slice
+	// whose capacity extends to the end of the parent compressed buffer,
+	// so the append silently overwrites the first 2 bytes of the NEXT
+	// block's bitstream. That corruption breaks the LZW state of every
+	// block after the first and can leave the decoded output shorter than
+	// W*H, triggering an index-out-of-range panic in Cz2Image.decompress.
+	padded := make([]byte, dataSize+2, dataSize+2)
+	copy(padded, data)
+	bitIO := NewBitIO(padded)
 	w := dictionary[0]
 
 	element := 0
@@ -168,9 +179,18 @@ func compressLZW2(data []byte, size int, last string) (count int, compressed []b
 			element = entry
 		} else {
 			writeBit(dictionary[element])
-			dictionary[entry] = dictionaryCount
+			// Yoremi Patch: cap the dictionary at 2^18 entries. Codes are
+			// written with WriteBit(code, 18), so any code >= 0x40000 is
+			// silently truncated to its low 18 bits and decoded as a
+			// different, shorter entry, producing fewer bytes on round-trip
+			// (the panic this fix addresses). Once full, the dictionary is
+			// frozen but lookups keep working, which is the standard LZW
+			// behaviour when no clear-code is available.
+			if dictionaryCount < 0x40000 {
+				dictionary[entry] = dictionaryCount
+				dictionaryCount++
+			}
 			element = string(c)
-			dictionaryCount++
 		}
 		count++
 		if size > 0 && bitIO.ByteSize() >= size {
