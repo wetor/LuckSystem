@@ -1,3 +1,111 @@
+# V3.1.6 — `font edit` / `font extract` panic fix for AIR & planetarian CZ2 fonts
+
+17/05/2026
+
+## Bug fixed: `Cz2Image.decompress` panics with `index out of range` on round-trip and silently corrupts pixels on load
+
+### Problem
+
+Running `font edit` on the Gothic fonts of AIR and planetarian (and re-extracting the resulting CZ2) crashed with:
+
+```
+panic: runtime error: index out of range [2143615] with length 2143615
+goroutine 1 [running]:
+lucksystem/czimage.(*Cz2Image).decompress
+        czimage/cz2.go:69 +0x24d
+```
+
+The decompressed alpha buffer was shorter than `Width × Height`, so the inner `for y { for x { pic.SetNRGBA(x, y, cz.ColorPanel[buf[i]]) }}` loop indexed past the end of the slice. Reproduces on every Gothic size from 22 onwards (12 and 16 happened to fit under the threshold described below).
+
+The same root cause was silently corrupting the *load* path too: extracting a Gothic font produced a PNG whose bytes drifted slightly from the source CZ2 (typically a few dozen bytes per file, visually undetectable but byte-different — confirmed by md5sum on the pre- vs. post-patch extract of `ゴシック32`).
+
+### Root cause — two independent bugs in the LZW codec, both in `czimage/lzw.go`
+
+**Bug 1 — slice-aliasing corruption in `decompressLZW2`:**
+
+```go
+dataSize := len(data)
+data = append(data, []byte{0, 0}...)
+```
+
+`Decompress2` slices the full compressed buffer into per-block sub-slices via `compressed[offsetTemp:offset]`. Those sub-slices share the underlying array with the parent, and their *capacity* extends to the end of the parent buffer. So `append(data, 0, 0)` doesn't allocate; it writes two zero bytes directly into the parent at `parent[offset]` and `parent[offset+1]` — i.e. into the **first two bytes of the next block's bitstream**.
+
+Every block after the first was reading a corrupted 16-bit prefix: the LZW code that should have been emitted as the first symbol of the block (the encoder's carry-over byte from the previous block) was overwritten with `00 00`. On `Decompress2(original_file)` the corruption was small (one byte per block boundary, plus dictionary drift of a few bytes). On the `Compress2` → `Decompress2` round-trip used by `font edit`, the corruption compounded across all five blocks and the total decoded length fell short of `W×H`, triggering the panic.
+
+**Bug 2 — silent 18-bit truncation in `compressLZW2`:**
+
+```go
+writeBit := func(code uint64) {
+    if code > 0x7FFF {
+        bitIO.WriteBit(1, 1)
+        bitIO.WriteBit(code, 18)  // <-- writes low 18 bits only
+    } else { ... }
+}
+// ... main loop ...
+dictionary[entry] = dictionaryCount
+dictionaryCount++  // <-- never capped
+```
+
+The wire format encodes long codes in 18 bits, so the maximum representable code is `0x3FFFF` (= 262143). The encoder's dictionary, however, was incremented unconditionally. On large blocks (default `0x87BDF` ≈ 555 KiB target compressed size, the value `Compress2` uses when no hint is given) `dictionaryCount` overflows past `0x40000` and assigns codes that no longer fit in 18 bits. When such a code is later emitted, `WriteBit(code, 18)` silently truncates to the low 18 bits, producing a completely different value. The decoder reads that truncated value, finds it in *its* dictionary pointing to a much shorter byte sequence, and the per-block decoded output ends up several bytes shorter than the encoder's `RawSize` claimed.
+
+Per-block traces on `ゴシック32` after Bug 1 was fixed:
+
+```
+block[0]: maxEmit=261664  overflows=0   loss=0
+block[1]: maxEmit=261978  overflows=0   loss=0
+block[2]: maxEmit=262532  overflows=16  loss=179
+block[3]: maxEmit=262149  overflows=1   loss=5
+block[4]: (last, small)                 loss=0
+```
+
+The 184-byte shortfall (179 + 5) matched the gap between the decoded buffer and `W×H` exactly.
+
+### Fix (1 file — CLI)
+
+**`czimage/lzw.go`**
+
+- `decompressLZW2()`: copy the compressed sub-slice into a freshly allocated buffer with explicit `len = dataSize + 2` *before* feeding it to `NewBitIO`. The append never aliases the parent, so the next block's first two bytes stay intact.
+
+  ```go
+  padded := make([]byte, dataSize+2, dataSize+2)
+  copy(padded, data)
+  bitIO := NewBitIO(padded)
+  ```
+
+- `compressLZW2()`: freeze the dictionary once it reaches `0x40000` entries — codes already assigned keep being used for lookups, no new entries are added. This is the standard LZW behaviour when no clear-code is available in the wire format. Block sizes don't change in practice (the per-block byte target is unaffected); the only effect is that the encoder stops emitting un-decodable codes on very large blocks.
+
+  ```go
+  if dictionaryCount < 0x40000 {
+      dictionary[entry] = dictionaryCount
+      dictionaryCount++
+  }
+  ```
+
+### Why this matters
+
+`font edit -r` (redraw current font in a different TTF) and `font edit -c` (append/replace charset) were both unusable on the larger Gothic sizes for Visual Art's/Key Luck Engine games — i.e. exactly the sizes used for in-game dialogue. Any French/accented build that touched the font produced a CZ2 that silently re-loaded with a too-short buffer and crashed at extract or in-game.
+
+Beyond the panic, the silent on-load pixel drift in Bug 1 also meant that any extracted PNG used as a reference (e.g. for diffing two patches, or for hand-pixel-art touch-ups) had a few wrong bytes near block boundaries. After this patch, `extract → compare` is byte-stable.
+
+### Backward compatibility
+
+- No exported function signatures changed.
+- CZ2 files produced by the patched encoder remain decodable by the patched decoder; on the round-trip test (alpha bytes → `Compress2` → `Decompress2`) all 13 Gothic sizes (12 → 38) now decode byte-for-byte identical to the input.
+- CZ2 files produced by the *unpatched* encoder are decoded correctly by the patched decoder, since the dictionary cap only changes what the encoder emits and the slice-aliasing fix is purely a defensive copy on read.
+- The same overflow window exists in `compressLZW`/`Compress` (CZ1/CZ3): `dictionaryCount` is a `uint16` that wraps at 65536, and the default block size of `0xFEFD` (= 65277) keeps codes just under the wraparound for normal-sized images. It has not been observed to fire in practice on Key fonts but should be revisited if a CZ1/CZ3 round-trip ever produces short output.
+
+### Testing
+
+On AIR's Gothic font (`FONT_GOTHIC1.PAK`, 13 sizes from 12 to 38):
+
+- `pak extract` of both `FONT__INFO.PAK` and `FONT_GOTHIC1.PAK`: OK.
+- `font extract` on each of the 13 sizes: OK before *and* after the patch (no panic on load), but post-patch PNG md5 differs from pre-patch — the patched extract is the byte-correct one.
+- `font edit -r` (redraw with DejaVu Sans) on sizes 12 / 22 / 32 / 38 followed by `font extract` on the result: OK on all four; pre-patch panicked from size 22 upward.
+- Round-trip `Compress2(data) → Decompress2 → data'` on all 13 sizes: byte-exact on every size.
+- Full `Cz2Image.Import(PNG) → Cz2Image.Write → LoadCzImage → GetImage` chain (the exact path `font edit` uses) on all 13 sizes: dimensions and decode succeed on every size.
+
+---
+
 # V3.1.5 — Amélioration du reporting d'erreurs à l'import de scripts et suppression du log raw-bytes
 
 ## Fichiers modifiés
