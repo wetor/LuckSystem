@@ -42,7 +42,11 @@ A Linux version is available as separate binaries (GUI + CLI). See the releases 
 
 ## Patches
 
-### Version 3.1.5 — Patch 1 *(latest)*
+### Version 3.1.6 — *(latest)*
+Patch 1 : Bug fixed: `Cz2Image.decompress` panics with `index out of range` on round-trip and silently corrupts pixels on load
+Patch 2 : silent 18-bit truncation in `compressLZW2`
+
+### Version 3.1.5 — Patch 1
 
 22. **Improved error reporting for script import + silent raw-byte log removal** — `script/script.go`, `game/VM/vm.go`, `game/operator/opcode.go`
     - `Import()`: error messages now include script name and line number; detects extra lines in translated files and reports: `[seen110] file has 1 extra line(s) beyond expected 3206 (check for stray newlines)`
