@@ -1,4 +1,4 @@
-# LuckSystem 2.3.2 — Yoremi Fork (v3.1.6)
+# LuckSystem 2.3.2 — Yoremi Fork (v3.1.7)
 
 Fork de [LuckSystem](https://github.com/wetor/LuckSystem) avec corrections de bugs, support de nouveaux formats, et interface graphique pour la traduction de visual novels Visual Art's/Key.
 
@@ -42,7 +42,23 @@ A Linux version is available as separate binaries (GUI + CLI). See the releases 
 
 ## Patches
 
-### Version 3.1.5 — Patch 1 *(latest)*
+### Version 3.1.7 — *(latest)*
+
+24. **AIR Vietnamese font workflow fix** — `font/info.go`, `font/font.go`, `czimage/cz2.go`, `czimage/util.go`, `pak/pak.go`, `tools/fontdiag`, `tools/vietfontpatch`
+    - Preserves AIR's legacy `CharNum=100 + CharNum2` font-info layout when writing edited font tables.
+    - Keeps original CZ2 atlas dimensions during partial charset replacement and preserves original CZ2 raw block boundaries whenever possible.
+    - Forces compact PAK rebuilds for rewritten font families and truncates rebuilt PAKs to the aligned real end, avoiding internal gaps and stale copied tails that caused AIR startup failures.
+    - Adds diagnostic and Vietnamese font patch helper tools; `vietfontpatch` can patch only selected slots/families (`-slot en`, `-family GOTHIC1`) and adjust injected glyph vertical metrics (`-yoffset`, AIR English slot validated with `Y+2`).
+    - Keeps already-present Vietnamese characters mapped to their original glyphs and injects only missing characters, preventing regressions on existing accented glyphs.
+    - Minor Go vet cleanup in `game/runtime/global_goto.go`.
+    - GUI source version labels updated to `v3.1.7` and stale duplicate frontend Go file removed; no GUI workflow regression expected because the GUI still calls the CLI as a subprocess.
+
+### Version 3.1.6
+Patch 1 : Bug fixed: `Cz2Image.decompress` panics with `index out of range` on round-trip and silently corrupts pixels on load
+
+Patch 2 : silent 18-bit truncation in `compressLZW2`
+
+### Version 3.1.5 — Patch 1
 
 22. **Improved error reporting for script import + silent raw-byte log removal** — `script/script.go`, `game/VM/vm.go`, `game/operator/opcode.go`
     - `Import()`: error messages now include script name and line number; detects extra lines in translated files and reports: `[seen110] file has 1 extra line(s) beyond expected 3206 (check for stray newlines)`
@@ -156,9 +172,10 @@ A Linux version is available as separate binaries (GUI + CLI). See the releases 
 
 | Document | Description |
 |----------|-------------|
-| [CHANGELOG.md](CHANGELOG.md) | Full changelog — all versions (EN + FR) |
-| [TECHNICAL.md](TECHNICAL.md) | Technical analysis — all patches |
-| [Usage.md](Usage.md) | CLI command reference |
+| [Fork-CHANGELOG.md](Fork-CHANGELOG.md) | Full changelog — all versions (EN + FR) |
+| [Fork-TECHNICAL.md](Fork-TECHNICAL.md) | Technical analysis — all patches |
+| [AIR_VIETNAMESE_FONT_GUI_GUIDE.md](AIR_VIETNAMESE_FONT_GUI_GUIDE.md) | Practical GUI procedure for AIR Vietnamese font tests |
+| `LuckSystem --help` | CLI command reference |
 
 ---
 
@@ -185,7 +202,7 @@ lucksystem font edit -s 明朝32 -S info32 -f Arial.ttf -o 明朝32_out -O info3
 
 ## Tested games / Jeux testés
 
-- **AIR** (Steam) — French translation complete (scripts + CG + UI)
+- **AIR** (Steam) — French translation complete (scripts + CG + UI); Vietnamese font injection validated on English slot with `FONT_GOTHIC1` / `Y+2`
 - **Summer Pockets** — RawSize fix confirmed
 - **Kanon** (Steam) — CZ2 font fix confirmed; script decompile confirmed (plugin import fix v3.1.4)
 - **Little Busters English** — CZ4 confirmed, script decompile confirmed (161 scripts, 102k+ MESSAGE lines, text properly decoded)
@@ -197,7 +214,7 @@ lucksystem font edit -s 明朝32 -S info32 -f Arial.ttf -o 明朝32_out -O info3
 - **[wetor](https://github.com/wetor)** — LuckSystem original
 - **masagrator** — RawSize bug identification (CZ3 layers)
 - **[G2-Games](https://github.com/G2-Games)** — CZ4 reference ([lbee-utils](https://github.com/G2-Games/lbee-utils))
-- **Yoremi** — patches 1-21, AIR French translation, GUI
+- **Yoremi** — patches 1-24, AIR French translation, GUI
 --------------------
 # Important
 This project only accepts **bug issues** and **pull requests**, and does not provide assistance in use  
@@ -207,8 +224,8 @@ This project only accepts **bug issues** and **pull requests**, and does not pro
 
 LucaSystem 引擎解析工具
 
-## 使用方法：[Usage](Usage.md)
-## 插件手册：[Plugin](Plugin.md)
+## 使用方法：运行 `LuckSystem --help`
+## 插件：参考 `data/*.py` 与 `data/base/*.py`
 
 ## LucaSystem解析完成进度
 
@@ -255,7 +272,7 @@ LucaSystem 引擎解析工具
 - ~~简单的模拟执行~~
 - 支持插件扩展（gpython）
   - 非标准的Python，语法类似Python3.4，缺少大量的内置库和一些特性，基本使用没有问题
-  - 插件手册 [Plugin](Plugin.md)
+  - 插件示例：`data/*.py` 与 `data/base/*.py`
 
 #### 笔记
 
