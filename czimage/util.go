@@ -195,30 +195,30 @@ func CompressWithRawSizes(data []byte, blockSize int, targetRawSizes []int) (com
 		TotalRawSize: len(data),
 		BlockInfo:    make([]CzBlockInfo, 0),
 	}
-	
+
 	// Compresser bloc par bloc en respectant les RawSize originaux
 	for blockIdx, targetSize := range targetRawSizes {
 		if offset >= len(data) {
 			break
 		}
-		
+
 		// Calculer la fin de ce chunk (limité aux données restantes)
 		chunkEnd := offset + targetSize
 		if chunkEnd > len(data) {
 			chunkEnd = len(data)
 		}
-		
+
 		// Compresser EXACTEMENT targetSize bytes (size=0 pour illimité)
 		count, partData, last = compressLZW(data[offset:chunkEnd], 0, last)
-		
+
 		// Vérification: count devrait être égal à targetSize
 		expectedCount := chunkEnd - offset
 		if count != expectedCount {
 			glog.V(2).Infof("Block %d: compressed %d bytes, expected %d\n", blockIdx, count, expectedCount)
 		}
-		
+
 		offset = chunkEnd
-		
+
 		// Écrire les codes LZW compressés
 		for _, d := range partData {
 			binary.LittleEndian.PutUint16(tmp, d)
@@ -236,9 +236,9 @@ func CompressWithRawSizes(data []byte, blockSize int, targetRawSizes []int) (com
 	return outputBuf.Bytes(), outputInfo
 }
 
-//	Param size int 分块大小
-//	Return compressed
-//	Return outputInfo
+// Param size int 分块大小
+// Return compressed
+// Return outputInfo
 func Compress2(data []byte, size int) (compressed []byte, outputInfo *CzOutputInfo) {
 
 	if size == 0 {
@@ -276,6 +276,58 @@ func Compress2(data []byte, size int) (compressed []byte, outputInfo *CzOutputIn
 		})
 		outputInfo.FileCount++
 		prevCarry = carry
+	}
+	outputInfo.TotalCompressedSize = outputBuf.Len()
+	return outputBuf.Bytes(), outputInfo
+}
+
+// Compress2WithRawSizes compresses CZ2 data while preserving the original
+// uncompressed block boundaries. Some Luck Engine builds appear to be stricter
+// about font CZ2 block layout than LuckSystem's generic recompressor.
+func Compress2WithRawSizes(data []byte, targetRawSizes []int) (compressed []byte, outputInfo *CzOutputInfo) {
+	offset := 0
+	outputBuf := &bytes.Buffer{}
+	outputInfo = &CzOutputInfo{
+		TotalRawSize: len(data),
+		BlockInfo:    make([]CzBlockInfo, 0, len(targetRawSizes)),
+	}
+	for _, rawSize := range targetRawSizes {
+		if rawSize <= 0 || offset >= len(data) {
+			break
+		}
+		end := offset + rawSize
+		if end > len(data) {
+			end = len(data)
+		}
+		chunk := data[offset:end]
+		maxCompressedSize := len(chunk)*3 + 1024
+		count, partData, last := compressLZW2(chunk, maxCompressedSize, "")
+		if count != len(chunk) || len(last) != 0 {
+			glog.V(2).Infof("CZ2 raw-block compression consumed %d/%d bytes, carry=%d\n",
+				count, len(chunk), len(last))
+		}
+		outputBuf.Write(partData)
+		outputInfo.BlockInfo = append(outputInfo.BlockInfo, CzBlockInfo{
+			CompressedSize: uint32(len(partData)),
+			RawSize:        uint32(len(chunk)),
+		})
+		outputInfo.FileCount++
+		offset = end
+	}
+	if offset < len(data) {
+		chunk := data[offset:]
+		maxCompressedSize := len(chunk)*3 + 1024
+		count, partData, last := compressLZW2(chunk, maxCompressedSize, "")
+		if count != len(chunk) || len(last) != 0 {
+			glog.V(2).Infof("CZ2 tail compression consumed %d/%d bytes, carry=%d\n",
+				count, len(chunk), len(last))
+		}
+		outputBuf.Write(partData)
+		outputInfo.BlockInfo = append(outputInfo.BlockInfo, CzBlockInfo{
+			CompressedSize: uint32(len(partData)),
+			RawSize:        uint32(len(chunk)),
+		})
+		outputInfo.FileCount++
 	}
 	outputInfo.TotalCompressedSize = outputBuf.Len()
 	return outputBuf.Bytes(), outputInfo
