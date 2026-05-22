@@ -146,10 +146,20 @@ func (cz *Cz2Image) Import(r io.Reader, fillSize bool) error {
 		}
 	}
 	blockSize := 0
+	targetRawSizes := make([]int, 0, len(cz.OutputInfo.BlockInfo))
+	targetRawTotal := 0
 	if len(cz.OutputInfo.BlockInfo) != 0 {
 		blockSize = int(cz.OutputInfo.BlockInfo[0].CompressedSize)
+		for _, block := range cz.OutputInfo.BlockInfo {
+			targetRawSizes = append(targetRawSizes, int(block.RawSize))
+			targetRawTotal += int(block.RawSize)
+		}
 	}
-	cz.Raw, cz.OutputInfo = Compress2(data, blockSize)
+	if targetRawTotal == len(data) {
+		cz.Raw, cz.OutputInfo = Compress2WithRawSizes(data, targetRawSizes)
+	} else {
+		cz.Raw, cz.OutputInfo = Compress2(data, blockSize)
+	}
 
 	cz.OutputInfo.TotalRawSize = 0
 	cz.OutputInfo.TotalCompressedSize = 0
