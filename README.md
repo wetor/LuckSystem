@@ -48,7 +48,7 @@ A Linux version is available as separate binaries (GUI + CLI). See the releases 
     - Preserves AIR's legacy `CharNum=100 + CharNum2` font-info layout when writing edited font tables.
     - Keeps original CZ2 atlas dimensions during partial charset replacement and preserves original CZ2 raw block boundaries whenever possible.
     - Forces compact PAK rebuilds for rewritten font families and truncates rebuilt PAKs to the aligned real end, avoiding internal gaps and stale copied tails that caused AIR startup failures.
-    - Adds diagnostic and Vietnamese font patch helper tools; `vietfontpatch` can patch only selected slots/families (`-slot en`, `-family GOTHIC1`) and adjust injected glyph vertical metrics (`-yoffset`, AIR English slot validated with `Y+2`).
+     - (Not included here, only on my repository)-Adds diagnostic and Vietnamese font patch helper tools; `vietfontpatch` can patch only selected slots/families (`-slot en`, `-family GOTHIC1`) and adjust injected glyph vertical metrics (`-yoffset`, AIR English slot validated with `Y+2`).
     - Keeps already-present Vietnamese characters mapped to their original glyphs and injects only missing characters, preventing regressions on existing accented glyphs.
     - Minor Go vet cleanup in `game/runtime/global_goto.go`.
     - GUI source version labels updated to `v3.1.7` and stale duplicate frontend Go file removed; no GUI workflow regression expected because the GUI still calls the CLI as a subprocess.

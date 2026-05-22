@@ -2,6 +2,8 @@
 
 This guide explains how to test a Vietnamese-capable TTF with AIR Steam fonts using the LuckSystem Yoremi GUI.
 
+It is written for GUI use only. You only need `LuckSystemGUI.exe`, the matching `lucksystem.exe`, the AIR font PAK files, a charset text file, and a TTF.
+
 The tested target is the English font slot. For quick in-game checks, generating only `FONT_GOTHIC1.PAK` plus the matching `FONT__INFO.PAK` is enough.
 
 ## Recommended Settings
@@ -35,7 +37,7 @@ For the tested English/Japanese AIR font table:
 - Missing Vietnamese characters to inject: `102`
 - Insert start index: `7193 - 102 = 7091`
 
-The best tested vertical alignment was generated with `Y+2`. The current GUI does not expose the vertical offset option, so GUI-only tests may still show a small baseline difference depending on the TTF. For final generation with vertical adjustment, use the CLI helper described near the end of this guide.
+The current GUI does not expose vertical offset adjustment. GUI-only tests may still show a small baseline difference depending on the TTF. If the font is readable but sits too high or too low, test another TTF or ask the maintainer for a prepared build.
 
 ## Charset Files
 
@@ -257,31 +259,7 @@ Bad signs:
 - Existing accented characters look different or broken.
 - Vietnamese marks are clipped or too high/low.
 
-If only the vertical position is wrong, the TTF may still be usable with a `Y` offset.
-
-## Recommended Final Generation Method
-
-For final builds, the CLI helper is safer than doing every size manually in the GUI. It automatically:
-
-- Keeps already-present Vietnamese characters at their original indexes.
-- Injects only missing characters.
-- Rebuilds compact AIR-safe PAKs.
-- Applies vertical offset.
-- Can generate only the English slot and only `GOTHIC1` for quick tests.
-
-Example:
-
-```powershell
-go run ./tools/vietfontpatch -slot en -family GOTHIC1 -yoffset 2 "C:\path\to\AIR\files" "C:\path\to\full_vietnamese_charset.txt" "C:\path\to\font.ttf" "C:\path\to\output"
-```
-
-For the validated AIR test, the best visual value was:
-
-```text
--yoffset 2
-```
-
-The helper accepts the full Vietnamese charset file. Unlike the manual GUI workflow, it filters out the 32 characters already present in AIR by itself.
+If only the vertical position is wrong, the TTF may still be usable, but this version of the GUI cannot adjust that value directly.
 
 ## Quick Reference
 
