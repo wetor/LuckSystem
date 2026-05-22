@@ -73,11 +73,11 @@ func (g *GlobalGoto) GetMaps(scriptName string) (labels map[int]int, gotos map[i
 func (g *GlobalGoto) AddGlobalLabelMap(labels map[int]int) {
 	for index, pos := range labels {
 		if _, ok := g.GlobalLabelGoto[index]; !ok {
-			glog.Warningf("全局标签不存在：global%s", index)
+			glog.Warningf("全局标签不存在：global%d", index)
 			continue
 		}
 		if _, ok := g.IGlobalLabelMap[index]; ok {
-			glog.Warningf("重复标签定义：global%s", index)
+			glog.Warningf("重复标签定义：global%d", index)
 			continue
 		}
 		g.IGlobalLabelMap[index] = pos
