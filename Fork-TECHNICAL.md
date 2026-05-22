@@ -1,3 +1,142 @@
+# V3.1.7 — AIR Vietnamese font rebuild / compact PAK fix
+
+## Fichiers modifiés
+
+### CLI / core
+- `font/info.go` — préservation du layout AIR `CharNum=100 + CharNum2` lors de l'écriture des tables `info`.
+- `font/font.go` — remplacement partiel sans réduction des dimensions d'atlas, copie de l'atlas original puis redraw des cellules remplacées uniquement.
+- `czimage/cz2.go` / `czimage/util.go` — recompression CZ2 capable de conserver les tailles brutes de blocs d'origine quand la taille raw totale ne change pas.
+- `pak/pak.go` — rebuild PAK compact avec offsets recalculés et troncature explicite à la vraie fin alignée.
+- `tools/fontdiag/main.go` — outil diagnostic de round-trip d'une famille de fonte.
+- `tools/vietfontpatch/main.go` — outil de patch AIR/Vietnamien avec filtres de slot/famille et réglage vertical.
+- `game/runtime/global_goto.go` — correction mineure de formats de logs (`%d` au lieu de `%s`) pour Go vet.
+
+### GUI
+- `SourcesGUI-wails/main.go`
+- `SourcesGUI-wails/frontend/src/App.svelte`
+- `SourcesGUI-wails/frontend/src/dialogue.go` — suppression d'un ancien doublon Go non utilisé; l'implémentation active est dans `app.go`.
+- `SourcesGUI-wails/GUI-Windows-README.md`
+- `SourcesGUI-wails/GUI-Linux-README.md`
+
+La GUI passe en affichage `v3.1.7`. Aucun changement de workflow n'est nécessaire côté interface : elle continue d'appeler `lucksystem`/`lucksystem.exe` en subprocess. Les corrections de fonte sont donc disponibles dès que la CLI reconstruite est placée à côté de la GUI.
+
+## Contexte
+
+Objectif initial : utiliser le slot anglais d'AIR Steam pour afficher une traduction vietnamienne. Le jeu propose trois slots de langue (anglais/chinois/japonais), mais certains caractères vietnamiens manquaient en jeu malgré la présence partielle de caractères accentués dans les tables de fonte.
+
+Les essais ont montré trois faits importants :
+
+1. Remplacer seulement `FONT__INFO.PAK` ne fait pas crasher AIR.
+2. Un round-trip sans changement de `FONT_GOTHIC1.PAK` faisait crasher AIR avant ce patch.
+3. Le round-trip `FONTZC_GOTHIC1.PAK` chinois était toléré, ce qui isolait le problème sur la grosse famille Gothic du slot anglais/japonais et sur la manière dont le PAK/CZ2 était réécrit.
+
+## Détail des corrections
+
+### 1. Préservation du layout `CharNum2` — `font/info.go`
+
+AIR encode ses tables de fonte avec `CharNum=100`, suivi d'un champ conditionnel `CharNum2` contenant le nombre réel de glyphes. LuckSystem normalisait `CharNum` en mémoire après lecture, puis écrivait une table différente au moment de l'export.
+
+Un booléen interne `UseCharNum2` mémorise maintenant que le layout d'origine utilisait ce mode. À l'écriture, une copie de la structure est packée avec :
+
+```go
+out.CharNum = 100
+out.CharNum2 = i.CharNum
+```
+
+Le nombre réel de glyphes reste donc inchangé, mais la forme binaire attendue par AIR est conservée.
+
+### 2. Remplacement partiel sans shrink d'atlas — `font/font.go`
+
+L'ancien `ReplaceChars()` recalculait la taille d'image à partir de `CharNum`. Pour AIR, cela pouvait produire une image valide mais différente de l'atlas original attendu par le moteur.
+
+Le patch garde les dimensions existantes si elles sont plus grandes que le minimum calculé. En mode remplacement partiel, l'atlas original est copié dans la nouvelle image et seules les cellules à partir de `startIndex` sont effacées/redessinées. Les glyphes non concernés restent donc byte-stables autant que possible.
+
+### 3. Préservation des blocs CZ2 — `czimage/cz2.go`, `czimage/util.go`
+
+Pour les atlas dont les dimensions ne changent pas, la taille raw totale (`width * height`) reste identique à l'original. Le patch récupère alors les `RawSize` des blocs CZ2 d'origine et recompresse bloc par bloc avec ces mêmes frontières.
+
+```go
+if targetRawTotal == len(data) {
+    cz.Raw, cz.OutputInfo = Compress2WithRawSizes(data, targetRawSizes)
+} else {
+    cz.Raw, cz.OutputInfo = Compress2(data, blockSize)
+}
+```
+
+Cette approche évite de changer la structure logique des blocs quand AIR attend une disposition très proche de l'original.
+
+### 4. Rebuild PAK compact + troncature — `pak/pak.go`
+
+Le crash principal venait du PAK réécrit plus que du charset lui-même. Quand une entrée remplacée était plus petite que l'entrée d'origine, LuckSystem pouvait laisser des trous internes dans le PAK. En mode rebuild, comme `Write()` commençait par copier le fichier source entier, une queue obsolète pouvait aussi rester à la fin du fichier si le résultat compact était plus court.
+
+Le patch force les outils de fonte à utiliser `familyPak.Rebuild = true`, puis `pak.Write()` tronque le writer si celui-ci supporte `Truncate()` :
+
+```go
+if p.Rebuild {
+    if truncater, ok := w.(interface{ Truncate(int64) error }); ok {
+        err = truncater.Truncate(int64(alignedEnd))
+    }
+}
+```
+
+Résultat attendu : offsets recalculés, aucun trou interne, aucune queue de l'ancien PAK.
+
+### 5. Outil diagnostic — `tools/fontdiag`
+
+`fontdiag` permet de réécrire une famille de fonte sans changer le charset :
+
+```bash
+go run ./tools/fontdiag <AIR/files> <output-dir> FONT_GOTHIC1.PAK
+```
+
+Il sert à distinguer un problème de writer/PAK/CZ2 d'un problème de glyphes. Le round-trip compact de `FONT_GOTHIC1.PAK` ne fait plus crasher AIR.
+
+### 6. Outil patch vietnamien — `tools/vietfontpatch`
+
+`vietfontpatch` automatise le patch AIR :
+
+```bash
+go run ./tools/vietfontpatch -slot en -family GOTHIC1 -yoffset 2 <AIR/files> <charset.txt> <font.ttf> <output-dir>
+```
+
+Fonctions importantes :
+
+- `-slot all|en|zc` pour limiter la génération au slot voulu.
+- `-family all|GOTHIC1|GOTHIC2|GOTHIC3|MINCHO|MODERN` pour itérer rapidement sur une seule famille.
+- `-yoffset N` pour ajuster verticalement les glyphes injectés.
+- Les caractères déjà présents dans AIR restent mappés vers leur index original.
+- Seuls les caractères manquants sont injectés dans les dernières cellules disponibles.
+
+Pour le charset vietnamien testé :
+
+- 134 caractères demandés.
+- 32 déjà présents dans AIR.
+- 102 injectés.
+- Slot anglais/japonais : remplacement à partir de l'index 7091.
+- Réglage visuel retenu : `Y+2` sur `FONT_GOTHIC1`.
+
+## Tests réalisés
+
+- `INFO only` : le jeu démarre.
+- Round-trip non compact : crash reproduit.
+- Round-trip compact `FONT_GOTHIC1` : le jeu démarre.
+- Patch vietnamien complet compact : plus de crash et plus de bugs visuels menus.
+- Comparaison `Y+1`, `Y+2`, `Y+3` : différences faibles mais réelles; `Y+2` retenu.
+- Contrôles binaires :
+  - dimensions d'atlas inchangées;
+  - tailles brutes des blocs CZ2 inchangées;
+  - PAK sans trous internes;
+  - mappings vietnamiens présents.
+
+## Compatibilité
+
+- Pas de changement d'API publique du core.
+- Les commandes existantes `font edit`, `font extract`, `pak replace`, etc. restent compatibles.
+- Les nouveaux outils sous `tools/` sont des utilitaires de release/diagnostic et ne changent pas l'interface Cobra principale.
+- La GUI n'embarque pas LuckSystem : elle profite de ces corrections dès que le binaire CLI `3.1.7` est placé à côté d'elle.
+
+---
+
 # V3.1.6 — `font edit` / `font extract` panic fix for AIR & planetarian CZ2 fonts
 
 17/05/2026

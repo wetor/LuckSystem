@@ -1,3 +1,80 @@
+# V3.1.7 — AIR Vietnamese font rebuild / compact PAK fix
+
+22/05/2026
+
+## Fixed: AIR no longer crashes after font round-trip or Vietnamese charset injection
+
+### Problem
+
+AIR Steam accepted edited `FONT__INFO.PAK` files on their own, but crashed on startup as soon as the large English/Japanese `FONT_GOTHIC1.PAK` was rewritten, even with a no-op round-trip. The same edits also produced visual menu glitches when several font sizes or families were touched.
+
+When Vietnamese glyphs were injected by replacing the tail of the original charset, missing characters started to appear, but early builds had two rendering problems:
+
+- AIR's font PAK preload path was sensitive to rewritten PAK layout.
+- Newly drawn Vietnamese glyphs used TTF vertical metrics directly, producing negative Y offsets and visible glyphs floating too high.
+
+### Root cause
+
+- `pak.Write()` copied the whole source PAK first. When replacements were smaller than the original slots and `Rebuild` was false, the output kept internal holes. When `Rebuild` was true, the file could still keep a stale copied tail unless it was explicitly truncated.
+- AIR font info tables use the legacy layout `CharNum=100` plus `CharNum2=<real count>`. Loading normalized the count, but writing did not preserve that layout.
+- Partial font replacement recomputed atlas dimensions from character count, which could shrink/reshape an atlas that AIR expected to stay byte-layout compatible.
+- CZ2 import recompressed the alpha image using LuckSystem's generic block splitting. AIR tolerated some rewritten CZ2s, but the large Japanese Gothic atlas path proved stricter.
+- Several Vietnamese characters already existed in AIR's charset (`á`, `ó`, `â`, etc.). Replacing them with newly drawn glyphs regressed their original metrics.
+
+### Fix
+
+**CLI / core**
+
+- `font/info.go`
+  - Preserve the `CharNum=100 + CharNum2` info layout on write when the source used it.
+- `font/font.go`
+  - Preserve original atlas dimensions during partial replacement.
+  - Copy the old atlas first and redraw only the replaced cells.
+- `czimage/cz2.go`, `czimage/util.go`
+  - Preserve original CZ2 raw block boundaries when the edited image has the same total raw size.
+- `pak/pak.go`
+  - Support compact rebuilt PAKs with recalculated offsets.
+  - Truncate rebuilt output to the aligned real end so stale bytes from the copied source PAK cannot remain.
+
+**CLI helper tools**
+
+- `tools/fontdiag`
+  - New diagnostic tool to round-trip one font family PAK without changing the charset.
+  - Forces compact rebuilds so AIR startup tests isolate CZ2/font writer behavior from PAK holes.
+- `tools/vietfontpatch`
+  - New AIR font patch helper.
+  - Injects only characters missing from the original slot and keeps already-present Vietnamese glyphs mapped to their original cells.
+  - Supports `-slot all|en|zc`, `-family all|GOTHIC1|...`, and `-yoffset N`.
+  - Normalizes injected glyph vertical metrics against original Latin/accented glyphs. AIR English slot testing selected `-yoffset 2` as the best visual match.
+
+**GUI**
+
+- Updated GUI title/about/version text to `v3.1.7`.
+- Removed stale duplicate `frontend/src/dialogue.go`; the maintained dialogue extract/import implementation is in `app.go`. This prevents `go test ./...` from treating the frontend folder as a broken Go package.
+- No GUI workflow change is required: the GUI remains a subprocess wrapper around the CLI. Existing Font Extract/Edit forms continue to use the patched core code once rebuilt with the new CLI.
+
+**Maintenance**
+
+- `game/runtime/global_goto.go`: fixed two `%s`/integer log format strings so `go test ./...` no longer fails Go vet on that package.
+
+### Testing
+
+AIR Steam font tests:
+
+- Info-only replacement starts successfully.
+- Previous no-op `FONT_GOTHIC1.PAK` round-trip crash is fixed with compact rebuild.
+- Full Vietnamese charset injection starts without menu visual corruption.
+- Missing Vietnamese characters render in the English slot.
+- Visual comparison of `Y+1`, `Y+2`, `Y+3` confirmed `Y+2` as the best default for the tested TTF.
+- `FONTZC_*` generation remains supported by the helper, but final AIR validation focused on the English slot only.
+
+Build checks:
+
+- `go test ./tools/fontdiag ./tools/vietfontpatch ./czimage`
+- GUI source/version strings checked; frontend dependencies are intentionally not committed.
+
+---
+
 # V3.1.6 — `font edit` / `font extract` panic fix for AIR & planetarian CZ2 fonts
 
 17/05/2026
