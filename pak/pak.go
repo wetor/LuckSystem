@@ -363,6 +363,7 @@ func (p *Pak) Write(w io.Writer) error {
 	}
 
 	// Ajouter padding si nécessaire pour aligner sur block_size
+	alignedEnd := lastFileEnd
 	if lastFileEnd%p.BlockSize != 0 {
 		paddingSize := p.BlockSize - (lastFileEnd % p.BlockSize)
 		padding := make([]byte, paddingSize)
@@ -373,6 +374,17 @@ func (p *Pak) Write(w io.Writer) error {
 			return err
 		}
 		glog.V(2).Infof("Added %d bytes of padding for block alignment\n", paddingSize)
+		alignedEnd += paddingSize
+	}
+
+	if p.Rebuild {
+		if truncater, ok := w.(interface{ Truncate(int64) error }); ok {
+			err = truncater.Truncate(int64(alignedEnd))
+			if err != nil {
+				glog.V(8).Infoln("file.Truncate", err)
+				return err
+			}
+		}
 	}
 
 	return nil
