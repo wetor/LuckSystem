@@ -155,10 +155,10 @@ func (s *Script) SetOperateParams(index int, mode enum.VMRunMode, params ...inte
 					paramList = append(paramList, val)
 				}
 			case *JumpParam:
-				paramList = append(paramList, param)
 				if param.GlobalIndex == 0 {
-					s.AddExportGotoLabel(index, param.Position)
+					param.LabelIndex = s.AddExportGotoLabel(index, param.Position)
 				}
+				paramList = append(paramList, param)
 			case *StringParam:
 				paramList = append(paramList, param.Data)
 			default:
@@ -239,6 +239,18 @@ func (s *Script) SetOperateParams(index int, mode enum.VMRunMode, params ...inte
 					}
 					// Toujours ajouter le StringParam même si pi dépasse
 					allParamList = append(allParamList, param)
+					pi++
+				case *JumpParam:
+					if pi >= len(code.Params) {
+						return fmt.Errorf("[%s] line %d (%s): missing goto parameter %d",
+							s.Name, index+1, code.OpStr, pi)
+					}
+					jump, ok := code.Params[pi].(*JumpParam)
+					if !ok {
+						return fmt.Errorf("[%s] line %d (%s): parameter %d type mismatch: expected goto label, got %T (re-decompile this script with the updated plugin)",
+							s.Name, index+1, code.OpStr, pi, code.Params[pi])
+					}
+					allParamList = append(allParamList, jump)
 					pi++
 				default:
 					if pi < len(code.Params) {
@@ -396,16 +408,30 @@ func (s *Script) ReadData(data []byte) error {
 func (s *Script) CodeParamsToBytes(code *CodeLine, coding charset.Charset, params []interface{}) {
 	buf := &bytes.Buffer{}
 	size := 0
-	position := 0
+	lastJumpPos := 0
+	paramJumpRegistered := false
 	for _, param := range code.FixedParam {
 		l, _ := SetParam(buf, param, coding, false)
 		size += l
 	}
 	for _, param := range params {
+		paramPos := size
 		l, j := SetParam(buf, param, coding, false)
 		size += l
 		if j {
-			position = size - 4
+			lastJumpPos = s.CurPos + 4 + paramPos
+			if jump, ok := param.(*JumpParam); ok {
+				labelIndex := jump.LabelIndex
+				if labelIndex == 0 {
+					labelIndex = jump.Position
+				}
+				if jump.GlobalIndex > 0 {
+					s.AddImportGlobalGoto(lastJumpPos, jump.GlobalIndex)
+				} else {
+					s.AddImportGoto(lastJumpPos, labelIndex)
+				}
+				paramJumpRegistered = true
+			}
 		}
 
 	}
@@ -413,20 +439,19 @@ func (s *Script) CodeParamsToBytes(code *CodeLine, coding charset.Charset, param
 		glog.V(8).Infof("%s: size %d -> %d\n", code.OpStr, len(code.RawBytes), buf.Len())
 	}
 	code.Len = uint16(size + 4)
-	position += 4
 	code.Align = make([]byte, code.Len&1)
 	code.RawBytes = buf.Bytes()
 	if code.LabelIndex > 0 {
 		s.AddImportLabel(code.LabelIndex, s.CurPos)
 	}
-	if code.GotoIndex > 0 {
-		s.AddImportGoto(s.CurPos+position, code.GotoIndex)
+	if code.GotoIndex > 0 && !paramJumpRegistered && lastJumpPos > 0 {
+		s.AddImportGoto(lastJumpPos, code.GotoIndex)
 	}
 	if code.GlobalLabelIndex > 0 {
 		s.AddImportGlobalLabel(code.GlobalLabelIndex, s.CurPos)
 	}
-	if code.GlobalGotoIndex > 0 {
-		s.AddImportGlobalGoto(s.CurPos+position, code.GlobalGotoIndex)
+	if code.GlobalGotoIndex > 0 && !paramJumpRegistered && lastJumpPos > 0 {
+		s.AddImportGlobalGoto(lastJumpPos, code.GlobalGotoIndex)
 	}
 
 	s.CurPos += int(code.Len + code.Len&1)
@@ -476,6 +501,10 @@ func CodeString(w io.Writer, data string, hasLen bool, coding charset.Charset) i
 	}
 	buf := []byte(dst)
 	size := len(buf)
+	if hasLen && size == 0 {
+		binary.Write(w, binary.LittleEndian, uint16(0))
+		return 2
+	}
 	if hasLen {
 		writeSize := uint16(0)
 		switch coding {
@@ -530,9 +559,16 @@ func SetParam(buf *bytes.Buffer, param interface{}, coding charset.Charset, hasL
 		//if value.ScriptName != "" {
 		//	size += CodeString(buf, value.ScriptName, false, coding)
 		//}
-		if value.Position > 0 || value.GlobalIndex > 0 { // 现在为labelIndex
+		if value.Position > 0 || value.GlobalIndex > 0 || value.LabelIndex > 0 { // 现在为labelIndex
 			jump = true
-			binary.Write(buf, binary.LittleEndian, uint32(value.Position))
+			position := value.Position
+			if value.LabelIndex > 0 {
+				position = value.LabelIndex
+			}
+			if value.GlobalIndex > 0 {
+				position = value.GlobalIndex
+			}
+			binary.Write(buf, binary.LittleEndian, uint32(position))
 			size += 4
 		}
 	default:
