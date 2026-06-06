@@ -31,6 +31,7 @@ type Info struct {
 	// FontMap     map[rune]uint16 `struct:"-"` // unicode -> imgindex
 	FontFace     font.Face `struct:"-"`
 	IndexUnicode []rune    `struct:"-"` // imgindex -> unicode
+	UseCharNum2  bool      `struct:"-"` // preserve legacy CharNum=100 + CharNum2 layout
 }
 
 func LoadFontInfoFile(file string) *Info {
@@ -47,6 +48,7 @@ func LoadFontInfo(data []byte) *Info {
 		glog.Fatalln("restruct.Unpack", err)
 	}
 	if info.CharNum == 100 {
+		info.UseCharNum2 = true
 		info.CharNum = info.CharNum2
 		info.CharNum2 = 100
 	}
@@ -89,11 +91,11 @@ func (i *Info) Get(unicode rune) (int, DrawSize, CharSize) {
 }
 
 // CreateFontInfo 创建字体Info信息
-//  Description
-//  Param fontSize int 字体实际大小
-//  Param blockSize int 字体所在区域大小（超过会被切割）
-//  Return *FontInfo
 //
+//	Description
+//	Param fontSize int 字体实际大小
+//	Param blockSize int 字体所在区域大小（超过会被切割）
+//	Return *FontInfo
 func CreateFontInfo(fontSize, blockSize int) *Info {
 
 	info := &Info{
@@ -108,13 +110,13 @@ func CreateFontInfo(fontSize, blockSize int) *Info {
 }
 
 // SetChars
-//  Description 如果startIndex=0且allChar为空，则为仅重绘
-//  Receiver i *Info
-//  Param fontFile io.Reader 字体文件
-//  Param allChar string 全字符串，若第一个字符不是空格，会自动补充为空格
-//  Param startIndex int 开始位置，即字库上面跳过多少字符
-//  Param reDraw bool 是否用新字体重绘startIndex之前的字符
 //
+//	Description 如果startIndex=0且allChar为空，则为仅重绘
+//	Receiver i *Info
+//	Param fontFile io.Reader 字体文件
+//	Param allChar string 全字符串，若第一个字符不是空格，会自动补充为空格
+//	Param startIndex int 开始位置，即字库上面跳过多少字符
+//	Param reDraw bool 是否用新字体重绘startIndex之前的字符
 func (i *Info) SetChars(fontFile io.Reader, allChar string, startIndex int, reDraw bool) {
 
 	if len(allChar) == 0 && startIndex == 0 && !reDraw {
@@ -225,25 +227,25 @@ func (i *Info) SetChars(fontFile io.Reader, allChar string, startIndex int, reDr
 }
 
 // Import
-//  Description 若startIndex=0, redraw=true, allChar="", 则仅使用字体重绘原字符集
-//  Receiver i *Info
-//  Param r io.Reader 字体文件
-//  Param startIndex int 开始位置。前面跳过字符数量
-//  Param redraw bool 是否用新字体重绘startIndex之前的字符
-//  Param allChar string 增加的全字符，若startIndex==0，且第一个字符不是空格，会自动补充为空格
-//  Return error
 //
+//	Description 若startIndex=0, redraw=true, allChar="", 则仅使用字体重绘原字符集
+//	Receiver i *Info
+//	Param r io.Reader 字体文件
+//	Param startIndex int 开始位置。前面跳过字符数量
+//	Param redraw bool 是否用新字体重绘startIndex之前的字符
+//	Param allChar string 增加的全字符，若startIndex==0，且第一个字符不是空格，会自动补充为空格
+//	Return error
 func (i *Info) Import(r io.Reader, startIndex int, redraw bool, allChar string) error {
 	i.SetChars(r, allChar, startIndex, redraw)
 	return nil
 }
 
 // Export
-//  Description
-//  Receiver i *Info
-//  Param w io.Writer
-//  Return error
 //
+//	Description
+//	Receiver i *Info
+//	Param w io.Writer
+//	Return error
 func (i *Info) Export(w io.Writer) error {
 
 	var err error
@@ -262,14 +264,19 @@ func (i *Info) Export(w io.Writer) error {
 }
 
 // Write
-//  Description
-//  Receiver i *Info
-//  Param w io.Writer
-//  Return error
 //
+//	Description
+//	Receiver i *Info
+//	Param w io.Writer
+//	Return error
 func (i *Info) Write(w io.Writer) error {
 
-	data, err := restruct.Pack(binary.LittleEndian, i)
+	out := *i
+	if i.UseCharNum2 && i.CharNum != 100 {
+		out.CharNum2 = i.CharNum
+		out.CharNum = 100
+	}
+	data, err := restruct.Pack(binary.LittleEndian, &out)
 	if err != nil {
 		glog.Fatalln("restruct.Pack", err)
 	}

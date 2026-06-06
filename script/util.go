@@ -17,23 +17,20 @@ func ToStringCodeParams(code *CodeLine) string {
 		case byte:
 			paramStr = append(paramStr, fmt.Sprintf("0x%X", param))
 		case string:
-			esc := strings.ReplaceAll(param, `\`, `\\`)
-			esc = strings.ReplaceAll(esc, `"`, `\"`)
-			paramStr = append(paramStr, `"`+esc+`"`)
+			paramStr = append(paramStr, `"`+param+`"`)
 		case *JumpParam:
-			if param.ScriptName != "" && param.LabelIndex > 0 {
-				// external jump in another script file
-        scriptEsc := strings.ReplaceAll(param.ScriptName, `\`, `\\`)
-				scriptEsc = strings.ReplaceAll(scriptEsc, `"`, `\"`)
-        paramStr = append(paramStr, fmt.Sprintf(`{goto "%s" global%d}`, scriptEsc, param.LabelIndex))
-			} else if param.LabelIndex > 0 {
-				// internal jump in the same file
+			if param.LabelIndex > 0 {
 				paramStr = append(paramStr, fmt.Sprintf("{goto label%d}", param.LabelIndex))
+			} else if code.GotoIndex > 0 {
+				paramStr = append(paramStr, fmt.Sprintf("{goto label%d}", code.GotoIndex))
+			} else if param.GlobalIndex > 0 {
+				paramStr = append(paramStr, fmt.Sprintf(`{goto "%s" global%d}`, param.ScriptName, param.GlobalIndex))
 			} else {
 				paramStr = append(paramStr, fmt.Sprintf("{goto %d}", param.Position))
 			}
 		default:
 			paramStr = append(paramStr, fmt.Sprintf("%v", param))
+
 		}
 	}
 	str := strings.Join(paramStr, ", ")
@@ -56,29 +53,19 @@ func ParseCodeParams(code *CodeLine, codeStr string) {
 	globalLabelIndex := 0
 	globalGotoIndex := 0
 	gotoFile := ""
+	specialGotoIndex := 0
+	specialGlobalGotoIndex := 0
+	specialGotoFile := ""
 	isString := false
 	isSpecial := false
-	escaped := false
 
 	for _, ch := range codeStr {
 		if isString {
-			if escaped {
-				// add any char after '\' to the word
-				word = append(word, ch)
-				escaped = false
-				continue
-			}
-			if ch == '\\' {
-				// start of escape sequence
-				escaped = true
-				continue
-			}
 			if ch == '"' {
 				if len(word) == 0 { // 空字符串
 					word = append(word, '\x00')
 				}
 				isString = false
-				escaped = false
 				continue
 			}
 			word = append(word, ch)
@@ -96,11 +83,11 @@ func ParseCodeParams(code *CodeLine, codeStr string) {
 					opStr = wordStr
 				} else if isSpecial {
 					if len(word) > 5 && wordStr[0:5] == "label" {
-						gotoIndex, _ = strconv.Atoi(wordStr[5:])
+						specialGotoIndex, _ = strconv.Atoi(wordStr[5:])
 					} else if len(word) > 6 && wordStr[0:6] == "global" {
-						globalGotoIndex, _ = strconv.Atoi(wordStr[6:])
+						specialGlobalGotoIndex, _ = strconv.Atoi(wordStr[6:])
 					} else if wordStr != "goto" {
-						gotoFile = wordStr
+						specialGotoFile = wordStr
 					}
 				} else {
 					params = append(params, wordStr)
@@ -108,14 +95,27 @@ func ParseCodeParams(code *CodeLine, codeStr string) {
 				word = word[0:0]
 			}
 			if ch == '}' {
-				isSpecial = false
-				if gotoFile != "" || gotoIndex > 0 || globalGotoIndex > 0 {
+				if specialGotoFile != "" || specialGotoIndex > 0 || specialGlobalGotoIndex > 0 {
 					params = append(params, &JumpParam{
-						LabelIndex: globalGotoIndex,
-						ScriptName: gotoFile,
-						Position:   gotoIndex + globalGotoIndex,
+						GlobalIndex: specialGlobalGotoIndex,
+						LabelIndex:  specialGotoIndex,
+						ScriptName:  specialGotoFile,
+						Position:    specialGotoIndex + specialGlobalGotoIndex, // 填充使用
 					})
+					if gotoIndex == 0 && specialGotoIndex > 0 {
+						gotoIndex = specialGotoIndex
+					}
+					if globalGotoIndex == 0 && specialGlobalGotoIndex > 0 {
+						globalGotoIndex = specialGlobalGotoIndex
+					}
+					if gotoFile == "" && specialGotoFile != "" {
+						gotoFile = specialGotoFile
+					}
 				}
+				specialGotoIndex = 0
+				specialGlobalGotoIndex = 0
+				specialGotoFile = ""
+				isSpecial = false
 			}
 		case ':':
 			if len(word) > 5 && string(word[0:5]) == "label" {
@@ -126,12 +126,8 @@ func ParseCodeParams(code *CodeLine, codeStr string) {
 			word = word[0:0]
 		case '"':
 			isString = true
-			escaped = false
 		case '{':
 			isSpecial = true
-			gotoIndex = 0
-			globalGotoIndex = 0
-			gotoFile = ""
 		default:
 			word = append(word, ch)
 		}
@@ -143,6 +139,14 @@ func ParseCodeParams(code *CodeLine, codeStr string) {
 	code.GlobalGotoIndex = globalGotoIndex
 	code.GlobalLabelIndex = globalLabelIndex
 
+	if isSpecial && (specialGotoFile != "" || specialGotoIndex > 0 || specialGlobalGotoIndex > 0) {
+		params = append(params, &JumpParam{
+			GlobalIndex: specialGlobalGotoIndex,
+			LabelIndex:  specialGotoIndex,
+			ScriptName:  specialGotoFile,
+			Position:    specialGotoIndex + specialGlobalGotoIndex, // 填充使用
+		})
+	}
 	code.Params = params
 
 	// if labelIndex > 0 {
