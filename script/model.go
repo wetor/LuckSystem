@@ -12,9 +12,10 @@ type GlobalLabel struct {
 }
 
 type JumpParam struct {
-	LabelIndex int
-	ScriptName string
-	Position   int
+	GlobalIndex int
+	LabelIndex  int
+	ScriptName  string
+	Position    int
 }
 
 type StringParam struct {
