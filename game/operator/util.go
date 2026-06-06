@@ -145,14 +145,15 @@ func GetParam(codeBytes []byte, data ...interface{}) int {
 		return next
 	case *lstring:
 		l := int(ToUint16(codeBytes[start : start+2]))
+		if l == 0 {
+			*value = lstring("")
+			return start + 2
+		}
 		switch coding {
 		case charset.Unicode, charset.ShiftJIS:
 			size = l * 2
 		case charset.UTF_8:
 			size = 0x10000 - l
-		}
-		if l == 0 {
-			size = 0
 		}
 		tmp, next := DecodeString(codeBytes, start+2, size, coding)
 		*value = lstring(tmp)
