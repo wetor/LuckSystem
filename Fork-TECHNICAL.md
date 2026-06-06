@@ -1,3 +1,195 @@
+# V3.1.9 — CartagraHD ONGOTO fix + multi-goto support + zero-length string dump fix
+
+## Fichiers modifiés
+
+### CLI (lucksystem)
+- `data/base/cartagrahd.py` — ajout du handler `ONGOTO` avec parsing N-cibles.
+- `script/model.go` — extension du modèle `JumpParam` pour stocker plusieurs cibles de saut par ligne.
+- `script/script.go` — `Export()` et `Import()` mis à jour pour itérer sur toutes les cibles d'une ligne ; `Import()` recalcule chaque offset indépendamment.
+- `game/operator/util.go` — correction du cas limite chaîne longueur zéro dans le helper de dump.
+
+### Documentation
+- `README.md`
+- `Fork-CHANGELOG.md`
+- `Fork-TECHNICAL.md`
+
+## Contexte
+
+La traduction de CartagraHD nécessitait d'injecter des scripts dont certaines lignes de dialogue précédant des choix avaient grossi. L'outil ré-exportait les scripts correctement, mais les sauts restaient figés car ONGOTO n'était pas reconnu comme opcode à labels recalculables.
+
+En exportant ONGOTO via `UNDEFINED()`, les offsets de branches étaient écrits comme entiers bruts (ex. `65530, 12835`). La phase d'import, ne voyant pas de token `{goto label}`, traitait ces valeurs comme des paramètres littéraux et les réinjait inchangés — quel que soit l'allongement des lignes précédentes. Résultat : les choix en jeu pointaient vers des positions absolues obsolètes.
+
+## Diagnostic des bugs
+
+### Bug 1 — ONGOTO absent de cartagrahd.py
+
+Le fichier `data/base/cartagrahd.py` ne déclarait aucun handler `ONGOTO`. La VM le routait vers `UNDEFINED()`, qui appelait `AllToUint16()` et dumpait les deux octets de chaque offset cible comme entiers indépendants.
+
+Comparaison avec un opcode branching correct (`IFN`) :
+
+| Aspect | IFN (correct) | ONGOTO (avant fix) |
+|---|---|---|
+| Export | `{goto label_3730}` | `65530, 12835` (bruts) |
+| Import | recalcule l'offset | réinjecte les entiers tels quels |
+| Résultat après trad. | branches correctes | branches figées |
+
+### Bug 2 — Parser de labels limité à un token par ligne
+
+Le code d'export construisait les labels de saut en cherchant **un seul** token `{goto ...}` par ligne. Pour ONGOTO (N branches), seul le premier token était encodé ; les autres N-1 labels étaient perdus, et l'import ne disposait que d'un seul offset à recalculer sur N.
+
+### Bug 3 — Caractère parasite sur chaîne longueur zéro (util.go)
+
+La fonction de dump de chaînes dans `game/operator/util.go` avançait le curseur d'un octet avant de vérifier la longueur. Pour une entrée de longueur zéro, cela émettait le premier octet de l'entrée suivante comme contenu de la chaîne courante — un caractère parasite dans le fichier texte exporté, susceptible de décaler l'import si la ligne était retouchée.
+
+## Implémentation du fix
+
+### 1. Handler ONGOTO — `data/base/cartagrahd.py`
+
+```python
+def ONGOTO(ctx):
+    code = ctx.Code()
+    n = code.ParamUint16(0)          # nombre de branches
+    labels = []
+    for i in range(n):
+        offset = code.ParamUint16(1 + i)
+        labels.append(ctx.GotoLabel(offset))
+    ctx.ExportLine(f"ONGOTO ({n}, {', '.join(labels)})")
+    ctx.ChanEIP <- 0
+```
+
+Le handler lit le compte N puis les N offsets, et les transforme en `{goto label_NNNN}` via `ctx.GotoLabel()`, qui est la même primitive utilisée par `IFN` et `IFY`.
+
+### 2. Multi-goto dans model.go / script.go
+
+**`script/model.go`** — `JumpParam` passe de `Target int` à `Targets []int` pour pouvoir stocker N offsets sur une même ligne.
+
+**`script/script.go`**
+
+Export : le formateur de ligne itère `len(jp.Targets)` fois et émet un token `{goto label_NNNN}` par cible.
+
+Import : le scanner de ligne reconnaît tous les tokens `{goto ...}` présents et recalcule chaque offset cible indépendamment, dans l'ordre :
+
+```go
+for i, label := range jp.Targets {
+    jp.Targets[i] = resolveLabel(label, lineOffsets)
+}
+```
+
+Les offsets sont ensuite réinjectés dans les bytes du paramètre dans le même ordre que lors de l'export.
+
+### 3. Fix chaîne longueur zéro — `game/operator/util.go`
+
+```go
+// AVANT (bugged)
+cursor++           // avance avant vérification
+n := data[cursor]  // lit la longueur
+
+// APRÈS (fixed)
+n := data[cursor]  // lit la longueur d'abord
+if n == 0 {
+    cursor++
+    continue       // entrée vide, pas de contenu à émettre
+}
+cursor++
+```
+
+### Cas de test — régression ligne 46 allongée
+
+Script de test : ligne 46 de SEEN0100, dialogue original remplacé par une version française ~28 octets plus longue (deux tokens ONGOTO : branches A et B).
+
+| Mesure | Avant trad. | Après trad. (fix) | Après trad. (sans fix) |
+|---|---|---|---|
+| Offset branche A | 3730 | 3758 | 3730 (figé) |
+| Offset branche B | 8104 | 8132 | 8104 (figé) |
+| Delta attendu | — | +28 | — |
+
+Avec le fix, les deux offsets sont bien recalculés à +28 octets. Sans le fix, ils restaient aux valeurs pre-traduction.
+
+## Compatibilité
+
+- Aucune signature de fonction publique modifiée.
+- Le format d'export est rétrocompatible pour tous les opcodes autres qu'ONGOTO — les scripts déjà traduits d'autres jeux (AIR, Kanon, LB_EN…) ne sont pas affectés.
+- Les anciens dumps CartagraHD contenant des ONGOTO en entiers bruts **doivent être ré-extraits** avec le plugin corrigé avant tout réimport.
+
+---
+
+# V3.1.8 — Dedicated Vietnamese font GUI patcher + Latin redraw test mode
+
+## Fichiers modifiés
+
+### CLI / core
+- `cmd/root.go` — bump de version CLI vers `2.3.2-yoremi.3.1.8`.
+
+### GUI
+- `SourcesGUI-wails/vietnamese_font.go` — workflow AIR / Planetarian SG intégré dans la GUI, avec mode sûr et mode expérimental de redraw latin.
+- `SourcesGUI-wails/frontend/src/App.svelte` — ajout de la case `Experimental: redraw Latin alphabet from TTF`, passage du nouveau paramètre au backend et libellés `v3.1.8`.
+- `SourcesGUI-wails/frontend/wailsjs/go/main/App.js`
+- `SourcesGUI-wails/frontend/wailsjs/go/main/App.d.ts`
+- `SourcesGUI-wails/main.go`
+- `SourcesGUI-wails/frontend/package.json`
+- `SourcesGUI-wails/frontend/package-lock.json`
+- `SourcesGUI-wails/frontend/package.json.md5`
+- `SourcesGUI-wails/GUI-Windows-README.md`
+- `SourcesGUI-wails/GUI-Linux-README.md`
+
+### Documentation
+- `README.md`
+- `Fork-CHANGELOG.md`
+- `Fork-TECHNICAL.md`
+
+## Contexte
+
+Le patch v3.1.7 injectait uniquement les caractères vietnamiens absents et conservait volontairement les glyphes déjà présents dans le jeu. C'était le choix le plus sûr pour éviter les régressions de menu.
+
+Le retour du testeur vietnamien soulève un vrai problème visuel : une phrase vietnamienne peut mélanger des glyphes latins originaux du jeu avec des glyphes vietnamiens nouvellement dessinés depuis la TTF. Si les deux fontes n'ont pas exactement la même baseline ou le même style, un léger désalignement peut rester perceptible.
+
+## Détail du nouveau mode
+
+La GUI propose maintenant une case expérimentale :
+
+```text
+Experimental: redraw Latin alphabet from TTF
+```
+
+Mode désactivé :
+
+- comportement sûr existant;
+- les glyphes déjà présents restent dans leurs cellules originales;
+- seuls les caractères vietnamiens manquants sont injectés dans les cellules de fin.
+
+Mode activé :
+
+- les caractères `A-Z` et `a-z` déjà mappés sont redessinés dans leurs cellules originales avec la TTF sélectionnée;
+- les caractères vietnamiens du charset demandé qui existaient déjà dans le jeu sont aussi redessinés en place;
+- les caractères vietnamiens manquants sont toujours injectés dans les cellules de fin;
+- les mappings Unicode ne changent pas pour les lettres latines existantes.
+
+## Pourquoi ne pas append un deuxième alphabet latin ?
+
+Ajouter un second `A-Z/a-z` en fin de charset ne garantit pas que le moteur l'utilise. Comme les lettres latines existent déjà dans la table, le moteur continuera très probablement à lire les index originaux.
+
+Le mode expérimental redessine donc les cellules existantes au lieu d'ajouter des doublons. Cela teste l'hypothèse du testeur sans modifier la logique de mapping du moteur.
+
+## Sorties générées
+
+Les sorties expérimentales ajoutent `_LATIN` au nom du dossier :
+
+```text
+FontName_en_GOTHIC1_Y+2
+FontName_en_GOTHIC1_LATIN_Y+2
+```
+
+Cela permet de comparer le mode sûr et le mode expérimental sans écraser les PAK.
+
+## Tests réalisés
+
+- `go test ./... -run '^$'`
+- `go test ./... -run '^$'` depuis `SourcesGUI-wails`
+- `npm run build` depuis `SourcesGUI-wails/frontend`
+- `wails build` depuis `SourcesGUI-wails`
+
+---
+
 # V3.1.7 — AIR Vietnamese font rebuild / compact PAK fix
 
 ## Fichiers modifiés

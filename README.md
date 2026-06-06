@@ -1,4 +1,4 @@
-# LuckSystem 2.3.2 — Yoremi Fork (v3.1.7)
+# LuckSystem 2.3.2 — Yoremi Fork (v3.1.9)
 
 Fork de [LuckSystem](https://github.com/wetor/LuckSystem) avec corrections de bugs, support de nouveaux formats, et interface graphique pour la traduction de visual novels Visual Art's/Key.
 
@@ -14,8 +14,8 @@ ProtoDB / LUCA System — AIR, CLANNAD, Kanon, Little Busters, Summer Pockets, H
 
 ## GUI
 
-A graphical interface is available in a separate repository:
-**[LuckSystem-2.3.2-Yoremi-Update + GUI](https://github.com/yoremi-trad-fr/LuckSystem-2.3.2-Yoremi-Update)** — Built with Wails (Go + Svelte), calls `lucksystem.exe` via subprocess.
+A graphical interface is available in this fork:
+**[LuckSystem-2.3.2-Yoremi-Update + GUI](https://github.com/yoremi-trad-fr/LuckSystem-2.3.2-Yoremi-Update)** — Built with Wails (Go + Svelte). Most workflows call `lucksystem.exe` via subprocess; the AIR / Planetarian SG Vietnamese font patcher is embedded directly in the GUI.
 
 ### GUI Features
 - **Game presets** / Auto-detect available games from data/ folder (OPCODE + plugin auto-fill)
@@ -24,6 +24,7 @@ A graphical interface is available in a separate repository:
 - Script Decompile / Compile
 - PAK Extract / Replace (CG and Font workflows separated)
 - Font Extract / Edit (append, insert, redraw modes)
+- Vietnamese Font Patch for AIR / Planetarian SG (slot/family selectors, TTF/OTF selection, Y-offset test folders, optional Latin redraw test mode)
 - Image Export / Import (single file + batch folder mode)
 - Real-time console output
 - **Stop button** to cancel any running operation
@@ -42,13 +43,32 @@ A Linux version is available as separate binaries (GUI + CLI). See the releases 
 
 ## Patches
 
-### Version 3.1.7 — *(latest)*
+### Version 3.1.9 — *(latest)*
+
+26. **CartagraHD ONGOTO fix + multi-goto support + zero-length string dump fix** — `data/base/cartagrahd.py`, `script/model.go`, `script/script.go`, `game/operator/util.go`
+    - `cartagrahd.py`: added `ONGOTO` handler that reads N branch targets and emits them as `{goto label_NNNN}` references instead of falling through to `UNDEFINED()` with raw uint16 dumps.
+    - `script/model.go`: extended `JumpParam` to hold a slice of targets per line, enabling a single script line to carry N `{goto ...}` tokens.
+    - `script/script.go`: updated `Export()` and `Import()` to iterate over all targets on a line; `Import()` recalculates each branch offset independently so all N ONGOTO branches are correctly repointed after line-size changes.
+    - `game/operator/util.go`: fixed zero-length string edge case — a zero-length entry no longer emits a spurious character before the closing delimiter.
+    - Existing CartagraHD dumps containing raw ONGOTO integers must be re-extracted with the corrected plugin before reimport.
+
+### Version 3.1.8
+
+25. **Dedicated AIR / Planetarian SG Vietnamese font GUI patcher + Latin redraw test mode** — `SourcesGUI-wails/vietnamese_font.go`, `SourcesGUI-wails/frontend/src/App.svelte`, `SourcesGUI-wails/frontend/wailsjs/go/main/App.js`, `SourcesGUI-wails/frontend/wailsjs/go/main/App.d.ts`
+    - Adds `VIET FONT -> AIR / SG Patch`, a beginner-safe GUI workflow for generating Vietnamese font PAKs from the original game `files` folder.
+    - Embeds the corrected Vietnamese font patch logic directly in the GUI so users do not need separate `vietnamesefont.exe` / `vietfontpatch.exe` helpers.
+    - Supports slot selection (`English`, `Chinese`, `All`), family selection (`GOTHIC1` quick test or all families), TTF/OTF selection, and Y-offset checkboxes from `Y-2` to `Y+3`.
+    - Adds an experimental checkbox: `Redraw Latin alphabet from TTF`. This redraws existing `A-Z/a-z` cells and already-present Vietnamese glyphs from the selected TTF while still injecting only missing Vietnamese glyphs into the tail cells.
+    - Generates a separate output folder for the experimental mode with `_LATIN` in the folder name, so safe and Latin-redraw tests cannot overwrite each other.
+    - GUI and CLI version labels updated to `v3.1.8`.
+
+### Version 3.1.7
 
 24. **AIR Vietnamese font workflow fix** — `font/info.go`, `font/font.go`, `czimage/cz2.go`, `czimage/util.go`, `pak/pak.go`, `tools/fontdiag`, `tools/vietfontpatch`
     - Preserves AIR's legacy `CharNum=100 + CharNum2` font-info layout when writing edited font tables.
     - Keeps original CZ2 atlas dimensions during partial charset replacement and preserves original CZ2 raw block boundaries whenever possible.
     - Forces compact PAK rebuilds for rewritten font families and truncates rebuilt PAKs to the aligned real end, avoiding internal gaps and stale copied tails that caused AIR startup failures.
-     - (Not included here, only on my repository)-Adds diagnostic and Vietnamese font patch helper tools; `vietfontpatch` can patch only selected slots/families (`-slot en`, `-family GOTHIC1`) and adjust injected glyph vertical metrics (`-yoffset`, AIR English slot validated with `Y+2`).
+    - Adds diagnostic and Vietnamese font patch helper tools; `vietfontpatch` can patch only selected slots/families (`-slot en`, `-family GOTHIC1`) and adjust injected glyph vertical metrics (`-yoffset`, AIR English slot validated with `Y+2`).
     - Keeps already-present Vietnamese characters mapped to their original glyphs and injects only missing characters, preventing regressions on existing accented glyphs.
     - Minor Go vet cleanup in `game/runtime/global_goto.go`.
     - GUI source version labels updated to `v3.1.7` and stale duplicate frontend Go file removed; no GUI workflow regression expected because the GUI still calls the CLI as a subprocess.
@@ -175,6 +195,8 @@ Patch 2 : silent 18-bit truncation in `compressLZW2`
 | [Fork-CHANGELOG.md](Fork-CHANGELOG.md) | Full changelog — all versions (EN + FR) |
 | [Fork-TECHNICAL.md](Fork-TECHNICAL.md) | Technical analysis — all patches |
 | [AIR_VIETNAMESE_FONT_GUI_GUIDE.md](AIR_VIETNAMESE_FONT_GUI_GUIDE.md) | Practical GUI procedure for AIR Vietnamese font tests |
+| [AIR_VIETNAMESE_FONT_WINDOWS_TECHNICAL_GUIDE.md](AIR_VIETNAMESE_FONT_WINDOWS_TECHNICAL_GUIDE.md) | Windows technical procedure for TTF/Y-offset tests and tool builds |
+| [VIETNAMESE_FONT_PATCH_GUI_BEGINNER_GUIDE.md](VIETNAMESE_FONT_PATCH_GUI_BEGINNER_GUIDE.md) | Beginner guide for the dedicated Vietnamese font GUI patcher |
 | `LuckSystem --help` | CLI command reference |
 
 ---
@@ -202,7 +224,7 @@ lucksystem font edit -s 明朝32 -S info32 -f Arial.ttf -o 明朝32_out -O info3
 
 ## Tested games / Jeux testés
 
-- **AIR** (Steam) — French translation complete (scripts + CG + UI); Vietnamese font injection validated on English slot with `FONT_GOTHIC1` / `Y+2`
+- **AIR** (Steam) — French translation complete (scripts + CG + UI); Vietnamese font injection validated on English slot with `FONT_GOTHIC1` / `Y+2`; optional Latin-redraw test mode available in the dedicated GUI patcher
 - **Summer Pockets** — RawSize fix confirmed
 - **Kanon** (Steam) — CZ2 font fix confirmed; script decompile confirmed (plugin import fix v3.1.4)
 - **Little Busters English** — CZ4 confirmed, script decompile confirmed (161 scripts, 102k+ MESSAGE lines, text properly decoded)
@@ -214,7 +236,7 @@ lucksystem font edit -s 明朝32 -S info32 -f Arial.ttf -o 明朝32_out -O info3
 - **[wetor](https://github.com/wetor)** — LuckSystem original
 - **masagrator** — RawSize bug identification (CZ3 layers)
 - **[G2-Games](https://github.com/G2-Games)** — CZ4 reference ([lbee-utils](https://github.com/G2-Games/lbee-utils))
-- **Yoremi** — patches 1-24, AIR French translation, GUI
+- **Yoremi** — patches 1-25, AIR French translation, GUI
 --------------------
 # Important
 This project only accepts **bug issues** and **pull requests**, and does not provide assistance in use  
