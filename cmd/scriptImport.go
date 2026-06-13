@@ -24,13 +24,14 @@ var scriptImportCmd = &cobra.Command{
 		game.ScriptBlackList = append(game.ScriptBlackList, strings.Split(ScriptBlackList, ",")...)
 
 		// PATCH YOREMI: Resolve game name from --game flag or auto-detect from OPCODE path.
-		// Same logic as scriptDecompile.go — ensures MESSAGE/SELECT/BATTLE opcodes
+		// Same logic as scriptDecompile.go — ensures MESSAGE/LOG_BEGIN/SELECT opcodes
 		// are properly re-encoded during import (not treated as raw uint16).
 		gameName := resolveGameName()
+		pluginFile := resolvePluginFile()
 
 		g := game.NewGame(&game.GameOptions{
 			GameName:   gameName,
-			PluginFile: ScriptPlugin,
+			PluginFile: pluginFile,
 			OpcodeFile: ScriptOpcode,
 			Coding:     charset.Charset(Charset),
 			Mode:       enum.VMRunImport,
