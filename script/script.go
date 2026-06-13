@@ -501,10 +501,6 @@ func CodeString(w io.Writer, data string, hasLen bool, coding charset.Charset) i
 	}
 	buf := []byte(dst)
 	size := len(buf)
-	if hasLen && size == 0 {
-		binary.Write(w, binary.LittleEndian, uint16(0))
-		return 2
-	}
 	if hasLen {
 		writeSize := uint16(0)
 		switch coding {
