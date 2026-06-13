@@ -1,3 +1,183 @@
+# V3.20 — Auto-sélection du plugin script + durcissement LOG_BEGIN + fix AIR chaîne vide
+
+## Fichiers modifiés
+
+### CLI
+- `cmd/scriptDecompile.go` — ajout de `resolvePluginFile()`, appelée avant `game.NewGame()`.
+- `cmd/scriptImport.go` — même auto-sélection en mode import/repack.
+- `cmd/root.go` — bump de version CLI vers `2.3.2-yoremi.3.20`.
+- `game/operator/util.go` — lecture correcte d'une `lstring` vide quand le terminateur est présent.
+- `game/operator/util_test.go` — test du cas AIR `00 00 00`.
+- `script/script.go` — réécriture du terminateur sur les `lstring` vides.
+- `script/script_test.go` — test de round-trip writer pour une `lstring` UTF-8 vide.
+
+### GUI
+- `SourcesGUI-wails/app.go` — reconnaissance d'opcodes Dialogue plus stricte et compatible `labelN:` / `globalN:`.
+- `SourcesGUI-wails/app_dialogue_test.go` — test ciblé d'extraction/import `LOG_BEGIN`.
+- `SourcesGUI-wails/frontend/package.json` — scripts npm robustes sous Linux (`node .../vite.js` au lieu du shim `.bin/vite`).
+- `SourcesGUI-wails/frontend/package-lock.json` — version frontend `3.20`.
+- `SourcesGUI-wails/frontend/package.json.md5` — empreinte mise à jour.
+- `SourcesGUI-wails/frontend/src/App.svelte` — libellés `v3.20`, aide Dialogue mise à jour pour `MESSAGE`, `LOG_BEGIN`, `SELECT`.
+- `SourcesGUI-wails/main.go` — titre de fenêtre `v3.20`.
+- `SourcesGUI-wails/GUI-Windows-README.md`
+- `SourcesGUI-wails/GUI-Linux-README.md`
+
+### Documentation
+- `README.md`
+- `Fork-CHANGELOG.md`
+- `Fork-TECHNICAL.md`
+
+## Contexte
+
+Un utilisateur Discord a signalé que les lignes `LOG_BEGIN` ne semblaient pas être prises en compte après repack CartagraHD. Le dossier fourni contenait :
+
+- le `SCRIPT.PAK` original;
+- un dossier `06_READY-TO-PACK` avec les scripts déjà modifiés;
+- deux captures montrant la ligne japonaise originale et la ligne anglaise prête à repacker.
+
+La ligne incriminée était bien présente dans le `.txt` prêt à importer :
+
+```text
+LOG_BEGIN ("The roar of water fills my ears.")
+```
+
+Le premier diagnostic important : l'extraction/import GUI des TSV n'était pas la cause directe. Les fichiers prêts à packer avaient déjà reçu la traduction.
+
+## Diagnostic
+
+Le round-trip réel a été reproduit avec le dossier fourni :
+
+```text
+go run . script import -s SCRIPT.PAK -O data\CartagraHD.txt -p data\CartagraHD.py -g CartagraHD -i 06_READY-TO-PACK -o SCRIPT_repacked.PAK
+go run . script decompile -s SCRIPT_repacked.PAK -O data\CartagraHD.txt -p data\CartagraHD.py -g CartagraHD -o redecoded
+```
+
+Après redécompilation, `0000-op0_HD.txt:144` contenait toujours :
+
+```text
+LOG_BEGIN ("The roar of water fills my ears.")
+```
+
+Conclusion : pas de bug moteur confirmé sur `LOG_BEGIN` quand le plugin CartagraHD est chargé.
+
+Le risque réel est une mauvaise manipulation utilisateur : sélectionner l'OPCODE `CartagraHD.txt`, mais oublier le plugin `CartagraHD.py`. Dans ce cas, la VM tombe sur le fallback générique. Le texte peut sembler correctement présent dans les `.txt`, mais le repack n'utilise pas le parseur spécifique au jeu pour réencoder les opcodes texte.
+
+## Implémentation du garde-fou CLI
+
+Ajout de `resolvePluginFile()` dans `cmd/scriptDecompile.go`, réutilisé par `script import`.
+
+Règles :
+
+| OPCODE sélectionné | Plugin auto-sélectionné |
+|---|---|
+| `data/CartagraHD.txt` | `data/CartagraHD.py` |
+| `data/LB_EN/OPCODE.txt` | `data/LB_EN.py` si présent |
+| Plugin déjà fourni via `-p` | aucun override |
+| Aucun plugin frère trouvé | comportement existant conservé |
+
+La CLI affiche l'auto-sélection :
+
+```text
+[INFO] Auto-selected plugin: data\CartagraHD.py
+```
+
+Cette logique protège les workflows GUI aussi, car la GUI appelle toujours la CLI en subprocess.
+
+## Durcissement GUI Dialogue
+
+La détection précédente utilisait des `strings.HasPrefix()` directs après retrait d'un préfixe `labelN:` simple.
+
+Deux limites ont été corrigées :
+
+1. `globalN:` n'était pas retiré, donc une ligne `global2: LOG_BEGIN (...)` pouvait être ignorée par l'extracteur Dialogue.
+2. `MESSAGE_CLEAR`, `MESSAGE_WAIT`, etc. commençaient par `MESSAGE` et pouvaient être comptés comme lignes de dialogue alors qu'ils ne contiennent pas de texte traduisible.
+
+La nouvelle détection :
+
+- retire en boucle les préfixes `labelN:` et `globalN:`;
+- reconnaît seulement les opcodes exacts `MESSAGE`, `LOG_BEGIN`, `SELECT`;
+- exige que le nom d'opcode soit suivi d'un espace, d'une tabulation, d'une parenthèse ou de la fin de ligne.
+
+## Test ajouté
+
+`SourcesGUI-wails/app_dialogue_test.go` vérifie :
+
+- extraction de `LOG_BEGIN` normal;
+- extraction de `label1: LOG_BEGIN`;
+- extraction de `global2: LOG_BEGIN`;
+- extraction de `global3: label4: LOG_BEGIN`;
+- non-extraction de `MESSAGE_CLEAR` et `MESSAGE_WAIT`;
+- réimport de la colonne cible sur les cinq lignes traduisibles (`LOG_BEGIN`, `MESSAGE`, `SELECT`).
+
+## Fix build Linux GUI
+
+Sous Ubuntu, `wails build -tags webkit2_41` peut échouer pendant l'étape frontend avec :
+
+```text
+> frontend@3.1.8 build
+> vite build
+
+sh: 1: vite: Permission denied
+```
+
+Ce cas arrive quand le shim `node_modules/.bin/vite` existe mais n'a pas le bit exécutable, souvent après copie/extraction d'un dossier `node_modules` depuis Windows ou depuis une archive qui ne préserve pas les permissions Unix.
+
+Le script npm ne lance plus `vite` directement :
+
+```json
+"build": "node ./node_modules/vite/bin/vite.js build"
+```
+
+Même logique pour `dev` et `preview`. Node ouvre le fichier JavaScript de Vite lui-même, donc le build ne dépend plus du mode exécutable du shim `.bin`.
+
+## Fix extraction AIR : `lstring` UTF-8 vide
+
+Le PAK AIR Steam fourni reproduisait un crash en décompilation :
+
+```text
+panic: [seen203] line 6498 (MESSAGE): runtime error: slice bounds out of range
+```
+
+La ligne `seen203` contient un `MESSAGE` avec :
+
+- une chaîne japonaise UTF-16 valide;
+- une chaîne UTF-8 vide;
+- une chaîne chinoise UTF-16 juste après.
+
+Dans ce fichier, la chaîne UTF-8 vide est encodée `00 00 00` : longueur zéro, puis terminateur `00`. L'ancien lecteur avançait seulement de 2 octets sur une `lstring` vide. Le terminateur restait donc dans le flux, et la lecture suivante interprétait les deux mauvais octets comme longueur UTF-16, ce qui produisait une taille impossible et le panic.
+
+Correction :
+
+- `GetParam()` avance maintenant aussi sur le terminateur présent pour les `lstring` vides (`UTF-8`/`ShiftJIS` : `00`, `Unicode` : `00 00`).
+- `CodeString()` réécrit ce terminateur pour les `lstring` vides, afin que l'import conserve le format attendu par AIR.
+
+## Validation
+
+- `go test ./... -count=1` depuis `SourcesGUI-wails` : OK.
+- `go test ./cmd ./script` : OK.
+- `go test ./cmd ./game/operator ./script` : OK.
+- `go test ./... -run "TestGetParamEmptyUTF8LStringConsumesTerminator|TestCodeStringEmptyUTF8LStringWritesTerminator"` : OK.
+- `go test ./... -run '^$'` depuis la racine : OK.
+- `npm run build` depuis `SourcesGUI-wails/frontend` : OK.
+- Repack du cas Discord sans `-p` :
+
+```text
+[INFO] Auto-selected plugin: data\CartagraHD.py
+```
+
+- Redécompilation du PAK repacké : `LOG_BEGIN ("The roar of water fills my ears.")` conservé à la ligne attendue.
+- Décompilation du PAK AIR Steam original avec `data\AIR.py` : OK, y compris `seen203`.
+- Import des scripts AIR exportés puis redécompilation du PAK reconstruit : OK.
+
+## Compatibilité
+
+- Aucun changement de format `.txt` ou TSV.
+- Aucun changement de signature publique.
+- Si l'utilisateur fournit explicitement `-p`, ce choix reste prioritaire.
+- Si aucun plugin frère n'existe, le fallback existant reste inchangé.
+
+---
+
 # V3.1.9 — CartagraHD ONGOTO fix + multi-goto support + zero-length string dump fix
 
 ## Fichiers modifiés

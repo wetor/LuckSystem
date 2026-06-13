@@ -1,4 +1,4 @@
-# LuckSystem 2.3.2 — Yoremi Fork (v3.1.9)
+# LuckSystem 2.3.2 — Yoremi Fork (v3.20)
 
 Fork de [LuckSystem](https://github.com/wetor/LuckSystem) avec corrections de bugs, support de nouveaux formats, et interface graphique pour la traduction de visual novels Visual Art's/Key.
 
@@ -43,7 +43,18 @@ A Linux version is available as separate binaries (GUI + CLI). See the releases 
 
 ## Patches
 
-### Version 3.1.9 — *(latest)*
+### Version 3.20 — *(latest)*
+
+27. **Script plugin auto-selection + Dialogue GUI LOG_BEGIN hardening + Linux GUI build fix + AIR empty string fix** — `cmd/scriptDecompile.go`, `cmd/scriptImport.go`, `SourcesGUI-wails/app.go`, `SourcesGUI-wails/frontend/package.json`, `game/operator/util.go`, `script/script.go`
+    - CLI: when an OPCODE file is selected but `-p` is omitted, LuckSystem now auto-selects the sibling Python plugin from the standard `data/GAME.txt` / `data/GAME.py` or `data/GAME/OPCODE.txt` / `data/GAME.py` layout.
+    - This prevents user-side repack mistakes where CartagraHD `LOG_BEGIN` lines were present in the edited `.txt` files but could be ignored during binary import because the game plugin was not loaded.
+    - GUI dialogue extract/import now recognizes `LOG_BEGIN` behind `labelN:` and `globalN:` prefixes and avoids treating non-dialogue opcodes such as `MESSAGE_CLEAR` / `MESSAGE_WAIT` as translatable `MESSAGE` lines.
+    - The reported CartagraHD Discord case was verified as a workflow/configuration issue rather than a confirmed engine import bug: repack + redecompile preserves `LOG_BEGIN ("The roar of water fills my ears.")` when the CartagraHD plugin is loaded.
+    - Linux GUI builds no longer depend on the executable bit of `node_modules/.bin/vite`; npm scripts now invoke Vite through `node ./node_modules/vite/bin/vite.js`.
+    - AIR script decompile/import now handles empty UTF-8 length-prefixed strings encoded as `00 00 00`, fixing the `seen203` slice-bounds crash while preserving the terminator on repack.
+    - GUI and CLI version labels updated to `v3.20`.
+
+### Version 3.1.9
 
 26. **CartagraHD ONGOTO fix + multi-goto support + zero-length string dump fix** — `data/base/cartagrahd.py`, `script/model.go`, `script/script.go`, `game/operator/util.go`
     - `cartagrahd.py`: added `ONGOTO` handler that reads N branch targets and emits them as `{goto label_NNNN}` references instead of falling through to `UNDEFINED()` with raw uint16 dumps.
