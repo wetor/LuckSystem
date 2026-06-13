@@ -1,3 +1,67 @@
+# V3.20 — Script plugin auto-selection + Dialogue GUI LOG_BEGIN hardening + AIR empty string fix
+
+13/06/2026
+
+## Added: safer script decompile/import when a plugin is omitted
+
+### Context
+
+A CartagraHD tester reported that translated `LOG_BEGIN` lines appeared in the decompiled `.txt` scripts but did not seem to apply after repacking. The supplied case showed that the edited scripts already contained the English `LOG_BEGIN` text, including the first visible line:
+
+```text
+LOG_BEGIN ("The roar of water fills my ears.")
+```
+
+Round-trip testing confirmed that `LOG_BEGIN` imports correctly when the CartagraHD plugin is loaded. The issue was therefore not a confirmed engine import bug; the likely failure mode was repacking with the OPCODE file but without the matching Python plugin, causing the generic fallback parser to be used.
+
+### Fix / hardening
+
+**CLI**
+
+- `script decompile` and `script import` now auto-select a sibling Python plugin when `-O` points to a standard repository layout and `-p` was left empty:
+  - `data/GAME.txt` -> `data/GAME.py`
+  - `data/GAME/OPCODE.txt` -> `data/GAME.py`
+- This keeps plugin-backed opcodes such as `MESSAGE`, `LOG_BEGIN`, and `SELECT` on the proper game-specific import/export path even if the user forgets to browse the plugin manually.
+- The CLI prints an explicit info line, for example:
+
+```text
+[INFO] Auto-selected plugin: data\CartagraHD.py
+```
+
+**GUI**
+
+- Dialogue extract/import opcode detection is now stricter:
+  - accepts `LOG_BEGIN` behind `labelN:` and `globalN:` prefixes;
+  - avoids treating `MESSAGE_CLEAR`, `MESSAGE_WAIT`, and similar non-dialogue opcodes as `MESSAGE`;
+  - keeps `MESSAGE`, `LOG_BEGIN`, and `SELECT` handling aligned between backend code and visible GUI help text.
+- Added a focused GUI backend test covering extraction and import of normal, labelled, and global-labelled `LOG_BEGIN` lines.
+- Frontend npm scripts now invoke Vite through `node ./node_modules/vite/bin/vite.js` instead of executing the `.bin/vite` shim directly. This avoids `sh: 1: vite: Permission denied` on Linux builds when `node_modules/.bin/vite` lost its executable bit.
+- Updated CLI and GUI version labels to `v3.20`.
+
+**AIR**
+
+- AIR `MESSAGE` lines with an empty UTF-8 translated string now decompile correctly. Some AIR Steam scripts encode that field as `00 00 00` (zero length plus string terminator); the reader now consumes the terminator and the writer preserves it during import.
+- Fixes the `seen203` panic: `runtime error: slice bounds out of range` during AIR script extraction.
+
+### Testing
+
+- `go test ./... -count=1` from `SourcesGUI-wails`: OK.
+- `go test ./cmd ./script`: OK.
+- `go test ./cmd ./game/operator ./script`: OK.
+- `go test ./... -run '^$'`: OK.
+- `npm run build` from `SourcesGUI-wails/frontend`: OK.
+- Repacked the supplied CartagraHD case without passing `-p`; auto-selection picked `data\CartagraHD.py`.
+- Redecoded the resulting PAK and confirmed `0000-op0_HD.txt:144` still contains:
+
+```text
+LOG_BEGIN ("The roar of water fills my ears.")
+```
+
+- Decompile of the supplied AIR Steam `BAK-SCRIPT.PAK` with `data\AIR.py`: OK, including `seen203`.
+- Import of the exported AIR scripts followed by redecompile of the rebuilt PAK: OK.
+
+---
+
 # V3.1.9 — CartagraHD ONGOTO fix + multi-goto support + zero-length string dump fix
 
 06/06/2026
@@ -842,6 +906,61 @@ The AIR.py definition script used `from base.air import *` to import functions f
 - **Yoremi** — all patches, AIR French translation, GUI
 
 ---
+---
+
+# V3.20 — Auto-sélection du plugin script + durcissement LOG_BEGIN dans la GUI Dialogue
+
+13/06/2026
+
+## Ajout : décompilation/import plus sûrs quand le plugin est oublié
+
+### Contexte
+
+Un testeur CartagraHD a signalé que des lignes `LOG_BEGIN` traduites semblaient ne pas s'appliquer après repack. Le dossier fourni montrait pourtant que les `.txt` prêts à repacker contenaient déjà le texte anglais, dont la toute première ligne visible :
+
+```text
+LOG_BEGIN ("The roar of water fills my ears.")
+```
+
+Les tests de round-trip ont confirmé que `LOG_BEGIN` est bien importé quand le plugin CartagraHD est chargé. Ce n'était donc pas un bug moteur confirmé ; le cas le plus probable était une mauvaise manipulation : repack avec l'OPCODE, mais sans le plugin Python correspondant, ce qui faisait tomber l'outil sur le parser générique.
+
+### Fix / garde-fou
+
+**CLI**
+
+- `script decompile` et `script import` auto-sélectionnent maintenant le plugin Python frère quand `-O` pointe vers une arborescence standard et que `-p` est vide :
+  - `data/GAME.txt` -> `data/GAME.py`
+  - `data/GAME/OPCODE.txt` -> `data/GAME.py`
+- Les opcodes dépendants du plugin, comme `MESSAGE`, `LOG_BEGIN` et `SELECT`, restent donc sur le chemin d'import/export spécifique au jeu même si l'utilisateur oublie de sélectionner manuellement le plugin.
+- La CLI affiche une ligne explicite, par exemple :
+
+```text
+[INFO] Auto-selected plugin: data\CartagraHD.py
+```
+
+**GUI**
+
+- La détection des lignes Dialogue est plus stricte :
+  - accepte `LOG_BEGIN` derrière les préfixes `labelN:` et `globalN:`;
+  - ne confond plus `MESSAGE_CLEAR`, `MESSAGE_WAIT` et les opcodes similaires avec de vrais `MESSAGE`;
+  - aligne l'aide visible de la GUI avec le backend : `MESSAGE`, `LOG_BEGIN` et `SELECT`.
+- Ajout d'un test backend GUI ciblé couvrant extraction et import de `LOG_BEGIN` normal, labellisé et global-labellisé.
+- Les scripts npm frontend lancent maintenant Vite via `node ./node_modules/vite/bin/vite.js` au lieu d'exécuter directement le shim `.bin/vite`. Cela évite `sh: 1: vite: Permission denied` lors des builds Linux si `node_modules/.bin/vite` a perdu son bit exécutable.
+- Passage des libellés CLI et GUI en `v3.20`.
+
+### Tests réalisés
+
+- `go test ./... -count=1` depuis `SourcesGUI-wails` : OK.
+- `go test ./cmd ./script` : OK.
+- `go test ./... -run '^$'` : OK.
+- `npm run build` depuis `SourcesGUI-wails/frontend` : OK.
+- Repack du cas CartagraHD fourni sans passer `-p`; auto-sélection de `data\CartagraHD.py`.
+- Redécompilation du PAK obtenu : `0000-op0_HD.txt:144` contient bien :
+
+```text
+LOG_BEGIN ("The roar of water fills my ears.")
+```
+
 ---
 
 # V3.1.9 — Correction ONGOTO CartagraHD + support multi-goto + fix dump chaîne longueur zéro

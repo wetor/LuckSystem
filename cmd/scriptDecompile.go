@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -70,6 +71,38 @@ func resolveGameName() string {
 	return "Custom"
 }
 
+// resolvePluginFile auto-selects the Python plugin that follows the repository
+// data layout when the user selected an OPCODE file but left -p empty.
+func resolvePluginFile() string {
+	if ScriptPlugin != "" || ScriptOpcode == "" {
+		return ScriptPlugin
+	}
+
+	opcodeBase := filepath.Base(ScriptOpcode)
+	opcodeDir := filepath.Dir(ScriptOpcode)
+	var gameName string
+	var pluginDir string
+
+	if strings.EqualFold(opcodeBase, "OPCODE.txt") {
+		gameName = filepath.Base(opcodeDir)
+		pluginDir = filepath.Dir(opcodeDir)
+	} else if strings.EqualFold(filepath.Ext(opcodeBase), ".txt") {
+		gameName = strings.TrimSuffix(opcodeBase, filepath.Ext(opcodeBase))
+		pluginDir = opcodeDir
+	}
+
+	if gameName == "" || pluginDir == "" {
+		return ScriptPlugin
+	}
+
+	candidate := filepath.Join(pluginDir, gameName+".py")
+	if _, err := os.Stat(candidate); err == nil {
+		fmt.Printf("[INFO] Auto-selected plugin: %s\n", candidate)
+		return candidate
+	}
+	return ScriptPlugin
+}
+
 // scriptDecompileCmd represents the scriptDecompileCmd command
 var scriptDecompileCmd = &cobra.Command{
 	Use:   "decompile",
@@ -80,13 +113,14 @@ var scriptDecompileCmd = &cobra.Command{
 		game.ScriptBlackList = append(game.ScriptBlackList, strings.Split(ScriptBlackList, ",")...)
 
 		// PATCH YOREMI: Resolve game name from --game flag or auto-detect from OPCODE path.
-		// This ensures MESSAGE/SELECT/BATTLE opcodes are properly decoded as text
+		// This ensures MESSAGE/LOG_BEGIN/SELECT opcodes are properly decoded as text
 		// instead of raw uint16 codepoints via the generic fallback.
 		gameName := resolveGameName()
+		pluginFile := resolvePluginFile()
 
 		g := game.NewGame(&game.GameOptions{
 			GameName:   gameName,
-			PluginFile: ScriptPlugin,
+			PluginFile: pluginFile,
 			OpcodeFile: ScriptOpcode,
 			Coding:     charset.Charset(Charset),
 			Mode:       enum.VMRunExport,
