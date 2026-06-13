@@ -147,7 +147,22 @@ func GetParam(codeBytes []byte, data ...interface{}) int {
 		l := int(ToUint16(codeBytes[start : start+2]))
 		if l == 0 {
 			*value = lstring("")
-			return start + 2
+			next := start + 2
+			switch coding {
+			case charset.ShiftJIS:
+				fallthrough
+			case charset.UTF_8:
+				if next < len(codeBytes) && codeBytes[next] == 0 {
+					next++
+				}
+			case charset.Unicode:
+				fallthrough
+			default:
+				if next+1 < len(codeBytes) && codeBytes[next] == 0 && codeBytes[next+1] == 0 {
+					next += 2
+				}
+			}
+			return next
 		}
 		switch coding {
 		case charset.Unicode, charset.ShiftJIS:
