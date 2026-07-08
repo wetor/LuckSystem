@@ -10,22 +10,27 @@ import (
 )
 
 // Cz4Image
-//  Description CZ4 format: LZW-compressed with separated RGB/Alpha channels
-//  and per-channel delta line encoding.
-//  Same header structure as CZ3, same LZW compression, but pixels are stored
-//  as [RGB: w*h*3 bytes][Alpha: w*h bytes] instead of interleaved RGBA.
+//
+//	Description CZ4 format: LZW-compressed with separated RGB/Alpha channels
+//	and per-channel delta line encoding.
+//	Same header structure as CZ3, same LZW compression, but pixels are stored
+//	as [RGB: w*h*3 bytes][Alpha: w*h bytes] instead of interleaved RGBA.
 type Cz4Image struct {
 	CzHeader
 	Cz3Header // CZ4 uses the same extended header as CZ3
+
+	// ExtraHeader preserves bytes between the fixed CZ4 header and HeaderLength.
+	ExtraHeader []byte
+
 	CzData
 }
 
 // Load
-//  Description Load CZ4 image data
-//  Receiver cz *Cz4Image
-//  Param header CzHeader
-//  Param data []byte
 //
+//	Description Load CZ4 image data
+//	Receiver cz *Cz4Image
+//	Param header CzHeader
+//	Param data []byte
 func (cz *Cz4Image) Load(header CzHeader, data []byte) {
 	cz.CzHeader = header
 	cz.Raw = data
@@ -33,14 +38,15 @@ func (cz *Cz4Image) Load(header CzHeader, data []byte) {
 	if err != nil {
 		panic(err)
 	}
+	cz.ExtraHeader = preserveExtraHeader(cz.Raw, cz.HeaderLength, fixedCzSubHeaderLength)
 	glog.V(6).Infoln("cz4 header ", cz.Cz3Header)
 	cz.OutputInfo = GetOutputInfo(cz.Raw[int(cz.HeaderLength):])
 }
 
 // decompress
-//  Description Decompress and decode CZ4 data
-//  Receiver cz *Cz4Image
 //
+//	Description Decompress and decode CZ4 data
+//	Receiver cz *Cz4Image
 func (cz *Cz4Image) decompress() {
 	buf := Decompress(cz.Raw[int(cz.HeaderLength)+cz.OutputInfo.Offset:], cz.OutputInfo)
 	glog.V(6).Infoln("uncompress size ", len(buf))
@@ -48,10 +54,10 @@ func (cz *Cz4Image) decompress() {
 }
 
 // GetImage
-//  Description Get decoded image
-//  Receiver cz *Cz4Image
-//  Return image.Image
 //
+//	Description Get decoded image
+//	Receiver cz *Cz4Image
+//	Return image.Image
 func (cz *Cz4Image) GetImage() image.Image {
 	if cz.Image == nil {
 		cz.decompress()
@@ -60,11 +66,11 @@ func (cz *Cz4Image) GetImage() image.Image {
 }
 
 // Export
-//  Description Export image as PNG
-//  Receiver cz *Cz4Image
-//  Param w io.Writer
-//  Return error
 //
+//	Description Export image as PNG
+//	Receiver cz *Cz4Image
+//	Param w io.Writer
+//	Return error
 func (cz *Cz4Image) Export(w io.Writer) error {
 	if cz.Image == nil {
 		cz.decompress()
@@ -85,12 +91,12 @@ func (cz *Cz4Image) Export(w io.Writer) error {
 }
 
 // Import
-//  Description Import PNG and encode as CZ4
-//  Receiver cz *Cz4Image
-//  Param r io.Reader
-//  Param fillSize bool
-//  Return error
 //
+//	Description Import PNG and encode as CZ4
+//	Receiver cz *Cz4Image
+//	Param r io.Reader
+//	Param fillSize bool
+//	Return error
 func (cz *Cz4Image) Import(r io.Reader, fillSize bool) error {
 	var err error
 	cz.PngImage, err = png.Decode(r)
@@ -150,11 +156,11 @@ func (cz *Cz4Image) Import(r io.Reader, fillSize bool) error {
 }
 
 // Write
-//  Description Write CZ4 image to output
-//  Receiver cz *Cz4Image
-//  Param w io.Writer
-//  Return error
 //
+//	Description Write CZ4 image to output
+//	Receiver cz *Cz4Image
+//	Param w io.Writer
+//	Return error
 func (cz *Cz4Image) Write(w io.Writer) error {
 	var err error
 	// Force CZ4 magic
@@ -168,7 +174,17 @@ func (cz *Cz4Image) Write(w io.Writer) error {
 	glog.V(0).Infof("Write CZ4: %dx%d, %d blocks, RawSize=%d\n",
 		cz.Width, cz.Heigth, cz.OutputInfo.FileCount, cz.OutputInfo.TotalRawSize)
 
-	err = WriteStruct(w, &cz.CzHeader, &cz.Cz3Header, cz.OutputInfo)
+	err = WriteStruct(w, &cz.CzHeader, &cz.Cz3Header)
+	if err != nil {
+		return err
+	}
+
+	err = writeExtraHeader(w, cz.HeaderLength, fixedCzSubHeaderLength, cz.ExtraHeader)
+	if err != nil {
+		return err
+	}
+
+	err = WriteStruct(w, cz.OutputInfo)
 	if err != nil {
 		return err
 	}
