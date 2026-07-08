@@ -53,6 +53,36 @@ func WriteStruct(writer io.Writer, list ...interface{}) error {
 	return nil
 }
 
+const fixedCzSubHeaderLength = 15 + 13
+
+func preserveExtraHeader(raw []byte, headerLength uint32, fixedLength int) []byte {
+	end := int(headerLength)
+	if end > len(raw) {
+		end = len(raw)
+	}
+	if end <= fixedLength {
+		return nil
+	}
+	return append([]byte(nil), raw[fixedLength:end]...)
+}
+
+func writeExtraHeader(w io.Writer, headerLength uint32, fixedLength int, extra []byte) error {
+	wantExtra := int(headerLength) - fixedLength
+	if wantExtra <= 0 {
+		return nil
+	}
+
+	if len(extra) == wantExtra {
+		_, err := w.Write(extra)
+		return err
+	}
+
+	buf := make([]byte, wantExtra)
+	copy(buf, extra)
+	_, err := w.Write(buf)
+	return err
+}
+
 // Decompress 解压数据
 //
 //	Description
